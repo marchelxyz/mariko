@@ -14,8 +14,7 @@ export default function TelegramAuth() {
 
       try {
         // Получаем initData из Telegram WebApp через SDK
-        // В новой версии SDK initData доступен через WebApp.initDataRaw или window.Telegram.WebApp.initData
-        const initData = (window as any).Telegram?.WebApp?.initData || WebApp.initDataRaw;
+        const initData = WebApp.initData || (window as any).Telegram?.WebApp?.initData;
         if (initData) {
           const response = await api.post('/auth/telegram', { initData });
           if (response.data.success) {
