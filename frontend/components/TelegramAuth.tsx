@@ -1,6 +1,5 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/router';
-import WebApp from '@twa-dev/sdk';
 import { useStore } from '@/store/useStore';
 import api from '@/lib/api';
 
@@ -13,6 +12,9 @@ export default function TelegramAuth() {
       if (typeof window === 'undefined') return;
 
       try {
+        // Динамический импорт SDK только на клиенте
+        const { default: WebApp } = await import('@twa-dev/sdk');
+        
         // Получаем initData из Telegram WebApp через SDK
         const initData = WebApp.initData || (window as any).Telegram?.WebApp?.initData;
         if (initData) {

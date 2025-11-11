@@ -8,6 +8,14 @@ const nextConfig = {
   env: {
     NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000',
   },
+  webpack: (config, { isServer }) => {
+    // Исключаем @twa-dev/sdk из серверной сборки
+    if (isServer) {
+      config.externals = config.externals || [];
+      config.externals.push('@twa-dev/sdk');
+    }
+    return config;
+  },
 }
 
 module.exports = nextConfig
