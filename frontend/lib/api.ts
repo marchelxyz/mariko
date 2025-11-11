@@ -1,0 +1,38 @@
+import axios from 'axios';
+
+const api = axios.create({
+  baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api',
+  headers: {
+    'Content-Type': 'application/json',
+  },
+  timeout: 10000, // 10 секунд таймаут
+});
+
+// Добавляем токен к каждому запросу
+api.interceptors.request.use((config) => {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
+// Обработка ошибок
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response) {
+      // Сервер ответил с ошибкой
+      console.error('API Error:', error.response.status, error.response.data);
+    } else if (error.request) {
+      // Запрос был отправлен, но ответа не получено
+      console.error('API Request Error: No response received');
+    } else {
+      // Ошибка при настройке запроса
+      console.error('API Error:', error.message);
+    }
+    return Promise.reject(error);
+  }
+);
+
+export default api;
