@@ -30,7 +30,7 @@ const getDatabaseConfig = () => {
 const dbConfig = getDatabaseConfig();
 
 export const AppDataSource = new DataSource({
-  type: 'postgres',
+  type: 'postgres' as const,
   ...dbConfig,
   entities: [User, Restaurant, MenuItem, Banner],
   synchronize: process.env.NODE_ENV !== 'production',
