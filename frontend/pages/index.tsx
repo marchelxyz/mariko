@@ -1,5 +1,4 @@
 import { useEffect } from 'react';
-import { useRouter } from 'next/router';
 import { useStore } from '@/store/useStore';
 import Layout from '@/components/Layout';
 import Header from '@/components/Header';
@@ -8,12 +7,12 @@ import Banners from '@/components/Banners';
 import MenuPreview from '@/components/MenuPreview';
 
 export default function Home() {
-  const router = useRouter();
-  const { selectedRestaurant, restaurants, fetchRestaurants } = useStore();
+  const { selectedRestaurant, fetchRestaurants } = useStore();
 
   useEffect(() => {
     fetchRestaurants();
-  }, [fetchRestaurants]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <Layout>

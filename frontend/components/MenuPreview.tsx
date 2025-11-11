@@ -20,26 +20,49 @@ export default function MenuPreview({ restaurantId }: MenuPreviewProps) {
   const { selectedRestaurant } = useStore();
   const router = useRouter();
   const [menuItems, setMenuItems] = useState<Record<string, MenuItem[]>>({});
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
+    // Пропускаем запрос на сервере
+    if (typeof window === 'undefined') return;
     if (!restaurantId) return;
 
     const fetchMenu = async () => {
+      setIsLoading(true);
       try {
         const response = await api.get(`/menu/${restaurantId}`);
         setMenuItems(response.data.data || {});
       } catch (error) {
         console.error('Failed to fetch menu:', error);
+        // Не показываем ошибку пользователю
+      } finally {
+        setIsLoading(false);
       }
     };
 
     fetchMenu();
   }, [restaurantId]);
 
-  if (Object.keys(menuItems).length === 0) {
+  if (!restaurantId) {
     return (
       <div className="bg-white rounded-lg shadow-sm p-6 text-center">
         <p className="text-text-primary">Выберите ресторан для просмотра меню</p>
+      </div>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <div className="bg-white rounded-lg shadow-sm p-6 text-center">
+        <p className="text-text-primary">Загрузка меню...</p>
+      </div>
+    );
+  }
+
+  if (Object.keys(menuItems).length === 0) {
+    return (
+      <div className="bg-white rounded-lg shadow-sm p-6 text-center">
+        <p className="text-text-primary">Меню пока пусто</p>
       </div>
     );
   }
