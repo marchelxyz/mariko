@@ -126,6 +126,13 @@ mariko-restaurant-tma/
 cd backend && npm install && npm run build && npm start
 ```
 
+Или Railway автоматически определит команду из `package.json`:
+```bash
+npm start
+```
+
+**Примечание:** Если нужна многопроцессная обработка (аналог `gunicorn -w 4`), можно использовать PM2. См. `backend/START_COMMAND.md` для деталей.
+
 ### Frontend (Vercel)
 
 1. Создайте новый проект на Vercel (https://vercel.com)
