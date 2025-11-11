@@ -6,10 +6,12 @@
 2. Подключите репозиторий GitHub
 3. Выберите папку `backend` как root directory
 4. Установите переменные окружения:
-   - `MONGODB_URI` - URI подключения к MongoDB (можно использовать Railway MongoDB плагин)
+   - `DATABASE_URL` - Автоматически устанавливается при подключении PostgreSQL плагина Railway (или используйте отдельные переменные DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_NAME)
    - `JWT_SECRET` - Секретный ключ для JWT (сгенерируйте случайную строку)
    - `FRONTEND_URL` - URL вашего Vercel приложения (например: https://your-app.vercel.app)
    - `PORT` - Railway установит автоматически
+
+   **Важно:** Подключите PostgreSQL плагин в Railway - он автоматически создаст переменную `DATABASE_URL`
 
 5. Railway автоматически определит Node.js проект и выполнит:
    - `npm install`

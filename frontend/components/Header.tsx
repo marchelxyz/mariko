@@ -35,7 +35,7 @@ export default function Header({ title, showLogo = false }: HeaderProps) {
               <div className="py-1">
                 {restaurants.map((restaurant) => (
                   <button
-                    key={restaurant._id}
+                    key={restaurant.id}
                     onClick={() => {
                       setSelectedRestaurant(restaurant);
                       setIsDropdownOpen(false);

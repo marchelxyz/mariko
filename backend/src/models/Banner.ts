@@ -1,26 +1,44 @@
-import { Schema, model, Document } from 'mongoose';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  UpdateDateColumn,
+  ManyToOne,
+  JoinColumn,
+} from 'typeorm';
+import { Restaurant } from './Restaurant';
 
-export interface IBanner extends Document {
-  restaurantId?: Schema.Types.ObjectId;
+@Entity('banners')
+export class Banner {
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
+
+  @Column('uuid', { nullable: true })
+  restaurantId?: string;
+
+  @ManyToOne(() => Restaurant)
+  @JoinColumn({ name: 'restaurantId' })
+  restaurant?: Restaurant;
+
+  @Column()
   title: string;
+
+  @Column()
   imageUrl: string;
+
+  @Column({ nullable: true })
   linkUrl?: string;
+
+  @Column({ default: true })
   isActive: boolean;
+
+  @Column({ default: 0 })
   order: number;
+
+  @CreateDateColumn()
   createdAt: Date;
+
+  @UpdateDateColumn()
   updatedAt: Date;
 }
-
-const bannerSchema = new Schema<IBanner>(
-  {
-    restaurantId: { type: Schema.Types.ObjectId, ref: 'Restaurant' },
-    title: { type: String, required: true },
-    imageUrl: { type: String, required: true },
-    linkUrl: String,
-    isActive: { type: Boolean, default: true },
-    order: { type: Number, default: 0 },
-  },
-  { timestamps: true }
-);
-
-export const Banner = model<IBanner>('Banner', bannerSchema);

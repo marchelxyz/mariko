@@ -1,7 +1,8 @@
 import { Router, Response } from 'express';
+import { AppDataSource } from '../config/database';
 import { authenticate, AuthRequest, requireRole } from '../middleware/auth';
 import { Banner } from '../models/Banner';
-import { User } from '../models/User';
+import { User, UserRole } from '../models/User';
 import { MenuItem } from '../models/MenuItem';
 
 const router = Router();
@@ -13,12 +14,19 @@ router.use(authenticate);
 router.get('/banners', requireRole('admin', 'marketing', 'manager'), async (req: AuthRequest, res: Response) => {
   try {
     const { restaurantId } = req.query;
-    const query: any = {};
-    if (restaurantId) query.restaurantId = restaurantId;
+    const bannerRepository = AppDataSource.getRepository(Banner);
     
-    const banners = await Banner.find(query).sort({ order: 1 });
+    const where: any = {};
+    if (restaurantId) where.restaurantId = restaurantId;
+    
+    const banners = await bannerRepository.find({
+      where,
+      order: { order: 'ASC' },
+    });
+    
     res.json({ success: true, data: banners });
   } catch (error) {
+    console.error('Error fetching admin banners:', error);
     res.status(500).json({ success: false, message: 'Failed to fetch banners' });
   }
 });
@@ -26,9 +34,11 @@ router.get('/banners', requireRole('admin', 'marketing', 'manager'), async (req:
 // Управление ролями
 router.get('/users', requireRole('admin'), async (req: AuthRequest, res: Response) => {
   try {
-    const users = await User.find().select('-__v');
+    const userRepository = AppDataSource.getRepository(User);
+    const users = await userRepository.find();
     res.json({ success: true, data: users });
   } catch (error) {
+    console.error('Error fetching users:', error);
     res.status(500).json({ success: false, message: 'Failed to fetch users' });
   }
 });
@@ -36,13 +46,21 @@ router.get('/users', requireRole('admin'), async (req: AuthRequest, res: Respons
 router.put('/users/:id/role', requireRole('admin'), async (req: AuthRequest, res: Response) => {
   try {
     const { role } = req.body;
-    const user = await User.findByIdAndUpdate(req.params.id, { role }, { new: true });
+    const userRepository = AppDataSource.getRepository(User);
+    const user = await userRepository.findOne({
+      where: { id: req.params.id },
+    });
+    
     if (!user) {
       res.status(404).json({ success: false, message: 'User not found' });
       return;
     }
+    
+    user.role = role as UserRole;
+    await userRepository.save(user);
     res.json({ success: true, data: user });
   } catch (error) {
+    console.error('Error updating role:', error);
     res.status(500).json({ success: false, message: 'Failed to update role' });
   }
 });
@@ -53,6 +71,7 @@ router.post('/menu/images', requireRole('admin', 'manager'), async (req: AuthReq
     // Здесь будет логика загрузки изображений
     res.json({ success: true, message: 'Image upload endpoint' });
   } catch (error) {
+    console.error('Error uploading image:', error);
     res.status(500).json({ success: false, message: 'Failed to upload image' });
   }
 });

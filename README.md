@@ -31,7 +31,14 @@ Backend будет доступен на `http://localhost:5000`
 
 #### Backend (Railway)
 - `PORT` - Порт сервера (по умолчанию 5000)
-- `MONGODB_URI` - URI подключения к MongoDB
+- `DATABASE_URL` - PostgreSQL connection string от Railway (автоматически устанавливается при подключении PostgreSQL плагина)
+- Или отдельные переменные:
+  - `DB_HOST` - Хост PostgreSQL
+  - `DB_PORT` - Порт PostgreSQL (по умолчанию 5432)
+  - `DB_USER` - Пользователь PostgreSQL
+  - `DB_PASSWORD` - Пароль PostgreSQL
+  - `DB_NAME` - Имя базы данных
+  - `DB_SSL` - Использовать SSL (true/false)
 - `JWT_SECRET` - Секретный ключ для JWT токенов
 - `FRONTEND_URL` - URL фронтенда для CORS
 
@@ -105,10 +112,12 @@ mariko-restaurant-tma/
    - **Start Command**: `npm start`
 
 4. Установите переменные окружения в Railway:
-   - `MONGODB_URI` - URI подключения к MongoDB (можно использовать Railway MongoDB плагин)
+   - `DATABASE_URL` - Автоматически устанавливается при подключении PostgreSQL плагина Railway
    - `JWT_SECRET` - Секретный ключ для JWT (сгенерируйте случайную строку)
    - `FRONTEND_URL` - URL вашего Vercel приложения (например: https://your-app.vercel.app)
    - `PORT` - Railway установит автоматически
+
+   **Важно:** Подключите PostgreSQL плагин в Railway - он автоматически создаст переменную `DATABASE_URL`
 
 5. Railway автоматически задеплоит приложение
 
@@ -173,7 +182,7 @@ cd backend && npm install && npm run build && npm start
 ### Backend:
 - Express.js
 - TypeScript
-- MongoDB + Mongoose
+- PostgreSQL + TypeORM
 - JWT аутентификация
 - Zod валидация
 

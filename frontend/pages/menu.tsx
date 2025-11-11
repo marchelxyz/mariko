@@ -6,7 +6,7 @@ import { useStore } from '@/store/useStore';
 import api from '@/lib/api';
 
 interface MenuItem {
-  _id: string;
+  id: string;
   name: string;
   description: string;
   price: number;
@@ -66,7 +66,7 @@ export default function Menu() {
               <h2 className="text-xl font-bold text-text-primary mb-4">{category}</h2>
               <div className="space-y-4">
                 {items.map((item) => (
-                  <div key={item._id} className="flex items-start space-x-4 pb-4 border-b last:border-0">
+                  <div key={item.id} className="flex items-start space-x-4 pb-4 border-b last:border-0">
                     <div className="w-24 h-24 bg-secondary rounded-lg flex items-center justify-center flex-shrink-0">
                       <span className="text-3xl">🍽️</span>
                     </div>

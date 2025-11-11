@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import api from '@/lib/api';
 
 interface Banner {
-  _id: string;
+  id: string;
   title: string;
   imageUrl: string;
   linkUrl?: string;
@@ -38,7 +38,7 @@ export default function Banners({ restaurantId }: BannersProps) {
     <div className="space-y-4">
       {banners.map((banner) => (
         <div
-          key={banner._id}
+          key={banner.id}
           className="bg-white rounded-lg shadow-sm overflow-hidden"
         >
           <div className="w-full h-48 bg-secondary flex items-center justify-center">

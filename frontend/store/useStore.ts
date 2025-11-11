@@ -2,7 +2,8 @@ import { create } from 'zustand';
 import api from '@/lib/api';
 
 interface User {
-  _id: string;
+  id: string;
+  _id?: string;
   telegramId: string;
   firstName?: string;
   lastName?: string;
@@ -13,8 +14,8 @@ interface User {
 }
 
 interface Restaurant {
-  _id: string;
-  id?: string;
+  id: string;
+  _id?: string;
   name: string;
   city: string;
   address: string;
@@ -58,7 +59,7 @@ export const useStore = create<Store>((set, get) => ({
       const response = await api.get('/restaurants');
       const restaurants = response.data.data.map((r: Restaurant) => ({
         ...r,
-        id: r._id,
+        id: r.id || r._id,
       }));
       set({ restaurants });
       

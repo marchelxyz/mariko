@@ -1,28 +1,47 @@
-import { Schema, model, Document } from 'mongoose';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  UpdateDateColumn,
+  ManyToOne,
+  JoinColumn,
+} from 'typeorm';
+import { Restaurant } from './Restaurant';
 
-export interface IMenuItem extends Document {
-  restaurantId: Schema.Types.ObjectId;
+@Entity('menu_items')
+export class MenuItem {
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
+
+  @Column('uuid')
+  restaurantId: string;
+
+  @ManyToOne(() => Restaurant)
+  @JoinColumn({ name: 'restaurantId' })
+  restaurant?: Restaurant;
+
+  @Column()
   name: string;
+
+  @Column('text')
   description: string;
+
+  @Column('decimal', { precision: 10, scale: 2 })
   price: number;
+
+  @Column()
   category: string;
+
+  @Column({ nullable: true })
   imageUrl?: string;
+
+  @Column({ default: true })
   isAvailable: boolean;
+
+  @CreateDateColumn()
   createdAt: Date;
+
+  @UpdateDateColumn()
   updatedAt: Date;
 }
-
-const menuItemSchema = new Schema<IMenuItem>(
-  {
-    restaurantId: { type: Schema.Types.ObjectId, ref: 'Restaurant', required: true },
-    name: { type: String, required: true },
-    description: { type: String, required: true },
-    price: { type: Number, required: true },
-    category: { type: String, required: true },
-    imageUrl: String,
-    isAvailable: { type: Boolean, default: true },
-  },
-  { timestamps: true }
-);
-
-export const MenuItem = model<IMenuItem>('MenuItem', menuItemSchema);
