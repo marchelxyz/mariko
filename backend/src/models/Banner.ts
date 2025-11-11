@@ -12,33 +12,33 @@ import { Restaurant } from './Restaurant';
 @Entity('banners')
 export class Banner {
   @PrimaryGeneratedColumn('uuid')
-  id: string;
+  id!: string;
 
   @Column('uuid', { nullable: true })
   restaurantId?: string;
 
-  @ManyToOne(() => Restaurant)
+  @ManyToOne(() => Restaurant, { nullable: true })
   @JoinColumn({ name: 'restaurantId' })
   restaurant?: Restaurant;
 
   @Column()
-  title: string;
+  title!: string;
 
   @Column()
-  imageUrl: string;
+  imageUrl!: string;
 
   @Column({ nullable: true })
   linkUrl?: string;
 
   @Column({ default: true })
-  isActive: boolean;
+  isActive!: boolean;
 
   @Column({ default: 0 })
-  order: number;
+  order!: number;
 
   @CreateDateColumn()
-  createdAt: Date;
+  createdAt!: Date;
 
   @UpdateDateColumn()
-  updatedAt: Date;
+  updatedAt!: Date;
 }

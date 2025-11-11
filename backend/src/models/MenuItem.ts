@@ -12,36 +12,36 @@ import { Restaurant } from './Restaurant';
 @Entity('menu_items')
 export class MenuItem {
   @PrimaryGeneratedColumn('uuid')
-  id: string;
+  id!: string;
 
   @Column('uuid')
-  restaurantId: string;
+  restaurantId!: string;
 
   @ManyToOne(() => Restaurant)
   @JoinColumn({ name: 'restaurantId' })
   restaurant?: Restaurant;
 
   @Column()
-  name: string;
+  name!: string;
 
   @Column('text')
-  description: string;
+  description!: string;
 
   @Column('decimal', { precision: 10, scale: 2 })
-  price: number;
+  price!: number;
 
   @Column()
-  category: string;
+  category!: string;
 
   @Column({ nullable: true })
   imageUrl?: string;
 
   @Column({ default: true })
-  isAvailable: boolean;
+  isAvailable!: boolean;
 
   @CreateDateColumn()
-  createdAt: Date;
+  createdAt!: Date;
 
   @UpdateDateColumn()
-  updatedAt: Date;
+  updatedAt!: Date;
 }
