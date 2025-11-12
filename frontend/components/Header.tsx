@@ -28,7 +28,7 @@ export default function Header({ title, showLogo = false }: HeaderProps) {
 
         {/* Приветствие */}
         <div className="w-full max-w-md mb-3">
-          <h2 className="text-text-secondary text-lg font-bold text-left">
+          <h2 className="text-text-secondary text-lg font-medium text-left">
             Привет, дорогой Гость!
           </h2>
         </div>
