@@ -37,11 +37,11 @@ export default function Header({ title, showLogo = false }: HeaderProps) {
         <div className="relative w-full max-w-md">
           <button
             onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-            className="w-full bg-accent text-text-secondary py-3 px-4 rounded-[10px] text-left hover:opacity-90 transition-opacity"
+            className="w-full bg-accent text-text-secondary py-2 px-4 rounded-[10px] text-left hover:opacity-90 transition-opacity"
           >
-            <div className="flex flex-col gap-1">
-              <span className="text-xs opacity-75 whitespace-nowrap">Адрес ресторана</span>
-              <span>{selectedRestaurant ? `${selectedRestaurant.city}, ${selectedRestaurant.address}` : 'Выбрать ресторан'}</span>
+            <div className="flex flex-col gap-0.5">
+              <span className="text-[10px] opacity-75 whitespace-nowrap">Адрес ресторана</span>
+              <span className="text-sm">{selectedRestaurant ? `${selectedRestaurant.city}, ${selectedRestaurant.address}` : 'Выбрать ресторан'}</span>
             </div>
           </button>
           {isDropdownOpen && (
