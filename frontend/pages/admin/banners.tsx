@@ -132,7 +132,7 @@ export default function AdminBanners() {
       <div className="px-4 py-6">
         <div className="mb-4 flex justify-between items-center">
           <p className="text-sm text-text-secondary">
-            Баннеры отображаются на главной странице в формате 9:16 (вертикальный)
+            Баннеры отображаются на главной странице в формате 16:9 (горизонтальный)
           </p>
           <button
             onClick={handleCreate}
@@ -158,13 +158,13 @@ export default function AdminBanners() {
                 className="bg-white rounded-lg shadow-sm overflow-hidden"
               >
                 <div className="flex">
-                  {/* Превью баннера 9:16 */}
+                  {/* Превью баннера 16:9 */}
                   <div className="w-32 flex-shrink-0 bg-gray-100 relative">
                     <div
                       className="absolute inset-0 bg-cover bg-center"
                       style={{
                         backgroundImage: banner.imageUrl ? `url(${banner.imageUrl})` : 'none',
-                        aspectRatio: '9/16',
+                        aspectRatio: '16/9',
                       }}
                     >
                       {!banner.imageUrl && (
@@ -268,7 +268,7 @@ export default function AdminBanners() {
 
                   <div>
                     <label className="block text-sm font-medium text-text-primary mb-1">
-                      URL изображения * (формат 9:16)
+                      URL изображения * (формат 16:9)
                     </label>
                     <input
                       type="url"
@@ -280,13 +280,13 @@ export default function AdminBanners() {
                     />
                     {formData.imageUrl && (
                       <div className="mt-2">
-                        <p className="text-xs text-text-secondary mb-2">Превью (9:16):</p>
+                        <p className="text-xs text-text-secondary mb-2">Превью (16:9):</p>
                         <div className="w-32 bg-gray-100 rounded overflow-hidden">
                           <div
                             className="bg-cover bg-center"
                             style={{
                               backgroundImage: `url(${formData.imageUrl})`,
-                              aspectRatio: '9/16',
+                              aspectRatio: '16/9',
                               width: '100%',
                             }}
                           />
