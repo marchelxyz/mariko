@@ -86,7 +86,7 @@ export default function Menu() {
 
   return (
     <Layout>
-      <Header title="Меню" showBackButton={true} />
+      <Header title="Меню" />
       <div className="px-4 py-6 space-y-6">
         {/* Кнопка назад */}
         <button
