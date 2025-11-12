@@ -15,6 +15,9 @@ import bannerRoutes from './routes/banners';
 import profileRoutes from './routes/profile';
 import adminRoutes from './routes/admin';
 import bookingRoutes from './routes/booking';
+import dishImageRoutes from './routes/dishImages';
+import * as cron from 'node-cron';
+import { syncAllRestaurantsMenu } from './services/syncService';
 
 const app = express();
 const PORT: number = Number(process.env.PORT) || 5000;
@@ -88,6 +91,7 @@ app.use('/api/banners', bannerRoutes);
 app.use('/api/profile', profileRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/booking', bookingRoutes);
+app.use('/api/dish-images', dishImageRoutes);
 
 // 404 handler для неизвестных маршрутов
 app.use((req, res, next) => {
@@ -116,6 +120,25 @@ const startServer = async () => {
       console.log(`📋 Environment: ${process.env.NODE_ENV || 'development'}`);
       console.log(`🔗 Frontend URL: ${process.env.FRONTEND_URL || 'http://localhost:3000'}`);
     });
+
+    // Настройка ежедневной синхронизации меню из Google Sheets
+    // Запускается каждый день в 3:00 утра по UTC
+    // Можно изменить расписание через переменную окружения SYNC_CRON_SCHEDULE
+    const syncSchedule = process.env.SYNC_CRON_SCHEDULE || '0 3 * * *';
+    
+    if (process.env.GOOGLE_SHEETS_ID && process.env.GOOGLE_SHEETS_CREDENTIALS) {
+      cron.schedule(syncSchedule, async () => {
+        console.log(`[${new Date().toISOString()}] Запуск запланированной синхронизации меню...`);
+        try {
+          await syncAllRestaurantsMenu();
+        } catch (error) {
+          console.error('Ошибка при запланированной синхронизации:', error);
+        }
+      });
+      console.log(`📅 Ежедневная синхронизация меню настроена на расписание: ${syncSchedule}`);
+    } else {
+      console.log('⚠️  Google Sheets не настроены. Синхронизация отключена.');
+    }
   } catch (error) {
     console.error('Failed to start server:', error);
     process.exit(1);

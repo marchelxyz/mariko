@@ -5,6 +5,7 @@ import { Banner } from '../models/Banner';
 import { User, UserRole } from '../models/User';
 import { MenuItem } from '../models/MenuItem';
 import { Restaurant } from '../models/Restaurant';
+import { createGoogleSheetsService } from '../services/GoogleSheetsService';
 
 const router = Router();
 
@@ -66,17 +67,6 @@ router.put('/users/:id/role', requireRole('admin'), async (req: AuthRequest, res
   }
 });
 
-// Управление изображениями блюд
-router.post('/menu/images', requireRole('admin', 'manager'), async (req: AuthRequest, res: Response) => {
-  try {
-    // Здесь будет логика загрузки изображений
-    res.json({ success: true, message: 'Image upload endpoint' });
-  } catch (error) {
-    console.error('Error uploading image:', error);
-    res.status(500).json({ success: false, message: 'Failed to upload image' });
-  }
-});
-
 // Управление ресторанами (только для администраторов)
 router.get('/restaurants', requireRole('admin'), async (req: AuthRequest, res: Response) => {
   try {
@@ -93,7 +83,7 @@ router.get('/restaurants', requireRole('admin'), async (req: AuthRequest, res: R
 
 router.post('/restaurants', requireRole('admin'), async (req: AuthRequest, res: Response) => {
   try {
-    const { name, city, address, phoneNumber } = req.body;
+    const { name, city, address, phoneNumber, googleSheetId } = req.body;
     
     if (!name || !city || !address || !phoneNumber) {
       res.status(400).json({ success: false, message: 'Missing required fields' });
@@ -101,15 +91,43 @@ router.post('/restaurants', requireRole('admin'), async (req: AuthRequest, res: 
     }
     
     const restaurantRepository = AppDataSource.getRepository(Restaurant);
+    
+    // Определяем ID таблицы Google Sheets
+    const sheetId = googleSheetId || process.env.GOOGLE_SHEETS_ID;
+    if (!sheetId) {
+      res.status(400).json({ 
+        success: false, 
+        message: 'GOOGLE_SHEETS_ID должен быть указан в запросе или переменных окружения' 
+      });
+      return;
+    }
+
+    // Создаем ресторан
     const restaurant = restaurantRepository.create({
       name,
       city,
       address,
       phoneNumber,
       isActive: true,
+      googleSheetId: sheetId,
+      googleSheetUrl: `https://docs.google.com/spreadsheets/d/${sheetId}`,
     });
     
     const savedRestaurant = await restaurantRepository.save(restaurant);
+
+    // Создаем лист в Google Sheets для нового ресторана
+    try {
+      const sheetsService = createGoogleSheetsService();
+      const sheetName = await sheetsService.createSheetForRestaurant(name, savedRestaurant.id);
+      
+      savedRestaurant.googleSheetName = sheetName;
+      await restaurantRepository.save(savedRestaurant);
+    } catch (sheetsError) {
+      console.error('Error creating Google Sheet for restaurant:', sheetsError);
+      // Не прерываем создание ресторана, если не удалось создать лист
+      // Администратор может создать лист вручную позже
+    }
+    
     res.json({ success: true, data: savedRestaurant });
   } catch (error) {
     console.error('Error creating restaurant:', error);
@@ -163,6 +181,44 @@ router.delete('/restaurants/:id', requireRole('admin'), async (req: AuthRequest,
   } catch (error) {
     console.error('Error deleting restaurant:', error);
     res.status(500).json({ success: false, message: 'Failed to delete restaurant' });
+  }
+});
+
+// Синхронизация меню из Google Sheets для конкретного ресторана
+router.post('/restaurants/:id/sync', requireRole('admin', 'manager'), async (req: AuthRequest, res: Response) => {
+  try {
+    const restaurantRepository = AppDataSource.getRepository(Restaurant);
+    const restaurant = await restaurantRepository.findOne({
+      where: { id: req.params.id },
+    });
+    
+    if (!restaurant) {
+      res.status(404).json({ success: false, message: 'Restaurant not found' });
+      return;
+    }
+
+    if (!restaurant.googleSheetName) {
+      res.status(400).json({ 
+        success: false, 
+        message: 'У ресторана не настроен лист Google Sheets' 
+      });
+      return;
+    }
+
+    const sheetsService = createGoogleSheetsService();
+    const result = await sheetsService.syncMenuFromSheet(restaurant);
+    
+    res.json({ 
+      success: true, 
+      message: 'Синхронизация завершена',
+      data: result 
+    });
+  } catch (error) {
+    console.error('Error syncing restaurant menu:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: error instanceof Error ? error.message : 'Failed to sync menu' 
+    });
   }
 });
 
