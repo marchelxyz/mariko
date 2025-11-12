@@ -80,10 +80,19 @@ export const useStore = create<Store>((set, get) => ({
     set({ isLoading: true, error: null });
     try {
       const response = await api.get('/restaurants');
-      const restaurants = response.data.data.map((r: Restaurant) => ({
-        ...r,
-        id: r.id || r._id,
-      }));
+      const restaurants: Restaurant[] = response.data.data
+        .map((r: any) => {
+          const id = r.id || r._id;
+          if (!id) {
+            console.warn('Restaurant without id:', r);
+            return null;
+          }
+          return {
+            ...r,
+            id: String(id),
+          };
+        })
+        .filter((r): r is Restaurant => r !== null);
       set({ restaurants, isLoading: false });
       
       // Автоматически выбираем первый ресторан, если не выбран
