@@ -11,6 +11,7 @@ interface Restaurant {
   address: string;
   phoneNumber: string;
   isActive: boolean;
+  googleSheetName?: string;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -21,6 +22,7 @@ export default function AdminRestaurants() {
   const [isLoading, setIsLoading] = useState(false);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingRestaurant, setEditingRestaurant] = useState<Restaurant | null>(null);
+  const [syncingRestaurantId, setSyncingRestaurantId] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     name: '',
     city: '',
@@ -130,6 +132,30 @@ export default function AdminRestaurants() {
     }
   };
 
+  const handleSyncMenu = async (restaurantId: string) => {
+    if (!confirm('Обновить меню из Google Sheets для этого ресторана?')) {
+      return;
+    }
+
+    try {
+      setSyncingRestaurantId(restaurantId);
+      const response = await api.post(`/admin/restaurants/${restaurantId}/sync`);
+      const result = response.data.data;
+      alert(
+        `Синхронизация завершена!\n` +
+        `Создано: ${result.created}\n` +
+        `Обновлено: ${result.updated}\n` +
+        `Удалено: ${result.deleted}`
+      );
+    } catch (error: any) {
+      console.error('Failed to sync menu:', error);
+      const errorMessage = error?.response?.data?.message || 'Не удалось синхронизировать меню';
+      alert(errorMessage);
+    } finally {
+      setSyncingRestaurantId(null);
+    }
+  };
+
   return (
     <Layout>
       <Header title="Управление ресторанами" />
@@ -195,6 +221,21 @@ export default function AdminRestaurants() {
                       className="px-3 py-1.5 bg-blue-500 text-white rounded text-sm hover:bg-blue-600 transition-colors whitespace-nowrap"
                     >
                       Редактировать
+                    </button>
+                    <button
+                      onClick={() => handleSyncMenu(restaurant.id)}
+                      disabled={syncingRestaurantId === restaurant.id || !restaurant.googleSheetName}
+                      className={`px-3 py-1.5 rounded text-sm transition-colors whitespace-nowrap ${
+                        syncingRestaurantId === restaurant.id
+                          ? 'bg-gray-400 text-white cursor-not-allowed'
+                          : restaurant.googleSheetName
+                          ? 'bg-green-500 text-white hover:bg-green-600'
+                          : 'bg-gray-300 text-gray-600 cursor-not-allowed'
+                      }`}
+                    >
+                      {syncingRestaurantId === restaurant.id
+                        ? 'Синхронизация...'
+                        : 'Обновить меню'}
                     </button>
                     <button
                       onClick={() => handleToggleActive(restaurant)}

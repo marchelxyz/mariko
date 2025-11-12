@@ -1,7 +1,9 @@
 import { useRouter } from 'next/router';
+import { useState } from 'react';
 import Layout from '@/components/Layout';
 import Header from '@/components/Header';
 import { useStore } from '@/store/useStore';
+import api from '@/lib/api';
 
 interface AdminSection {
   id: string;
@@ -16,6 +18,7 @@ interface AdminSection {
 export default function Admin() {
   const { user } = useStore();
   const router = useRouter();
+  const [isSyncing, setIsSyncing] = useState(false);
 
   if (!user || !['admin', 'marketing', 'manager'].includes(user.role)) {
     return (
@@ -90,10 +93,43 @@ export default function Admin() {
     }
   };
 
+  const handleSyncAll = async () => {
+    if (!confirm('Обновить меню всех ресторанов из Google Sheets?')) {
+      return;
+    }
+
+    try {
+      setIsSyncing(true);
+      await api.post('/admin/restaurants/sync-all');
+      alert('Синхронизация всех ресторанов завершена успешно!');
+    } catch (error: any) {
+      console.error('Failed to sync all restaurants:', error);
+      const errorMessage = error?.response?.data?.message || 'Не удалось синхронизировать меню';
+      alert(errorMessage);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
   return (
     <Layout>
       <Header title="Админ панель" />
       <div className="px-4 py-6">
+        {user?.role === 'admin' && (
+          <div className="mb-6">
+            <button
+              onClick={handleSyncAll}
+              disabled={isSyncing}
+              className={`w-full py-3 px-4 rounded-lg font-medium transition-colors ${
+                isSyncing
+                  ? 'bg-gray-400 text-white cursor-not-allowed'
+                  : 'bg-green-500 text-white hover:bg-green-600'
+              }`}
+            >
+              {isSyncing ? '⏳ Синхронизация меню всех ресторанов...' : '🔄 Обновить меню всех ресторанов'}
+            </button>
+          </div>
+        )}
         <div className="grid grid-cols-2 gap-4">
           {availableSections.map((section) => (
             <button
