@@ -67,7 +67,27 @@ export const connectDatabase = async (): Promise<void> => {
     // Проверяем, что таблицы созданы
     const queryRunner = AppDataSource.createQueryRunner();
     const tables = await queryRunner.getTables();
-    console.log('🗄️  Созданные таблицы в БД:', tables.map(t => t.name).join(', '));
+    const tableNames = tables.map(t => t.name);
+    console.log('🗄️  Созданные таблицы в БД:', tableNames.join(', '));
+    
+    // Проверяем наличие таблицы users
+    if (!tableNames.includes('users')) {
+      console.warn('⚠️  Таблица users не найдена! TypeORM должен создать её автоматически при synchronize: true');
+      // Если synchronize включен, TypeORM должен создать таблицу автоматически
+      // Но на всякий случай проверим еще раз после небольшой задержки
+      setTimeout(async () => {
+        const checkTables = await queryRunner.getTables();
+        const checkTableNames = checkTables.map(t => t.name);
+        if (checkTableNames.includes('users')) {
+          console.log('✅ Таблица users создана автоматически');
+        } else {
+          console.error('❌ Таблица users все еще не создана! Проверьте настройки synchronize');
+        }
+      }, 1000);
+    } else {
+      console.log('✅ Таблица users существует');
+    }
+    
     await queryRunner.release();
   } catch (error) {
     console.error('❌ PostgreSQL connection error:', error);
