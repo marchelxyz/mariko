@@ -12,6 +12,7 @@ interface MenuItem {
   price: number;
   category: string;
   imageUrl?: string;
+  calories?: number;
 }
 
 const CATEGORIES = [
@@ -76,9 +77,16 @@ export default function Menu() {
     ? availableCategories
     : Object.keys(menuItems).filter((cat) => menuItems[cat] && menuItems[cat].length > 0);
 
+  // Получаем все блюда для отображения в сетке
+  const allItemsToShow: MenuItem[] = [];
+  categoriesToShow.forEach((category) => {
+    const items = menuItems[category] || [];
+    allItemsToShow.push(...items);
+  });
+
   return (
     <Layout>
-      <Header title="Меню" />
+      <Header title="Меню" showBackButton={true} />
       <div className="px-4 py-6 space-y-6">
         {/* Фильтр категорий */}
         {availableCategories.length > 0 && (
@@ -111,49 +119,62 @@ export default function Menu() {
           </div>
         )}
 
-        {/* Меню */}
-        {categoriesToShow.length === 0 ? (
+        {/* Меню в виде сетки карточек */}
+        {allItemsToShow.length === 0 ? (
           <div className="bg-white rounded-lg shadow-sm p-6 text-center">
             <p className="text-text-primary">Меню пока пусто</p>
           </div>
         ) : (
-          categoriesToShow.map((category) => {
-            const items = menuItems[category] || [];
-            if (items.length === 0) return null;
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+            {allItemsToShow.map((item) => (
+              <div
+                key={item.id}
+                className="bg-[#F7F7F7] rounded-xl p-3 flex flex-col"
+              >
+                {/* Фото блюда */}
+                {item.imageUrl ? (
+                  <div
+                    className="w-full rounded-lg overflow-hidden mb-3"
+                    style={{
+                      aspectRatio: '4/3',
+                    }}
+                  >
+                    <img
+                      src={item.imageUrl}
+                      alt={item.name}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                ) : (
+                  <div
+                    className="w-full rounded-lg bg-[#E5E5E5] flex items-center justify-center mb-3"
+                    style={{
+                      aspectRatio: '4/3',
+                    }}
+                  >
+                    <span className="text-3xl">🍽️</span>
+                  </div>
+                )}
 
-            return (
-              <div key={category} className="bg-white rounded-lg shadow-sm p-4">
-                <h2 className="text-xl font-bold text-text-primary mb-4">{category}</h2>
-                <div className="space-y-4">
-                  {items.map((item) => (
-                    <div
-                      key={item.id}
-                      className="flex items-start space-x-4 pb-4 border-b last:border-0"
-                    >
-                      {item.imageUrl ? (
-                        <img
-                          src={item.imageUrl}
-                          alt={item.name}
-                          className="w-24 h-24 object-cover rounded-lg flex-shrink-0"
-                        />
-                      ) : (
-                        <div className="w-24 h-24 bg-secondary rounded-lg flex items-center justify-center flex-shrink-0">
-                          <span className="text-3xl">🍽️</span>
-                        </div>
-                      )}
-                      <div className="flex-1">
-                        <h3 className="font-semibold text-text-primary text-lg mb-1">
-                          {item.name}
-                        </h3>
-                        <p className="text-sm text-gray-600 mb-2">{item.description}</p>
-                        <p className="text-primary font-bold text-lg">{item.price} ₽</p>
-                      </div>
-                    </div>
-                  ))}
+                {/* Цена */}
+                <div className="text-sm font-bold text-black mb-1">
+                  {item.price} ₽
                 </div>
+
+                {/* Название блюда */}
+                <div className="text-sm font-medium text-black mb-1 line-clamp-2">
+                  {item.name}
+                </div>
+
+                {/* Калорийность */}
+                {item.calories && (
+                  <div className="text-xs font-normal text-[rgba(27,31,59,0.4)] mt-auto">
+                    {item.calories} ккал
+                  </div>
+                )}
               </div>
-            );
-          })
+            ))}
+          </div>
         )}
       </div>
     </Layout>

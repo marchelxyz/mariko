@@ -1,29 +1,70 @@
 import { useState } from 'react';
+import { useRouter } from 'next/router';
 import { useStore } from '@/store/useStore';
 import Image from 'next/image';
 
 interface HeaderProps {
   title?: string;
   showLogo?: boolean;
+  showBackButton?: boolean;
+  onBack?: () => void;
 }
 
-export default function Header({ title, showLogo = false }: HeaderProps) {
+export default function Header({ title, showLogo = false, showBackButton = false, onBack }: HeaderProps) {
   const { selectedRestaurant, restaurants, setSelectedRestaurant, isLoading } = useStore();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const router = useRouter();
+
+  const handleBack = () => {
+    if (onBack) {
+      onBack();
+    } else {
+      router.push('/');
+    }
+  };
 
   return (
     <header className="bg-primary text-text-secondary rounded-b-[20px] pb-6 pt-4 px-4 sticky top-0 z-50">
       <div className="flex flex-col items-center">
-        {/* Логотип по центру */}
-        <div className="flex justify-center mb-5 mt-4">
-          <Image
-            src="/image/image 159.webp"
-            alt="Logo"
-            width={100}
-            height={100}
-            className="object-contain"
-            unoptimized
-          />
+        {/* Кнопка назад и логотип */}
+        <div className="flex items-center justify-between w-full max-w-md mb-5 mt-4 relative">
+          {showBackButton && (
+            <button
+              onClick={handleBack}
+              className="absolute left-0 p-2 hover:opacity-80 transition-opacity"
+              aria-label="Назад"
+            >
+              <svg
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+                className="text-white"
+              >
+                <path
+                  d="M15 18L9 12L15 6"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </button>
+          )}
+          {/* Логотип по центру */}
+          <div className="flex justify-center flex-1">
+            <Image
+              src="/image/image 159.webp"
+              alt="Logo"
+              width={100}
+              height={100}
+              className="object-contain"
+              unoptimized
+            />
+          </div>
+          {/* Пустой элемент для балансировки, если есть кнопка назад */}
+          {showBackButton && <div className="w-10" />}
         </div>
 
         {/* Приветствие */}
