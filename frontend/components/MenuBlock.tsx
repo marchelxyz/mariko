@@ -98,7 +98,7 @@ export default function MenuBlock({ restaurantId }: MenuBlockProps) {
             className="flex-shrink-0"
             style={{ width: '180px' }}
           >
-            {/* Подложка для изображения */}
+            {/* Подложка */}
             <div
               className="relative"
               style={{
@@ -117,10 +117,10 @@ export default function MenuBlock({ restaurantId }: MenuBlockProps) {
                 <div
                   style={{
                     width: '100%',
-                    height: '100%',
-                    borderRadius: '8px',
+                    borderRadius: '15px',
                     overflow: 'hidden',
                     position: 'relative',
+                    aspectRatio: '4/3',
                   }}
                 >
                   <img
@@ -137,12 +137,12 @@ export default function MenuBlock({ restaurantId }: MenuBlockProps) {
                 <div
                   style={{
                     width: '100%',
-                    height: '100%',
-                    borderRadius: '8px',
+                    borderRadius: '15px',
                     backgroundColor: '#E5E5E5',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
+                    aspectRatio: '4/3',
                   }}
                 >
                   <span className="text-3xl">🍽️</span>
@@ -150,14 +150,25 @@ export default function MenuBlock({ restaurantId }: MenuBlockProps) {
               )}
             </div>
 
+            {/* Цена */}
+            <div
+              style={{
+                marginTop: '3px',
+                fontSize: '14px',
+                fontWeight: 'bold',
+                color: '#000000',
+              }}
+            >
+              {item.price} ₽
+            </div>
+
             {/* Название блюда */}
             <div
               style={{
-                marginTop: '8px',
+                marginTop: '2px',
                 fontSize: '14px',
-                fontWeight: 500,
+                fontWeight: 500, // Medium
                 color: '#000000',
-                lineHeight: '1.4',
               }}
             >
               {item.name}
@@ -167,28 +178,15 @@ export default function MenuBlock({ restaurantId }: MenuBlockProps) {
             {item.calories && (
               <div
                 style={{
-                  marginTop: '4px',
+                  marginTop: '2px',
                   fontSize: '12px',
                   fontWeight: 'normal',
-                  color: 'rgba(27, 31, 59, 0.4)',
-                  lineHeight: '1.4',
+                  color: 'rgba(27, 31, 59, 0.4)', // #1B1F3B с прозрачностью 40%
                 }}
               >
                 {item.calories} ккал
               </div>
             )}
-
-            {/* Цена */}
-            <div
-              style={{
-                marginTop: '6px',
-                fontSize: '14px',
-                fontWeight: 'bold',
-                color: '#000000',
-              }}
-            >
-              {item.price} ₽
-            </div>
           </div>
         ))}
       </div>
