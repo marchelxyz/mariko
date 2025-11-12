@@ -13,13 +13,26 @@ export const errorHandler = (
   const statusCode = err.statusCode || 500;
   const message = err.message || 'Internal Server Error';
 
-  console.error('Error:', err);
+  // Логируем ошибку с контекстом
+  console.error(`[${new Date().toISOString()}] Error ${statusCode} on ${req.method} ${req.path}:`, {
+    message: err.message,
+    stack: process.env.NODE_ENV === 'development' ? err.stack : undefined,
+    body: req.body,
+    query: req.query,
+    params: req.params,
+  });
 
-  res.status(statusCode).json({
+  // Не отправляем stack trace в production
+  const response: any = {
     success: false,
     error: {
       message,
-      ...(process.env.NODE_ENV === 'development' && { stack: err.stack }),
     },
-  });
+  };
+
+  if (process.env.NODE_ENV === 'development') {
+    response.error.stack = err.stack;
+  }
+
+  res.status(statusCode).json(response);
 };
