@@ -65,11 +65,11 @@ export default function MenuBlock({ restaurantId }: MenuBlockProps) {
   }
 
   return (
-    <div className="bg-white rounded-lg px-4 py-6">
+    <div className="bg-white rounded-lg py-6">
       {/* Заголовок "Рекомендуем попробовать" с стрелкой */}
       <button
         onClick={handleMenuClick}
-        className="flex items-center justify-between w-full mb-4 group"
+        className="flex items-center justify-between w-full mb-4 group px-4"
       >
         <span className="text-[#000000] font-normal text-base">Рекомендуем попробовать</span>
         <svg
@@ -91,7 +91,7 @@ export default function MenuBlock({ restaurantId }: MenuBlockProps) {
       </button>
 
       {/* Блюда */}
-      <div className="flex gap-4">
+      <div className="flex gap-4 px-4">
         {menuItems.map((item) => (
           <div
             key={item.id}
