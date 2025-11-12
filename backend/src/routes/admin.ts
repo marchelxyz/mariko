@@ -4,6 +4,7 @@ import { authenticate, AuthRequest, requireRole } from '../middleware/auth';
 import { Banner } from '../models/Banner';
 import { User, UserRole } from '../models/User';
 import { MenuItem } from '../models/MenuItem';
+import { Restaurant } from '../models/Restaurant';
 
 const router = Router();
 
@@ -73,6 +74,95 @@ router.post('/menu/images', requireRole('admin', 'manager'), async (req: AuthReq
   } catch (error) {
     console.error('Error uploading image:', error);
     res.status(500).json({ success: false, message: 'Failed to upload image' });
+  }
+});
+
+// Управление ресторанами (только для администраторов)
+router.get('/restaurants', requireRole('admin'), async (req: AuthRequest, res: Response) => {
+  try {
+    const restaurantRepository = AppDataSource.getRepository(Restaurant);
+    const restaurants = await restaurantRepository.find({
+      order: { city: 'ASC', name: 'ASC' },
+    });
+    res.json({ success: true, data: restaurants });
+  } catch (error) {
+    console.error('Error fetching restaurants:', error);
+    res.status(500).json({ success: false, message: 'Failed to fetch restaurants' });
+  }
+});
+
+router.post('/restaurants', requireRole('admin'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { name, city, address, phoneNumber } = req.body;
+    
+    if (!name || !city || !address || !phoneNumber) {
+      res.status(400).json({ success: false, message: 'Missing required fields' });
+      return;
+    }
+    
+    const restaurantRepository = AppDataSource.getRepository(Restaurant);
+    const restaurant = restaurantRepository.create({
+      name,
+      city,
+      address,
+      phoneNumber,
+      isActive: true,
+    });
+    
+    const savedRestaurant = await restaurantRepository.save(restaurant);
+    res.json({ success: true, data: savedRestaurant });
+  } catch (error) {
+    console.error('Error creating restaurant:', error);
+    res.status(500).json({ success: false, message: 'Failed to create restaurant' });
+  }
+});
+
+router.put('/restaurants/:id', requireRole('admin'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { name, city, address, phoneNumber, isActive } = req.body;
+    const restaurantRepository = AppDataSource.getRepository(Restaurant);
+    const restaurant = await restaurantRepository.findOne({
+      where: { id: req.params.id },
+    });
+    
+    if (!restaurant) {
+      res.status(404).json({ success: false, message: 'Restaurant not found' });
+      return;
+    }
+    
+    if (name) restaurant.name = name;
+    if (city) restaurant.city = city;
+    if (address) restaurant.address = address;
+    if (phoneNumber) restaurant.phoneNumber = phoneNumber;
+    if (typeof isActive === 'boolean') restaurant.isActive = isActive;
+    
+    const updatedRestaurant = await restaurantRepository.save(restaurant);
+    res.json({ success: true, data: updatedRestaurant });
+  } catch (error) {
+    console.error('Error updating restaurant:', error);
+    res.status(500).json({ success: false, message: 'Failed to update restaurant' });
+  }
+});
+
+router.delete('/restaurants/:id', requireRole('admin'), async (req: AuthRequest, res: Response) => {
+  try {
+    const restaurantRepository = AppDataSource.getRepository(Restaurant);
+    const restaurant = await restaurantRepository.findOne({
+      where: { id: req.params.id },
+    });
+    
+    if (!restaurant) {
+      res.status(404).json({ success: false, message: 'Restaurant not found' });
+      return;
+    }
+    
+    // Мягкое удаление - просто деактивируем ресторан
+    restaurant.isActive = false;
+    await restaurantRepository.save(restaurant);
+    res.json({ success: true, message: 'Restaurant deactivated' });
+  } catch (error) {
+    console.error('Error deleting restaurant:', error);
+    res.status(500).json({ success: false, message: 'Failed to delete restaurant' });
   }
 });
 
