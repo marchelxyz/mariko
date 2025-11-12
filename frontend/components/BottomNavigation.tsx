@@ -119,7 +119,7 @@ export default function BottomNavigation() {
 
   return (
     <nav className="fixed bottom-[30px] left-0 right-0" style={{ backgroundColor: '#ffffff' }}>
-      <div className="flex justify-center items-center h-16 relative gap-4">
+      <div className="flex justify-center items-center h-16 relative gap-4 overflow-hidden">
         <div 
           ref={indicatorRef}
           className={`absolute top-0 h-1 rounded-sm ${enableTransition ? 'transition-all duration-700 ease-in-out' : ''}`}
