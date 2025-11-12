@@ -39,7 +39,10 @@ export default function Header({ title, showLogo = false }: HeaderProps) {
             onClick={() => setIsDropdownOpen(!isDropdownOpen)}
             className="w-full bg-accent text-text-secondary py-3 px-4 rounded-[10px] text-left hover:opacity-90 transition-opacity"
           >
-            {selectedRestaurant ? `${selectedRestaurant.city}, ${selectedRestaurant.address}` : 'Выбрать ресторан'}
+            <div className="flex items-center gap-2">
+              <span className="text-xs opacity-75 whitespace-nowrap">Адрес ресторана</span>
+              <span>{selectedRestaurant ? `${selectedRestaurant.city}, ${selectedRestaurant.address}` : 'Выбрать ресторан'}</span>
+            </div>
           </button>
           {isDropdownOpen && (
             <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-[10px] shadow-lg z-50 overflow-hidden max-h-60 overflow-y-auto">
