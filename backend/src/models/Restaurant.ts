@@ -26,6 +26,18 @@ export class Restaurant {
   @Column({ default: true })
   isActive!: boolean;
 
+  @Column({ nullable: true })
+  googleSheetId?: string;
+
+  @Column({ nullable: true })
+  googleSheetUrl?: string;
+
+  @Column({ nullable: true })
+  googleSheetName?: string; // Название листа для этого ресторана
+
+  @Column({ nullable: true })
+  lastSyncAt?: Date;
+
   @CreateDateColumn()
   createdAt!: Date;
 
