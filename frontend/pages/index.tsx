@@ -5,7 +5,7 @@ import Layout from '@/components/Layout';
 import Header from '@/components/Header';
 import ActionButtons from '@/components/ActionButtons';
 import Banners from '@/components/Banners';
-import MenuPreview from '@/components/MenuPreview';
+import MenuBlock from '@/components/MenuBlock';
 
 interface Banner {
   id: string;
@@ -41,7 +41,7 @@ export default function Home({ initialBanners, restaurantId }: HomeProps) {
       <ActionButtons />
       <div className="px-4 py-6 space-y-6">
         <Banners restaurantId={selectedRestaurant?.id || restaurantId} initialBanners={initialBanners} />
-        <MenuPreview restaurantId={selectedRestaurant?.id || restaurantId} />
+        <MenuBlock restaurantId={selectedRestaurant?.id || restaurantId} />
       </div>
     </Layout>
   );
