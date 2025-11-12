@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { AppDataSource } from '../config/database';
 import { Banner } from '../models/Banner';
-import { authenticate, AuthRequest } from '../middleware/auth';
+import { authenticate, AuthRequest, requireRole } from '../middleware/auth';
 
 const router = Router();
 
@@ -29,7 +29,7 @@ router.get('/', async (req: Request, res: Response) => {
   }
 });
 
-router.post('/', authenticate, async (req: AuthRequest, res: Response) => {
+router.post('/', authenticate, requireRole('admin'), async (req: AuthRequest, res: Response) => {
   try {
     const bannerRepository = AppDataSource.getRepository(Banner);
     const banner = bannerRepository.create(req.body);
@@ -41,7 +41,7 @@ router.post('/', authenticate, async (req: AuthRequest, res: Response) => {
   }
 });
 
-router.put('/:id', authenticate, async (req: AuthRequest, res: Response) => {
+router.put('/:id', authenticate, requireRole('admin'), async (req: AuthRequest, res: Response) => {
   try {
     const bannerRepository = AppDataSource.getRepository(Banner);
     const banner = await bannerRepository.findOne({
@@ -62,7 +62,7 @@ router.put('/:id', authenticate, async (req: AuthRequest, res: Response) => {
   }
 });
 
-router.delete('/:id', authenticate, async (req: AuthRequest, res: Response) => {
+router.delete('/:id', authenticate, requireRole('admin'), async (req: AuthRequest, res: Response) => {
   try {
     const bannerRepository = AppDataSource.getRepository(Banner);
     await bannerRepository.delete(req.params.id);
