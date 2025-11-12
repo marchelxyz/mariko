@@ -4,7 +4,9 @@ import { useEffect, useRef, useState } from 'react';
 export default function BottomNavigation() {
   const router = useRouter();
   const [indicatorStyle, setIndicatorStyle] = useState({ left: 0, width: 30 });
+  const [isInitialized, setIsInitialized] = useState(false);
   const buttonRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  const isInitializedRef = useRef(false);
 
   const navItems = [
     { 
@@ -38,16 +40,34 @@ export default function BottomNavigation() {
   ];
 
   useEffect(() => {
-    const activeIndex = navItems.findIndex(item => router.pathname === item.path);
-    if (activeIndex !== -1 && buttonRefs.current[activeIndex]) {
-      const button = buttonRefs.current[activeIndex];
-      const container = button?.parentElement;
-      if (container) {
-        const containerRect = container.getBoundingClientRect();
-        const buttonRect = button.getBoundingClientRect();
-        const left = buttonRect.left - containerRect.left + (buttonRect.width / 2) - 15;
-        setIndicatorStyle({ left, width: 30 });
+    const updateIndicator = () => {
+      const activeIndex = navItems.findIndex(item => router.pathname === item.path);
+      if (activeIndex !== -1 && buttonRefs.current[activeIndex]) {
+        const button = buttonRefs.current[activeIndex];
+        const container = button?.parentElement;
+        if (container) {
+          const containerRect = container.getBoundingClientRect();
+          const buttonRect = button.getBoundingClientRect();
+          const left = buttonRect.left - containerRect.left + (buttonRect.width / 2) - 15;
+          
+          if (!isInitializedRef.current) {
+            // При первой инициализации устанавливаем позицию без анимации
+            setIndicatorStyle({ left, width: 30 });
+            setIsInitialized(true);
+            isInitializedRef.current = true;
+          } else {
+            // При последующих изменениях применяем анимацию
+            setIndicatorStyle({ left, width: 30 });
+          }
+        }
       }
+    };
+
+    // Небольшая задержка для первого рендера, чтобы элементы успели отрисоваться
+    if (!isInitializedRef.current) {
+      setTimeout(updateIndicator, 0);
+    } else {
+      updateIndicator();
     }
   }, [router.pathname]);
 
@@ -55,7 +75,7 @@ export default function BottomNavigation() {
     <nav className="fixed bottom-[30px] left-0 right-0" style={{ backgroundColor: '#ffffff' }}>
       <div className="flex justify-center items-center h-16 relative gap-4">
         <div 
-          className="absolute top-0 h-1 rounded-sm transition-all duration-300 ease-in-out"
+          className={`absolute top-0 h-1 rounded-sm ${isInitialized ? 'transition-all duration-300 ease-in-out' : ''}`}
           style={{ 
             backgroundColor: '#8E1A1A',
             width: `${indicatorStyle.width}px`,
