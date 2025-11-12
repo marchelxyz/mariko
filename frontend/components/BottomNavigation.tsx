@@ -41,7 +41,7 @@ export default function BottomNavigation() {
   ];
 
   useEffect(() => {
-    const updateIndicator = () => {
+    const updateIndicator = (attempt = 0) => {
       const activeIndex = navItems.findIndex(item => router.pathname === item.path);
       if (activeIndex !== -1 && buttonRefs.current[activeIndex]) {
         const button = buttonRefs.current[activeIndex];
@@ -49,35 +49,47 @@ export default function BottomNavigation() {
         if (container) {
           const containerRect = container.getBoundingClientRect();
           const buttonRect = button.getBoundingClientRect();
-          const newLeft = buttonRect.left - containerRect.left + (buttonRect.width / 2) - 15;
           
-          if (!isInitializedRef.current) {
-            // При первой инициализации устанавливаем позицию без анимации
-            setIndicatorStyle({ left: newLeft, width: 30 });
-            setIsInitialized(true);
-            isInitializedRef.current = true;
-            previousIndexRef.current = activeIndex;
-          } else {
-            // При последующих изменениях применяем анимацию
-            // Убеждаемся, что текущая позиция установлена перед анимацией
-            if (previousIndexRef.current !== activeIndex) {
-              // Небольшая задержка для обеспечения плавной анимации от текущей позиции
-              requestAnimationFrame(() => {
-                setIndicatorStyle({ left: newLeft, width: 30 });
-              });
+          // Проверяем, что кнопка действительно отрисована (имеет валидные размеры)
+          if (buttonRect.width > 0 && containerRect.width > 0) {
+            const newLeft = buttonRect.left - containerRect.left + (buttonRect.width / 2) - 15;
+            
+            if (!isInitializedRef.current) {
+              // При первой инициализации устанавливаем позицию без анимации
+              setIndicatorStyle({ left: newLeft, width: 30 });
+              setIsInitialized(true);
+              isInitializedRef.current = true;
               previousIndexRef.current = activeIndex;
+            } else {
+              // При последующих изменениях применяем анимацию
+              if (previousIndexRef.current !== activeIndex) {
+                // Используем requestAnimationFrame для гарантии, что DOM обновился
+                // и текущая позиция индикатора уже установлена
+                requestAnimationFrame(() => {
+                  setIndicatorStyle({ left: newLeft, width: 30 });
+                });
+                previousIndexRef.current = activeIndex;
+              }
             }
+            return true; // Успешно обновлено
+          } else if (attempt < 5) {
+            // Если элементы еще не готовы, повторяем попытку
+            setTimeout(() => updateIndicator(attempt + 1), 10);
           }
         }
+      } else if (attempt < 5) {
+        // Если кнопка еще не найдена, повторяем попытку
+        setTimeout(() => updateIndicator(attempt + 1), 10);
       }
+      return false;
     };
 
-    // Небольшая задержка для первого рендера, чтобы элементы успели отрисоваться
-    if (!isInitializedRef.current) {
-      setTimeout(updateIndicator, 0);
-    } else {
-      updateIndicator();
-    }
+    // Используем requestAnimationFrame для первого кадра, затем setTimeout для гарантии обновления DOM
+    requestAnimationFrame(() => {
+      setTimeout(() => {
+        updateIndicator();
+      }, 0);
+    });
   }, [router.pathname]);
 
   return (
