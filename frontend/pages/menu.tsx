@@ -91,7 +91,7 @@ export default function Menu() {
         {/* Кнопка назад */}
         <button
           onClick={() => router.push('/')}
-          className="flex items-center gap-2 text-text-primary hover:opacity-80 transition-opacity mb-2"
+          className="flex items-center gap-2 text-text-primary hover:opacity-80 transition-opacity"
           aria-label="Назад на главную"
         >
           <svg
