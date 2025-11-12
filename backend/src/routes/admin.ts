@@ -10,8 +10,8 @@ const router = Router();
 // Все админ роуты требуют аутентификации
 router.use(authenticate);
 
-// Управление баннерами
-router.get('/banners', requireRole('admin', 'marketing', 'manager'), async (req: AuthRequest, res: Response) => {
+// Управление баннерами (только для администраторов)
+router.get('/banners', requireRole('admin'), async (req: AuthRequest, res: Response) => {
   try {
     const { restaurantId } = req.query;
     const bannerRepository = AppDataSource.getRepository(Banner);
