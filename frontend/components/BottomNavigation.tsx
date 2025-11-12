@@ -5,9 +5,12 @@ export default function BottomNavigation() {
   const router = useRouter();
   const [indicatorStyle, setIndicatorStyle] = useState({ left: 0, width: 30 });
   const [isInitialized, setIsInitialized] = useState(false);
+  const [enableTransition, setEnableTransition] = useState(false);
   const buttonRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  const indicatorRef = useRef<HTMLDivElement | null>(null);
   const isInitializedRef = useRef(false);
   const previousIndexRef = useRef<number>(-1);
+  const currentLeftRef = useRef<number>(0);
 
   const navItems = [
     { 
@@ -57,16 +60,38 @@ export default function BottomNavigation() {
             if (!isInitializedRef.current) {
               // При первой инициализации устанавливаем позицию без анимации
               setIndicatorStyle({ left: newLeft, width: 30 });
+              currentLeftRef.current = newLeft;
               setIsInitialized(true);
               isInitializedRef.current = true;
               previousIndexRef.current = activeIndex;
             } else {
               // При последующих изменениях применяем анимацию
               if (previousIndexRef.current !== activeIndex) {
-                // Используем requestAnimationFrame для гарантии, что DOM обновился
-                // и текущая позиция индикатора уже установлена
+                // Читаем текущую позицию индикатора из DOM перед анимацией
+                // Это гарантирует, что анимация начинается от реальной текущей позиции
+                let startLeft = indicatorStyle.left;
+                if (indicatorRef.current) {
+                  const indicatorRect = indicatorRef.current.getBoundingClientRect();
+                  const containerRectCurrent = container.getBoundingClientRect();
+                  const currentLeft = indicatorRect.left - containerRectCurrent.left;
+                  // Используем текущую позицию из DOM, если она валидна
+                  if (currentLeft >= 0) {
+                    startLeft = currentLeft;
+                    currentLeftRef.current = currentLeft;
+                  }
+                }
+                
+                // Отключаем transition и устанавливаем текущую позицию синхронно
+                setEnableTransition(false);
+                setIndicatorStyle({ left: startLeft, width: 30 });
+                
+                // Затем в следующем кадре включаем transition и устанавливаем новую позицию
                 requestAnimationFrame(() => {
-                  setIndicatorStyle({ left: newLeft, width: 30 });
+                  setEnableTransition(true);
+                  requestAnimationFrame(() => {
+                    setIndicatorStyle({ left: newLeft, width: 30 });
+                    currentLeftRef.current = newLeft;
+                  });
                 });
                 previousIndexRef.current = activeIndex;
               }
@@ -96,7 +121,8 @@ export default function BottomNavigation() {
     <nav className="fixed bottom-[30px] left-0 right-0" style={{ backgroundColor: '#ffffff' }}>
       <div className="flex justify-center items-center h-16 relative gap-4">
         <div 
-          className={`absolute top-0 h-1 rounded-sm ${isInitialized ? 'transition-all duration-300 ease-in-out' : ''}`}
+          ref={indicatorRef}
+          className={`absolute top-0 h-1 rounded-sm ${enableTransition ? 'transition-all duration-300 ease-in-out' : ''}`}
           style={{ 
             backgroundColor: '#8E1A1A',
             width: `${indicatorStyle.width}px`,
