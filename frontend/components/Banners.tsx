@@ -15,6 +15,7 @@ interface BannersProps {
 export default function Banners({ restaurantId }: BannersProps) {
   const [banners, setBanners] = useState<Banner[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [currentIndex, setCurrentIndex] = useState(0);
 
   useEffect(() => {
     // Пропускаем запрос на сервере
@@ -38,36 +39,83 @@ export default function Banners({ restaurantId }: BannersProps) {
     fetchBanners();
   }, [restaurantId]);
 
+  // Автоматическое переключение слайдов
+  useEffect(() => {
+    if (banners.length <= 1) return;
+
+    const interval = setInterval(() => {
+      setCurrentIndex((prevIndex) => (prevIndex + 1) % banners.length);
+    }, 5000); // Переключение каждые 5 секунд
+
+    return () => clearInterval(interval);
+  }, [banners.length]);
+
+  // Обработка клика на индикатор
+  const goToSlide = (index: number) => {
+    setCurrentIndex(index);
+  };
+
   if (isLoading || banners.length === 0) {
     return null;
   }
 
   return (
-    <div className="space-y-4">
-      {banners.map((banner) => (
+    <div className="relative">
+      <div className="overflow-hidden rounded-[15px]">
         <div
-          key={banner.id}
-          className={`bg-white rounded-[15px] shadow-sm overflow-hidden ${banner.linkUrl ? 'cursor-pointer hover:shadow-md transition-shadow' : ''}`}
-          onClick={() => {
-            if (banner.linkUrl) {
-              window.open(banner.linkUrl, '_blank');
-            }
+          className="flex transition-transform duration-500 ease-in-out"
+          style={{
+            transform: `translateX(-${currentIndex * 100}%)`,
           }}
         >
-          {banner.imageUrl ? (
-            <img
-              src={banner.imageUrl}
-              alt={banner.title || 'Banner'}
-              className="w-full object-cover rounded-[15px]"
-              style={{ aspectRatio: '16/9' }}
-            />
-          ) : (
-            <div className="w-full bg-secondary flex items-center justify-center rounded-[15px]" style={{ aspectRatio: '16/9' }}>
-              <span className="text-4xl">🖼️</span>
+          {banners.map((banner) => (
+            <div
+              key={banner.id}
+              className="min-w-full flex-shrink-0"
+            >
+              <div
+                className={`bg-white rounded-[15px] shadow-sm overflow-hidden ${banner.linkUrl ? 'cursor-pointer hover:shadow-md transition-shadow' : ''}`}
+                onClick={() => {
+                  if (banner.linkUrl) {
+                    window.open(banner.linkUrl, '_blank');
+                  }
+                }}
+              >
+                {banner.imageUrl ? (
+                  <img
+                    src={banner.imageUrl}
+                    alt={banner.title || 'Banner'}
+                    className="w-full object-cover rounded-[15px]"
+                    style={{ aspectRatio: '16/9' }}
+                  />
+                ) : (
+                  <div className="w-full bg-secondary flex items-center justify-center rounded-[15px]" style={{ aspectRatio: '16/9' }}>
+                    <span className="text-4xl">🖼️</span>
+                  </div>
+                )}
+              </div>
             </div>
-          )}
+          ))}
         </div>
-      ))}
+      </div>
+
+      {/* Индикаторы точек */}
+      {banners.length > 1 && (
+        <div className="flex justify-center gap-2 mt-4">
+          {banners.map((_, index) => (
+            <button
+              key={index}
+              onClick={() => goToSlide(index)}
+              className={`h-2 rounded-full transition-all duration-300 ${
+                index === currentIndex
+                  ? 'w-8 bg-primary'
+                  : 'w-2 bg-gray-300 hover:bg-gray-400'
+              }`}
+              aria-label={`Перейти к слайду ${index + 1}`}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
