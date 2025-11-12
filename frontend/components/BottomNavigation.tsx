@@ -35,23 +35,28 @@ export default function BottomNavigation() {
   ];
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0" style={{ backgroundColor: '#ffffff' }}>
-      <div className="flex justify-around items-center h-16 relative">
+    <nav className="fixed bottom-[30px] left-0 right-0" style={{ backgroundColor: '#ffffff' }}>
+      <div className="flex justify-center items-center h-16 relative gap-4">
         {navItems.map((item) => {
           const isActive = router.pathname === item.path;
           return (
             <button
               key={item.path}
               onClick={() => router.push(item.path)}
-              className="flex flex-col items-center justify-center flex-1 h-full relative"
+              className="flex flex-col items-center justify-center h-full relative px-4"
               style={{
                 color: isActive ? '#8E1A1A' : '#8E8E93'
               }}
             >
               {isActive && (
                 <div 
-                  className="absolute top-0 left-0 right-0 h-1"
-                  style={{ backgroundColor: '#8E1A1A' }}
+                  className="absolute top-0 h-1 rounded-sm"
+                  style={{ 
+                    backgroundColor: '#8E1A1A',
+                    width: '24px',
+                    left: '50%',
+                    transform: 'translateX(-50%)'
+                  }}
                 />
               )}
               <span className="mb-1">{item.icon}</span>
