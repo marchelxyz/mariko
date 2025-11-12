@@ -31,7 +31,7 @@ export default function Header({ title, showLogo = false, showBackButton = false
           {showBackButton && (
             <button
               onClick={handleBack}
-              className="absolute left-0 flex items-center gap-2 p-2 hover:opacity-80 transition-opacity"
+              className="absolute left-0 p-2 hover:opacity-80 transition-opacity"
               aria-label="Назад"
             >
               <svg
@@ -50,7 +50,6 @@ export default function Header({ title, showLogo = false, showBackButton = false
                   strokeLinejoin="round"
                 />
               </svg>
-              <span className="text-white text-base font-medium">Назад</span>
             </button>
           )}
           {/* Логотип по центру */}
@@ -65,7 +64,7 @@ export default function Header({ title, showLogo = false, showBackButton = false
             />
           </div>
           {/* Пустой элемент для балансировки, если есть кнопка назад */}
-          {showBackButton && <div className="w-24" />}
+          {showBackButton && <div className="w-10" />}
         </div>
 
         {/* Приветствие */}
