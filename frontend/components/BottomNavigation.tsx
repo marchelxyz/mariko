@@ -1,7 +1,10 @@
 import { useRouter } from 'next/router';
+import { useEffect, useRef, useState } from 'react';
 
 export default function BottomNavigation() {
   const router = useRouter();
+  const [indicatorStyle, setIndicatorStyle] = useState({ left: 0, width: 24 });
+  const buttonRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
   const navItems = [
     { 
@@ -34,31 +37,43 @@ export default function BottomNavigation() {
     },
   ];
 
+  useEffect(() => {
+    const activeIndex = navItems.findIndex(item => router.pathname === item.path);
+    if (activeIndex !== -1 && buttonRefs.current[activeIndex]) {
+      const button = buttonRefs.current[activeIndex];
+      const container = button?.parentElement;
+      if (container) {
+        const containerRect = container.getBoundingClientRect();
+        const buttonRect = button.getBoundingClientRect();
+        const left = buttonRect.left - containerRect.left + (buttonRect.width / 2) - 12;
+        setIndicatorStyle({ left, width: 24 });
+      }
+    }
+  }, [router.pathname]);
+
   return (
     <nav className="fixed bottom-[30px] left-0 right-0" style={{ backgroundColor: '#ffffff' }}>
       <div className="flex justify-center items-center h-16 relative gap-4">
-        {navItems.map((item) => {
+        <div 
+          className="absolute top-0 h-1 rounded-sm transition-all duration-300 ease-in-out"
+          style={{ 
+            backgroundColor: '#8E1A1A',
+            width: `${indicatorStyle.width}px`,
+            left: `${indicatorStyle.left}px`,
+          }}
+        />
+        {navItems.map((item, index) => {
           const isActive = router.pathname === item.path;
           return (
             <button
               key={item.path}
+              ref={(el) => { buttonRefs.current[index] = el; }}
               onClick={() => router.push(item.path)}
-              className="flex flex-col items-center justify-center h-full relative px-4"
+              className="flex flex-col items-center justify-center h-full relative px-4 transition-colors duration-300"
               style={{
                 color: isActive ? '#8E1A1A' : '#8E8E93'
               }}
             >
-              {isActive && (
-                <div 
-                  className="absolute top-0 h-1 rounded-sm"
-                  style={{ 
-                    backgroundColor: '#8E1A1A',
-                    width: '24px',
-                    left: '50%',
-                    transform: 'translateX(-50%)'
-                  }}
-                />
-              )}
               <span className="mb-1">{item.icon}</span>
               <span className="text-xs">{item.label}</span>
             </button>
