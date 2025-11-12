@@ -86,8 +86,33 @@ export default function Menu() {
 
   return (
     <Layout>
-      <Header title="Меню" showBackButton={true} />
+      <Header title="Меню" />
       <div className="px-4 py-6 space-y-6">
+        {/* Кнопка назад */}
+        <button
+          onClick={() => router.push('/')}
+          className="flex items-center gap-2 text-text-primary hover:opacity-80 transition-opacity mb-2"
+          aria-label="Назад на главную"
+        >
+          <svg
+            width="24"
+            height="24"
+            viewBox="0 0 24 24"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+            className="text-text-primary"
+          >
+            <path
+              d="M15 18L9 12L15 6"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+          <span className="text-base font-medium">Назад</span>
+        </button>
+
         {/* Фильтр категорий */}
         {availableCategories.length > 0 && (
           <div className="bg-white rounded-lg shadow-sm p-4">
