@@ -44,18 +44,19 @@ export default function ActionButtons() {
     <div className="bg-white px-4 py-4">
       <div className="grid grid-cols-4 gap-2">
         {actions.map((action, index) => (
-          <button
-            key={index}
-            onClick={action.action}
-            className="bg-[#F7F7F7] rounded-[10px] p-3 flex flex-col items-center justify-center hover:opacity-90 transition-opacity aspect-square"
-          >
-            <div className="flex items-center justify-center mb-2">
-              {action.icon}
-            </div>
-            <span className="text-xs font-medium text-[#000000] text-center leading-tight mt-auto">
+          <div key={index} className="flex flex-col items-center">
+            <button
+              onClick={action.action}
+              className="bg-[#F7F7F7] rounded-[10px] p-3 flex items-center justify-center hover:opacity-90 transition-opacity aspect-square w-full"
+            >
+              <div className="flex items-center justify-center">
+                {action.icon}
+              </div>
+            </button>
+            <span className="text-xs font-medium text-[#000000] text-center leading-tight mt-2">
               {action.label}
             </span>
-          </button>
+          </div>
         ))}
       </div>
     </div>
