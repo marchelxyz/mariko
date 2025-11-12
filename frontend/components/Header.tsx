@@ -8,7 +8,7 @@ interface HeaderProps {
 }
 
 export default function Header({ title, showLogo = false }: HeaderProps) {
-  const { selectedRestaurant, restaurants, setSelectedRestaurant } = useStore();
+  const { selectedRestaurant, restaurants, setSelectedRestaurant, isLoading } = useStore();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
   return (
@@ -44,19 +44,25 @@ export default function Header({ title, showLogo = false }: HeaderProps) {
           {isDropdownOpen && (
             <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-[10px] shadow-lg z-50 overflow-hidden max-h-60 overflow-y-auto">
               <div className="py-1">
-                {restaurants.map((restaurant) => (
-                  <button
-                    key={restaurant.id}
-                    onClick={() => {
-                      setSelectedRestaurant(restaurant);
-                      setIsDropdownOpen(false);
-                    }}
-                    className="block w-full text-left px-4 py-2 text-text-primary hover:bg-gray-100 transition-colors"
-                  >
-                    <div className="font-medium">{restaurant.city}</div>
-                    <div className="text-sm text-gray-600">{restaurant.address}</div>
-                  </button>
-                ))}
+                {isLoading ? (
+                  <div className="px-4 py-2 text-text-primary text-center">Загрузка ресторанов...</div>
+                ) : restaurants.length === 0 ? (
+                  <div className="px-4 py-2 text-text-primary text-center">Рестораны не найдены</div>
+                ) : (
+                  restaurants.map((restaurant) => (
+                    <button
+                      key={restaurant.id}
+                      onClick={() => {
+                        setSelectedRestaurant(restaurant);
+                        setIsDropdownOpen(false);
+                      }}
+                      className="block w-full text-left px-4 py-2 text-text-primary hover:bg-gray-100 transition-colors"
+                    >
+                      <div className="font-medium">{restaurant.city}</div>
+                      <div className="text-sm text-gray-600">{restaurant.address}</div>
+                    </button>
+                  ))
+                )}
               </div>
             </div>
           )}
