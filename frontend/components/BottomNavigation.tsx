@@ -4,7 +4,7 @@ export default function BottomNavigation() {
   const router = useRouter();
 
   const navItems = [
-    { path: '/', label: 'Главная', icon: '🏠' },
+    { path: '/', label: 'Главная', icon: '🏡' },
     { path: '/franchise', label: 'Франшиза', icon: '💼' },
     { path: '/profile', label: 'Профиль', icon: '👤' },
   ];
@@ -22,7 +22,7 @@ export default function BottomNavigation() {
                 : 'text-gray-500'
             }`}
           >
-            <span className="text-xl mb-1">{item.icon}</span>
+            <span className="text-2xl mb-1">{item.icon}</span>
             <span className="text-xs">{item.label}</span>
           </button>
         ))}
