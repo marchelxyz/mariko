@@ -10,16 +10,20 @@ interface Banner {
 
 interface BannersProps {
   restaurantId?: string;
+  initialBanners?: Banner[];
 }
 
-export default function Banners({ restaurantId }: BannersProps) {
+export default function Banners({ restaurantId, initialBanners }: BannersProps) {
   const { bannersByRestaurant, fetchBanners } = useStore();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
 
   // Получаем баннеры из кэша для конкретного ресторана
   const key = restaurantId || 'default';
-  const banners = bannersByRestaurant[key] || [];
+  const cachedBanners = bannersByRestaurant[key] || [];
+  
+  // Используем предзагруженные баннеры, если они есть и кэш пуст
+  const banners = cachedBanners.length > 0 ? cachedBanners : (initialBanners || []);
 
   useEffect(() => {
     // Пропускаем запрос на сервере
@@ -29,8 +33,14 @@ export default function Banners({ restaurantId }: BannersProps) {
       const key = restaurantId || 'default';
       const cachedBanners = bannersByRestaurant[key];
       
-      // Если баннеры уже есть в кэше, не показываем загрузку
+      // Если баннеры уже есть в кэше или есть initialBanners, не показываем загрузку
       if (cachedBanners && cachedBanners.length > 0) {
+        setIsLoading(false);
+        return;
+      }
+      
+      // Если есть initialBanners, не делаем запрос
+      if (initialBanners && initialBanners.length > 0) {
         setIsLoading(false);
         return;
       }
@@ -48,7 +58,7 @@ export default function Banners({ restaurantId }: BannersProps) {
     };
 
     loadBanners();
-  }, [restaurantId, fetchBanners, bannersByRestaurant]);
+  }, [restaurantId, fetchBanners, bannersByRestaurant, initialBanners]);
 
   // Автоматическое переключение слайдов
   useEffect(() => {

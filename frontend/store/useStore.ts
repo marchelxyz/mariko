@@ -47,6 +47,7 @@ interface Store {
   updateProfile: (data: Partial<User>) => Promise<void>;
   fetchBanners: (restaurantId?: string) => Promise<void>;
   prefetchBanners: (restaurantId?: string) => Promise<void>;
+  setBannersForRestaurant: (restaurantId: string | null, banners: Banner[]) => void;
 }
 
 export const useStore = create<Store>((set, get) => ({
@@ -184,5 +185,17 @@ export const useStore = create<Store>((set, get) => ({
       // Тихая ошибка при предзагрузке
       console.debug('Failed to prefetch banners:', error);
     }
+  },
+
+  setBannersForRestaurant: (restaurantId, banners) => {
+    const key = restaurantId || 'default';
+    set((state) => ({
+      bannersByRestaurant: {
+        ...state.bannersByRestaurant,
+        [key]: banners,
+      },
+      // Если это баннеры для текущего ресторана, обновляем и текущие баннеры
+      banners: banners,
+    }));
   },
 }));
