@@ -53,7 +53,14 @@ export const connectDatabase = async (): Promise<void> => {
       synchronize: true,
     });
     
-    await AppDataSource.initialize();
+    // Добавляем таймаут для подключения (30 секунд)
+    const connectionPromise = AppDataSource.initialize();
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('Database connection timeout after 30 seconds')), 30000);
+    });
+    
+    await Promise.race([connectionPromise, timeoutPromise]);
+    
     console.log('✅ PostgreSQL connected');
     console.log('📋 Доступные таблицы:', AppDataSource.entityMetadatas.map(e => e.tableName).join(', '));
     
