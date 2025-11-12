@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 
 export default function BottomNavigation() {
   const router = useRouter();
-  const [indicatorStyle, setIndicatorStyle] = useState({ left: 0, width: 24 });
+  const [indicatorStyle, setIndicatorStyle] = useState({ left: 0, width: 30 });
   const buttonRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
   const navItems = [
@@ -45,8 +45,8 @@ export default function BottomNavigation() {
       if (container) {
         const containerRect = container.getBoundingClientRect();
         const buttonRect = button.getBoundingClientRect();
-        const left = buttonRect.left - containerRect.left + (buttonRect.width / 2) - 12;
-        setIndicatorStyle({ left, width: 24 });
+        const left = buttonRect.left - containerRect.left + (buttonRect.width / 2) - 15;
+        setIndicatorStyle({ left, width: 30 });
       }
     }
   }, [router.pathname]);
