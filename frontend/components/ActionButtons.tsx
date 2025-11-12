@@ -31,7 +31,7 @@ export default function ActionButtons() {
                 {action.icon}
               </div>
             </button>
-            <span className="text-xs font-medium text-[#000000] text-center leading-tight mt-2">
+            <span className="text-xs font-medium text-[#000000] text-center leading-tight mt-1">
               {action.label}
             </span>
           </div>
