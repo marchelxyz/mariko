@@ -86,7 +86,7 @@ export default function Menu() {
 
   return (
     <Layout>
-      <Header title="Меню" />
+      <Header title="Меню" showBackButton={true} />
       <div className="px-4 py-6 space-y-6">
         {/* Фильтр категорий */}
         {availableCategories.length > 0 && (
