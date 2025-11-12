@@ -39,7 +39,7 @@ export default function Header({ title, showLogo = false }: HeaderProps) {
             onClick={() => setIsDropdownOpen(!isDropdownOpen)}
             className="w-full bg-accent text-text-secondary py-3 px-4 rounded-[10px] text-left hover:opacity-90 transition-opacity"
           >
-            <div className="flex items-center gap-2">
+            <div className="flex flex-col gap-1">
               <span className="text-xs opacity-75 whitespace-nowrap">Адрес ресторана</span>
               <span>{selectedRestaurant ? `${selectedRestaurant.city}, ${selectedRestaurant.address}` : 'Выбрать ресторан'}</span>
             </div>
