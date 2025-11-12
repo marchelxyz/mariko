@@ -17,8 +17,8 @@ export default function Home() {
   return (
     <Layout>
       <Header />
+      <ActionButtons />
       <div className="px-4 py-6 space-y-6">
-        <ActionButtons />
         <Banners restaurantId={selectedRestaurant?.id} />
         <MenuPreview restaurantId={selectedRestaurant?.id} />
       </div>
