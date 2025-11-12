@@ -1,18 +1,7 @@
 import { useRouter } from 'next/router';
 import { useEffect, useRef, useState } from 'react';
 
-export default function BottomNavigation() {
-  const router = useRouter();
-  const [indicatorStyle, setIndicatorStyle] = useState({ left: 0, width: 30 });
-  const [isInitialized, setIsInitialized] = useState(false);
-  const [enableTransition, setEnableTransition] = useState(false);
-  const buttonRefs = useRef<(HTMLButtonElement | null)[]>([]);
-  const indicatorRef = useRef<HTMLDivElement | null>(null);
-  const isInitializedRef = useRef(false);
-  const previousIndexRef = useRef<number>(-1);
-  const currentLeftRef = useRef<number>(0);
-
-  const navItems = [
+const navItems = [
     { 
       path: '/', 
       label: 'Главная', 
@@ -41,7 +30,18 @@ export default function BottomNavigation() {
         </svg>
       )
     },
-  ];
+];
+
+export default function BottomNavigation() {
+  const router = useRouter();
+  const [indicatorStyle, setIndicatorStyle] = useState({ left: 0, width: 30 });
+  const [isInitialized, setIsInitialized] = useState(false);
+  const [enableTransition, setEnableTransition] = useState(false);
+  const buttonRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  const indicatorRef = useRef<HTMLDivElement | null>(null);
+  const isInitializedRef = useRef(false);
+  const previousIndexRef = useRef<number>(-1);
+  const currentLeftRef = useRef<number>(0);
 
   useEffect(() => {
     const updateIndicator = (attempt = 0) => {
@@ -69,7 +69,7 @@ export default function BottomNavigation() {
               if (previousIndexRef.current !== activeIndex) {
                 // Читаем текущую позицию индикатора из DOM перед анимацией
                 // Это гарантирует, что анимация начинается от реальной текущей позиции
-                let startLeft = indicatorStyle.left;
+                let startLeft = currentLeftRef.current;
                 if (indicatorRef.current) {
                   const indicatorRect = indicatorRef.current.getBoundingClientRect();
                   const containerRectCurrent = container.getBoundingClientRect();
@@ -115,7 +115,7 @@ export default function BottomNavigation() {
         updateIndicator();
       }, 0);
     });
-  }, [router.pathname]);
+  }, [router.pathname, navItems]);
 
   return (
     <nav className="fixed bottom-[30px] left-0 right-0" style={{ backgroundColor: '#ffffff' }}>

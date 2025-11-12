@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import Layout from '@/components/Layout';
 import Header from '@/components/Header';
 import { useStore } from '@/store/useStore';
@@ -28,6 +28,24 @@ export default function AdminBanners() {
     order: 0,
   });
 
+  const fetchBanners = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const response = await api.get('/admin/banners');
+      setBanners(response.data.data || []);
+    } catch (error) {
+      console.error('Failed to fetch banners:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (user && user.role === 'admin') {
+      fetchBanners();
+    }
+  }, [user, fetchBanners]);
+
   // Проверка прав доступа
   if (typeof window !== 'undefined' && (!user || user.role !== 'admin')) {
     return (
@@ -40,22 +58,6 @@ export default function AdminBanners() {
       </Layout>
     );
   }
-
-  useEffect(() => {
-    fetchBanners();
-  }, []);
-
-  const fetchBanners = async () => {
-    setIsLoading(true);
-    try {
-      const response = await api.get('/admin/banners');
-      setBanners(response.data.data || []);
-    } catch (error) {
-      console.error('Failed to fetch banners:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const handleCreate = () => {
     setEditingBanner(null);
