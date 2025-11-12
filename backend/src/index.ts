@@ -29,9 +29,32 @@ app.use(morgan('dev'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Health check
-app.get('/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+// Health check с проверкой подключения к БД
+app.get('/health', async (req, res) => {
+  try {
+    const { AppDataSource } = await import('./config/database');
+    const isDbConnected = AppDataSource.isInitialized;
+    
+    if (isDbConnected) {
+      res.json({ 
+        status: 'ok', 
+        timestamp: new Date().toISOString(),
+        database: 'connected'
+      });
+    } else {
+      res.status(503).json({ 
+        status: 'unhealthy', 
+        timestamp: new Date().toISOString(),
+        database: 'disconnected'
+      });
+    }
+  } catch (error) {
+    res.status(503).json({ 
+      status: 'error', 
+      timestamp: new Date().toISOString(),
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
 });
 
 // Routes
@@ -47,17 +70,64 @@ app.use('/api/booking', bookingRoutes);
 app.use(errorHandler);
 
 // Start server
+let server: any = null;
+
 const startServer = async () => {
   try {
     await connectDatabase();
-    app.listen(PORT, () => {
+    server = app.listen(PORT, () => {
       console.log(`🚀 Server running on port ${PORT}`);
+      console.log(`📡 Health check available at http://localhost:${PORT}/health`);
     });
   } catch (error) {
     console.error('Failed to start server:', error);
     process.exit(1);
   }
 };
+
+// Graceful shutdown - обработка сигналов завершения
+const gracefulShutdown = async (signal: string) => {
+  console.log(`\n${signal} received. Starting graceful shutdown...`);
+  
+  if (server) {
+    server.close(() => {
+      console.log('✅ HTTP server closed');
+    });
+  }
+  
+  // Закрываем подключение к БД
+  try {
+    const { AppDataSource } = await import('./config/database');
+    if (AppDataSource.isInitialized) {
+      await AppDataSource.destroy();
+      console.log('✅ Database connection closed');
+    }
+  } catch (error) {
+    console.error('Error closing database:', error);
+  }
+  
+  // Даем время на завершение операций (максимум 10 секунд)
+  setTimeout(() => {
+    console.log('⚠️  Forced shutdown after timeout');
+    process.exit(0);
+  }, 10000);
+  
+  process.exit(0);
+};
+
+// Обработка сигналов завершения
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+
+// Обработка необработанных ошибок
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+});
+
+process.on('uncaughtException', (error) => {
+  console.error('Uncaught Exception:', error);
+  gracefulShutdown('uncaughtException');
+});
 
 startServer();
 
