@@ -6,6 +6,7 @@ import { User, UserRole } from '../models/User';
 import { MenuItem } from '../models/MenuItem';
 import { Restaurant } from '../models/Restaurant';
 import { createGoogleSheetsService } from '../services/GoogleSheetsService';
+import { syncAllRestaurantsMenu } from '../services/syncService';
 
 const router = Router();
 
@@ -218,6 +219,23 @@ router.post('/restaurants/:id/sync', requireRole('admin', 'manager'), async (req
     res.status(500).json({ 
       success: false, 
       message: error instanceof Error ? error.message : 'Failed to sync menu' 
+    });
+  }
+});
+
+// Синхронизация меню всех ресторанов
+router.post('/restaurants/sync-all', requireRole('admin'), async (req: AuthRequest, res: Response) => {
+  try {
+    await syncAllRestaurantsMenu();
+    res.json({ 
+      success: true, 
+      message: 'Синхронизация всех ресторанов завершена'
+    });
+  } catch (error) {
+    console.error('Error syncing all restaurants:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: error instanceof Error ? error.message : 'Failed to sync all restaurants' 
     });
   }
 });

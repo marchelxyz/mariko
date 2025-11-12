@@ -163,6 +163,7 @@ export class GoogleSheetsService {
         const calories = row[3] ? parseFloat(String(row[3])) : null;
         const ingredients = row[4] ? String(row[4]).trim() : null;
         const dishImageId = row[5] ? String(row[5]).trim() : null;
+        // Нормализуем категорию: убираем пробелы и приводим к правильному формату
         const category = row[6] ? String(row[6]).trim() : 'Без категории';
 
         processedInternalIds.add(internalDishId);
