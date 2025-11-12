@@ -49,7 +49,7 @@ export default function Banners({ restaurantId }: BannersProps) {
           key={banner.id}
           className="bg-white rounded-lg shadow-sm overflow-hidden"
         >
-          <div className="w-full h-48 bg-secondary flex items-center justify-center">
+          <div className="w-full bg-secondary flex items-center justify-center" style={{ aspectRatio: '16/9' }}>
             <span className="text-4xl">🖼️</span>
           </div>
           {banner.title && (
