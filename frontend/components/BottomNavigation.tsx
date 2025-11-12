@@ -46,7 +46,7 @@ const adminNavItem = {
 
 export default function BottomNavigation() {
   const router = useRouter();
-  const { user } = useStore();
+  const { user, selectedRestaurant, prefetchBanners } = useStore();
   const [indicatorStyle, setIndicatorStyle] = useState({ left: 0, width: 30 });
   const [isInitialized, setIsInitialized] = useState(false);
   const [enableTransition, setEnableTransition] = useState(false);
@@ -151,11 +151,20 @@ export default function BottomNavigation() {
         />
         {navItems.map((item, index) => {
           const isActive = router.pathname === item.path;
+          const isHomePage = item.path === '/';
+          
           return (
             <button
               key={item.path}
               ref={(el) => { buttonRefs.current[index] = el; }}
               onClick={() => router.push(item.path)}
+              onMouseEnter={() => {
+                // Предзагружаем баннеры при наведении на главную страницу
+                if (isHomePage) {
+                  const restaurantId = selectedRestaurant?.id;
+                  prefetchBanners(restaurantId);
+                }
+              }}
               className="flex flex-col items-center justify-center h-full relative px-4 transition-colors duration-300"
               style={{
                 color: isActive ? '#8E1A1A' : '#8E8E93'

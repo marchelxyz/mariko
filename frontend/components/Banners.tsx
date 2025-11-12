@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import api from '@/lib/api';
+import { useStore } from '@/store/useStore';
 
 interface Banner {
   id: string;
@@ -13,21 +13,32 @@ interface BannersProps {
 }
 
 export default function Banners({ restaurantId }: BannersProps) {
-  const [banners, setBanners] = useState<Banner[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const { bannersByRestaurant, fetchBanners } = useStore();
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [isLoading, setIsLoading] = useState(false);
+
+  // Получаем баннеры из кэша для конкретного ресторана
+  const key = restaurantId || 'default';
+  const banners = bannersByRestaurant[key] || [];
 
   useEffect(() => {
     // Пропускаем запрос на сервере
     if (typeof window === 'undefined') return;
 
-    const fetchBanners = async () => {
+    const loadBanners = async () => {
+      const key = restaurantId || 'default';
+      const cachedBanners = bannersByRestaurant[key];
+      
+      // Если баннеры уже есть в кэше, не показываем загрузку
+      if (cachedBanners && cachedBanners.length > 0) {
+        setIsLoading(false);
+        return;
+      }
+
       setIsLoading(true);
       try {
-        const response = await api.get('/banners', {
-          params: restaurantId ? { restaurantId } : {},
-        });
-        setBanners(response.data.data || []);
+        // Используем функцию из store, которая проверяет кэш
+        await fetchBanners(restaurantId);
       } catch (error) {
         console.error('Failed to fetch banners:', error);
         // Не показываем ошибку пользователю, просто не отображаем баннеры
@@ -36,8 +47,8 @@ export default function Banners({ restaurantId }: BannersProps) {
       }
     };
 
-    fetchBanners();
-  }, [restaurantId]);
+    loadBanners();
+  }, [restaurantId, fetchBanners, bannersByRestaurant]);
 
   // Автоматическое переключение слайдов
   useEffect(() => {
