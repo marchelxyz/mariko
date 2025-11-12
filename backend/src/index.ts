@@ -17,7 +17,7 @@ import adminRoutes from './routes/admin';
 import bookingRoutes from './routes/booking';
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = Number(process.env.PORT) || 5000;
 
 // Middleware
 app.use(helmet());
