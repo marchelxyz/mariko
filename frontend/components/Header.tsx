@@ -15,12 +15,12 @@ export default function Header({ title, showLogo = false }: HeaderProps) {
     <header className="bg-primary text-text-secondary rounded-b-[20px] pb-6 pt-4 px-4 sticky top-0 z-50">
       <div className="flex flex-col items-center">
         {/* Логотип по центру */}
-        <div className="flex justify-center mb-5">
+        <div className="flex justify-center mb-5 mt-2">
           <Image
             src="/image/image 159.webp"
             alt="Logo"
-            width={120}
-            height={120}
+            width={100}
+            height={100}
             className="object-contain"
             unoptimized
           />
