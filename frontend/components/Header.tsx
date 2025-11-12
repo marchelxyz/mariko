@@ -15,7 +15,7 @@ export default function Header({ title, showLogo = false }: HeaderProps) {
     <header className="bg-primary text-text-secondary rounded-b-[20px] pb-6 pt-4 px-4 sticky top-0 z-50">
       <div className="flex flex-col items-center">
         {/* Логотип по центру */}
-        <div className="flex justify-center mb-5 mt-2">
+        <div className="flex justify-center mb-5 mt-6">
           <Image
             src="/image/image 159.webp"
             alt="Logo"
