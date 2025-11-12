@@ -98,9 +98,9 @@ export default function Banners({ restaurantId }: BannersProps) {
           ))}
         </div>
 
-        {/* Индикаторы точек - на баннере, 2px выше нижнего края */}
+        {/* Индикаторы точек - на баннере, 1px выше нижнего края */}
         {banners.length > 1 && (
-          <div className="absolute bottom-[2px] left-0 right-0 flex justify-center gap-2 pb-2">
+          <div className="absolute bottom-[1px] left-0 right-0 flex justify-center gap-2">
             {banners.map((_, index) => (
               <button
                 key={index}
