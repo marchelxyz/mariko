@@ -5,13 +5,34 @@ import api from '@/lib/api';
 
 export default function TelegramAuth() {
   const router = useRouter();
-  const { setToken, setUser } = useStore();
+  const { setToken, setUser, fetchProfile } = useStore();
 
   useEffect(() => {
     const initTelegramAuth = async () => {
       if (typeof window === 'undefined') return;
 
       try {
+        // Проверяем, есть ли токен в localStorage
+        const existingToken = localStorage.getItem('token');
+        const { user } = useStore.getState();
+        
+        // Если токен есть, но пользователь не загружен, загружаем профиль
+        if (existingToken && !user) {
+          try {
+            await fetchProfile();
+          } catch (error) {
+            console.error('Failed to fetch profile with existing token:', error);
+            // Если токен невалидный, удаляем его
+            if (error && typeof error === 'object' && 'response' in error) {
+              const axiosError = error as any;
+              if (axiosError.response?.status === 401) {
+                localStorage.removeItem('token');
+                setToken(null);
+              }
+            }
+          }
+        }
+
         // Динамический импорт SDK только на клиенте
         const { default: WebApp } = await import('@twa-dev/sdk');
         
@@ -46,6 +67,12 @@ export default function TelegramAuth() {
           if (response.data.success) {
             setToken(response.data.token);
             setUser(response.data.user);
+            // Загружаем актуальные данные профиля, чтобы убедиться, что роль обновлена
+            try {
+              await fetchProfile();
+            } catch (error) {
+              console.error('Failed to fetch profile after auth:', error);
+            }
           }
         }
       } catch (error) {
@@ -54,7 +81,7 @@ export default function TelegramAuth() {
     };
 
     initTelegramAuth();
-  }, [setToken, setUser]);
+  }, [setToken, setUser, fetchProfile]);
 
   return null;
 }

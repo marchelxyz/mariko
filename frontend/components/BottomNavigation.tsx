@@ -1,7 +1,8 @@
 import { useRouter } from 'next/router';
 import { useEffect, useRef, useState } from 'react';
+import { useStore } from '@/store/useStore';
 
-const navItems = [
+const baseNavItems = [
     { 
       path: '/', 
       label: 'Главная', 
@@ -32,8 +33,20 @@ const navItems = [
     },
 ];
 
+const adminNavItem = {
+  path: '/admin',
+  label: 'Админ',
+  icon: (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M12 15C15.866 15 19 11.866 19 8C19 4.13401 15.866 1 12 1C8.13401 1 5 4.13401 5 8C5 11.866 8.13401 15 12 15Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+      <path d="M8.21 13.89L7 23L12 20L17 23L15.79 13.88" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  )
+};
+
 export default function BottomNavigation() {
   const router = useRouter();
+  const { user } = useStore();
   const [indicatorStyle, setIndicatorStyle] = useState({ left: 0, width: 30 });
   const [isInitialized, setIsInitialized] = useState(false);
   const [enableTransition, setEnableTransition] = useState(false);
@@ -42,6 +55,13 @@ export default function BottomNavigation() {
   const isInitializedRef = useRef(false);
   const previousIndexRef = useRef<number>(-1);
   const currentLeftRef = useRef<number>(0);
+
+  // Формируем список пунктов меню в зависимости от роли пользователя
+  const navItems = [
+    ...baseNavItems,
+    // Добавляем админский пункт меню, если пользователь админ
+    ...(user && ['admin', 'ADMIN'].includes(user.role) ? [adminNavItem] : [])
+  ];
 
   useEffect(() => {
     const updateIndicator = (attempt = 0) => {
@@ -115,7 +135,7 @@ export default function BottomNavigation() {
         updateIndicator();
       }, 0);
     });
-  }, [router.pathname, navItems]);
+  }, [router.pathname, navItems, user]);
 
   return (
     <nav className="fixed bottom-[30px] left-0 right-0" style={{ backgroundColor: '#ffffff' }}>
