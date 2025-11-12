@@ -7,6 +7,7 @@ export default function BottomNavigation() {
   const [isInitialized, setIsInitialized] = useState(false);
   const buttonRefs = useRef<(HTMLButtonElement | null)[]>([]);
   const isInitializedRef = useRef(false);
+  const previousIndexRef = useRef<number>(-1);
 
   const navItems = [
     { 
@@ -48,16 +49,24 @@ export default function BottomNavigation() {
         if (container) {
           const containerRect = container.getBoundingClientRect();
           const buttonRect = button.getBoundingClientRect();
-          const left = buttonRect.left - containerRect.left + (buttonRect.width / 2) - 15;
+          const newLeft = buttonRect.left - containerRect.left + (buttonRect.width / 2) - 15;
           
           if (!isInitializedRef.current) {
             // При первой инициализации устанавливаем позицию без анимации
-            setIndicatorStyle({ left, width: 30 });
+            setIndicatorStyle({ left: newLeft, width: 30 });
             setIsInitialized(true);
             isInitializedRef.current = true;
+            previousIndexRef.current = activeIndex;
           } else {
             // При последующих изменениях применяем анимацию
-            setIndicatorStyle({ left, width: 30 });
+            // Убеждаемся, что текущая позиция установлена перед анимацией
+            if (previousIndexRef.current !== activeIndex) {
+              // Небольшая задержка для обеспечения плавной анимации от текущей позиции
+              requestAnimationFrame(() => {
+                setIndicatorStyle({ left: newLeft, width: 30 });
+              });
+              previousIndexRef.current = activeIndex;
+            }
           }
         }
       }
