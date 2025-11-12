@@ -95,101 +95,98 @@ export default function MenuBlock({ restaurantId }: MenuBlockProps) {
         {menuItems.map((item) => (
           <div
             key={item.id}
-            className="flex-shrink-0 px-2"
+            className="flex-shrink-0"
             style={{ width: '180px' }}
           >
-            {/* Контейнер карты */}
-            <div className="w-full">
-              {/* Подложка */}
-              <div
-                className="relative"
-                style={{
-                  width: '100%',
-                  height: '196px',
-                  backgroundColor: '#F7F7F7',
-                  borderRadius: '12px',
-                  padding: '4px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                {/* Фото блюда */}
-                {item.imageUrl ? (
-                  <div
-                    style={{
-                      width: '100%',
-                      borderRadius: '15px',
-                      overflow: 'hidden',
-                      position: 'relative',
-                      aspectRatio: '4/3',
-                    }}
-                  >
-                    <img
-                      src={item.imageUrl}
-                      alt={item.name}
-                      style={{
-                        width: '100%',
-                        height: '100%',
-                        objectFit: 'cover',
-                      }}
-                    />
-                  </div>
-                ) : (
-                  <div
-                    style={{
-                      width: '100%',
-                      borderRadius: '15px',
-                      backgroundColor: '#E5E5E5',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      aspectRatio: '4/3',
-                    }}
-                  >
-                    <span className="text-3xl">🍽️</span>
-                  </div>
-                )}
-              </div>
-
-              {/* Цена */}
-              <div
-                style={{
-                  marginTop: '3px',
-                  fontSize: '14px',
-                  fontWeight: 'bold',
-                  color: '#000000',
-                }}
-              >
-                {item.price} ₽
-              </div>
-
-              {/* Название блюда */}
-              <div
-                style={{
-                  marginTop: '2px',
-                  fontSize: '14px',
-                  fontWeight: 500, // Medium
-                  color: '#000000',
-                }}
-              >
-                {item.name}
-              </div>
-
-              {/* Калорийность */}
-              {item.calories && (
+            {/* Подложка */}
+            <div
+              className="relative"
+              style={{
+                width: '180px',
+                height: '196px',
+                backgroundColor: '#F7F7F7',
+                borderRadius: '12px',
+                padding: '4px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              {/* Фото блюда */}
+              {item.imageUrl ? (
                 <div
                   style={{
-                    marginTop: '2px',
-                    fontSize: '12px',
-                    fontWeight: 'normal',
-                    color: 'rgba(27, 31, 59, 0.4)', // #1B1F3B с прозрачностью 40%
+                    width: '100%',
+                    borderRadius: '15px',
+                    overflow: 'hidden',
+                    position: 'relative',
+                    aspectRatio: '4/3',
                   }}
                 >
-                  {item.calories} ккал
+                  <img
+                    src={item.imageUrl}
+                    alt={item.name}
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      objectFit: 'cover',
+                    }}
+                  />
+                </div>
+              ) : (
+                <div
+                  style={{
+                    width: '100%',
+                    borderRadius: '15px',
+                    backgroundColor: '#E5E5E5',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    aspectRatio: '4/3',
+                  }}
+                >
+                  <span className="text-3xl">🍽️</span>
                 </div>
               )}
             </div>
+
+            {/* Цена */}
+            <div
+              style={{
+                marginTop: '3px',
+                fontSize: '14px',
+                fontWeight: 'bold',
+                color: '#000000',
+              }}
+            >
+              {item.price} ₽
+            </div>
+
+            {/* Название блюда */}
+            <div
+              style={{
+                marginTop: '2px',
+                fontSize: '14px',
+                fontWeight: 500, // Medium
+                color: '#000000',
+              }}
+            >
+              {item.name}
+            </div>
+
+            {/* Калорийность */}
+            {item.calories && (
+              <div
+                style={{
+                  marginTop: '2px',
+                  fontSize: '12px',
+                  fontWeight: 'normal',
+                  color: 'rgba(27, 31, 59, 0.4)', // #1B1F3B с прозрачностью 40%
+                }}
+              >
+                {item.calories} ккал
+              </div>
+            )}
           </div>
         ))}
       </div>
