@@ -122,7 +122,7 @@ export default function BottomNavigation() {
       <div className="flex justify-center items-center h-16 relative gap-4">
         <div 
           ref={indicatorRef}
-          className={`absolute top-0 h-1 rounded-sm ${enableTransition ? 'transition-all duration-300 ease-in-out' : ''}`}
+          className={`absolute top-0 h-1 rounded-sm ${enableTransition ? 'transition-all duration-700 ease-in-out' : ''}`}
           style={{ 
             backgroundColor: '#8E1A1A',
             width: `${indicatorStyle.width}px`,
