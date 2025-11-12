@@ -45,8 +45,16 @@ export default function Profile() {
       <div className="px-4 py-6">
         <div className="bg-white rounded-lg shadow-sm p-6 space-y-6">
           <div className="flex items-center space-x-4">
-            <div className="w-20 h-20 bg-secondary rounded-full flex items-center justify-center">
-              <span className="text-2xl">👤</span>
+            <div className="w-20 h-20 bg-secondary rounded-full flex items-center justify-center overflow-hidden">
+              {user?.photoUrl ? (
+                <img 
+                  src={user.photoUrl} 
+                  alt={`${user.firstName || ''} ${user.lastName || ''}`.trim() || 'Пользователь'}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <span className="text-2xl">👤</span>
+              )}
             </div>
             <div>
               <h2 className="text-xl font-bold text-text-primary">

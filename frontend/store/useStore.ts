@@ -7,6 +7,7 @@ interface User {
   telegramId: string;
   firstName?: string;
   lastName?: string;
+  photoUrl?: string;
   phoneNumber?: string;
   dateOfBirth?: string;
   gender?: string;

@@ -10,9 +10,30 @@ router.post('/telegram', async (req: Request, res: Response) => {
   try {
     const { initData } = req.body;
 
-    // В реальном приложении нужно валидировать initData через Telegram
-    // Для упрощения здесь базовая реализация
-    const telegramUser = JSON.parse(decodeURIComponent(initData));
+    // Парсим initData из Telegram WebApp
+    // initData может быть строкой с параметрами или уже объектом
+    let telegramUser: any;
+    
+    if (typeof initData === 'string') {
+      // Если initData - строка, пытаемся извлечь user параметр
+      try {
+        // Пробуем распарсить как JSON
+        telegramUser = JSON.parse(decodeURIComponent(initData));
+      } catch {
+        // Если не JSON, пытаемся извлечь из query string
+        const params = new URLSearchParams(initData);
+        const userParam = params.get('user');
+        if (userParam) {
+          telegramUser = JSON.parse(decodeURIComponent(userParam));
+        } else {
+          // Если нет параметра user, пробуем распарсить всю строку как JSON
+          telegramUser = JSON.parse(initData);
+        }
+      }
+    } else {
+      telegramUser = initData;
+    }
+
     const telegramId = telegramUser.id.toString();
 
     const userRepository = AppDataSource.getRepository(User);
@@ -30,6 +51,7 @@ router.post('/telegram', async (req: Request, res: Response) => {
         firstName: telegramUser.first_name,
         lastName: telegramUser.last_name,
         username: telegramUser.username,
+        photoUrl: telegramUser.photo_url,
         role: isAdmin ? UserRole.ADMIN : UserRole.USER,
       });
       await userRepository.save(user);
@@ -38,6 +60,10 @@ router.post('/telegram', async (req: Request, res: Response) => {
       user.firstName = telegramUser.first_name || user.firstName;
       user.lastName = telegramUser.last_name || user.lastName;
       user.username = telegramUser.username || user.username;
+      // Обновляем фото, если оно есть в данных
+      if (telegramUser.photo_url) {
+        user.photoUrl = telegramUser.photo_url;
+      }
       
       // Если пользователь в списке админов, устанавливаем роль admin
       if (isAdmin && user.role !== UserRole.ADMIN) {
