@@ -80,10 +80,26 @@ export const useStore = create<Store>((set, get) => ({
     set({ isLoading: true, error: null });
     try {
       const response = await api.get('/restaurants');
-      const restaurants = response.data.data.map((r: Restaurant) => ({
+      console.log('Restaurants API response:', response.data);
+      
+      // Проверяем структуру ответа
+      const restaurantsData = response.data?.data || response.data || [];
+      if (!Array.isArray(restaurantsData)) {
+        console.error('Invalid restaurants data format:', restaurantsData);
+        set({ 
+          restaurants: [], 
+          isLoading: false,
+          error: 'Неверный формат данных ресторанов'
+        });
+        return;
+      }
+      
+      const restaurants = restaurantsData.map((r: Restaurant) => ({
         ...r,
         id: r.id || r._id,
       }));
+      
+      console.log('Processed restaurants:', restaurants);
       set({ restaurants, isLoading: false });
       
       // Автоматически выбираем первый ресторан, если не выбран
@@ -93,6 +109,7 @@ export const useStore = create<Store>((set, get) => ({
     } catch (error: any) {
       console.error('Failed to fetch restaurants:', error);
       set({ 
+        restaurants: [],
         error: error?.response?.data?.message || 'Не удалось загрузить рестораны',
         isLoading: false 
       });
