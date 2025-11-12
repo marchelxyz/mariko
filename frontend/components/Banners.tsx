@@ -47,7 +47,7 @@ export default function Banners({ restaurantId }: BannersProps) {
       {banners.map((banner) => (
         <div
           key={banner.id}
-          className={`bg-white rounded-lg shadow-sm overflow-hidden ${banner.linkUrl ? 'cursor-pointer hover:shadow-md transition-shadow' : ''}`}
+          className={`bg-white rounded-[15px] shadow-sm overflow-hidden ${banner.linkUrl ? 'cursor-pointer hover:shadow-md transition-shadow' : ''}`}
           onClick={() => {
             if (banner.linkUrl) {
               window.open(banner.linkUrl, '_blank');
@@ -58,11 +58,11 @@ export default function Banners({ restaurantId }: BannersProps) {
             <img
               src={banner.imageUrl}
               alt={banner.title || 'Banner'}
-              className="w-full object-cover"
+              className="w-full object-cover rounded-[15px]"
               style={{ aspectRatio: '16/9' }}
             />
           ) : (
-            <div className="w-full bg-secondary flex items-center justify-center" style={{ aspectRatio: '16/9' }}>
+            <div className="w-full bg-secondary flex items-center justify-center rounded-[15px]" style={{ aspectRatio: '16/9' }}>
               <span className="text-4xl">🖼️</span>
             </div>
           )}
