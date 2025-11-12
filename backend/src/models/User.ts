@@ -39,6 +39,9 @@ export class User {
   username?: string;
 
   @Column({ nullable: true })
+  photoUrl?: string;
+
+  @Column({ nullable: true })
   phoneNumber?: string;
 
   @Column({ type: 'date', nullable: true })
