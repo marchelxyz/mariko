@@ -94,10 +94,12 @@ export const useStore = create<Store>((set, get) => ({
         return;
       }
       
-      const restaurants = restaurantsData.map((r: Restaurant) => ({
-        ...r,
-        id: r.id || r._id,
-      }));
+      const restaurants = restaurantsData
+        .map((r: any) => ({
+          ...r,
+          id: r.id || r._id,
+        }))
+        .filter((r: any): r is Restaurant => typeof r.id === 'string' && r.id.length > 0);
       
       console.log('Processed restaurants:', restaurants);
       set({ restaurants, isLoading: false });
