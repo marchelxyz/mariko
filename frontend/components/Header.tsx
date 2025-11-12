@@ -27,9 +27,11 @@ export default function Header({ title, showLogo = false }: HeaderProps) {
         </div>
 
         {/* Приветствие */}
-        <h2 className="text-text-secondary text-lg mb-5">
-          Привет, дорогой Гость!
-        </h2>
+        <div className="w-full max-w-md mb-3">
+          <h2 className="text-text-secondary text-lg font-bold text-left">
+            Привет, дорогой Гость!
+          </h2>
+        </div>
 
         {/* Прямоугольник для выбора ресторана */}
         <div className="relative w-full max-w-md">
