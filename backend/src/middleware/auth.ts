@@ -13,9 +13,30 @@ export interface AuthRequest extends Request {
  * Проверяет, является ли Telegram ID админом
  * Админы определяются через переменную окружения TELEGRAM_ADMIN_IDS (через запятую)
  */
-export const isTelegramAdmin = (telegramId: string): boolean => {
-  const adminIds = process.env.TELEGRAM_ADMIN_IDS?.split(',').map(id => id.trim()) || [];
-  return adminIds.includes(telegramId);
+export const isTelegramAdmin = (telegramId: string | number | undefined | null): boolean => {
+  if (!telegramId) {
+    console.log('[isTelegramAdmin] Telegram ID is empty or undefined');
+    return false;
+  }
+
+  // Нормализуем Telegram ID в строку
+  const normalizedTelegramId = String(telegramId).trim();
+  
+  const adminIdsEnv = process.env.TELEGRAM_ADMIN_IDS;
+  if (!adminIdsEnv) {
+    console.log('[isTelegramAdmin] TELEGRAM_ADMIN_IDS environment variable is not set');
+    return false;
+  }
+
+  const adminIds = adminIdsEnv.split(',').map(id => id.trim()).filter(id => id.length > 0);
+  
+  console.log('[isTelegramAdmin] Checking Telegram ID:', normalizedTelegramId);
+  console.log('[isTelegramAdmin] Admin IDs from env:', adminIds);
+  
+  const isAdmin = adminIds.includes(normalizedTelegramId);
+  console.log('[isTelegramAdmin] Result:', isAdmin);
+  
+  return isAdmin;
 };
 
 export const authenticate = async (
@@ -48,13 +69,21 @@ export const authenticate = async (
     // Проверяем, является ли пользователь админом по Telegram ID
     // Если да, то принудительно устанавливаем роль admin
     let userRole = decoded.role;
+    console.log('[authenticate] User Telegram ID:', user.telegramId);
+    console.log('[authenticate] Current user role from token:', decoded.role);
+    console.log('[authenticate] Current user role from DB:', user.role);
+    
     if (isTelegramAdmin(user.telegramId)) {
+      console.log('[authenticate] User is admin by Telegram ID, setting role to ADMIN');
       userRole = UserRole.ADMIN;
       // Обновляем роль в БД, если она изменилась
       if (user.role !== UserRole.ADMIN) {
+        console.log('[authenticate] Updating user role in DB to ADMIN');
         user.role = UserRole.ADMIN;
         await userRepository.save(user);
       }
+    } else {
+      console.log('[authenticate] User is not admin by Telegram ID');
     }
 
     req.userId = decoded.userId;
