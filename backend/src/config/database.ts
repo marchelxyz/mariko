@@ -31,19 +31,43 @@ const dbConfig = getDatabaseConfig();
 
 export const AppDataSource = new DataSource({
   type: 'postgres',
-  ...dbConfig,
+  host: dbConfig.host,
+  port: dbConfig.port,
+  username: dbConfig.username,
+  password: dbConfig.password,
+  database: dbConfig.database,
   entities: [User, Restaurant, MenuItem, Banner],
-  synchronize: process.env.NODE_ENV !== 'production',
+  synchronize: true, // Включаем синхронизацию для автоматического создания таблиц
   logging: process.env.NODE_ENV === 'development',
   ssl: process.env.DB_SSL === 'true' || process.env.DATABASE_URL ? { rejectUnauthorized: false } : false,
 });
 
 export const connectDatabase = async (): Promise<void> => {
   try {
+    console.log('🔄 Инициализация подключения к базе данных...');
+    console.log('📊 Конфигурация БД:', {
+      host: dbConfig.host,
+      port: dbConfig.port,
+      database: dbConfig.database,
+      username: dbConfig.username,
+      synchronize: true,
+    });
+    
     await AppDataSource.initialize();
     console.log('✅ PostgreSQL connected');
+    console.log('📋 Доступные таблицы:', AppDataSource.entityMetadatas.map(e => e.tableName).join(', '));
+    
+    // Проверяем, что таблицы созданы
+    const queryRunner = AppDataSource.createQueryRunner();
+    const tables = await queryRunner.getTables();
+    console.log('🗄️  Созданные таблицы в БД:', tables.map(t => t.name).join(', '));
+    await queryRunner.release();
   } catch (error) {
     console.error('❌ PostgreSQL connection error:', error);
+    if (error instanceof Error) {
+      console.error('❌ Детали ошибки:', error.message);
+      console.error('❌ Stack trace:', error.stack);
+    }
     throw error;
   }
 };
