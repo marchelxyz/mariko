@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import Image from 'next/image';
 import Layout from '@/components/Layout';
 import Header from '@/components/Header';
 import { useStore } from '@/store/useStore';
@@ -47,9 +48,11 @@ export default function Profile() {
           <div className="flex items-center space-x-4">
             <div className="w-20 h-20 bg-secondary rounded-full flex items-center justify-center overflow-hidden">
               {user?.photoUrl ? (
-                <img 
+                <Image 
                   src={user.photoUrl} 
                   alt={`${user.firstName || ''} ${user.lastName || ''}`.trim() || 'Пользователь'}
+                  width={80}
+                  height={80}
                   className="w-full h-full object-cover"
                 />
               ) : (
