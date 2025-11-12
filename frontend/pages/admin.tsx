@@ -73,7 +73,7 @@ export default function Admin() {
       icon: '🍽️',
       path: '/admin/menu-images',
       roles: ['admin', 'manager'],
-      available: false,
+      available: true,
     },
   ];
 
