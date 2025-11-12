@@ -148,7 +148,7 @@ export default function MenuBlock({ restaurantId }: MenuBlockProps) {
                 fontSize: '14px',
                 fontWeight: 'bold',
                 color: '#000000',
-                marginBottom: '4px',
+                marginBottom: '2px',
               }}
             >
               {item.price} ₽
@@ -160,7 +160,7 @@ export default function MenuBlock({ restaurantId }: MenuBlockProps) {
                 fontSize: '14px',
                 fontWeight: 500, // Medium
                 color: '#000000',
-                marginBottom: '4px',
+                marginBottom: '2px',
               }}
             >
               {item.name}
