@@ -35,6 +35,8 @@ router.post('/telegram', async (req: Request, res: Response) => {
     }
 
     const telegramId = telegramUser.id.toString();
+    console.log('[auth/telegram] Received Telegram ID:', telegramId);
+    console.log('[auth/telegram] Full telegramUser object:', JSON.stringify(telegramUser, null, 2));
 
     const userRepository = AppDataSource.getRepository(User);
     let user = await userRepository.findOne({
@@ -43,6 +45,7 @@ router.post('/telegram', async (req: Request, res: Response) => {
 
     // Проверяем, является ли пользователь админом по Telegram ID
     const isAdmin = isTelegramAdmin(telegramId);
+    console.log('[auth/telegram] Is admin check result:', isAdmin);
 
     if (!user) {
       // При создании нового пользователя проверяем, является ли он админом
@@ -67,7 +70,12 @@ router.post('/telegram', async (req: Request, res: Response) => {
       
       // Если пользователь в списке админов, устанавливаем роль admin
       if (isAdmin && user.role !== UserRole.ADMIN) {
+        console.log('[auth/telegram] Updating user role to ADMIN');
         user.role = UserRole.ADMIN;
+      } else if (isAdmin) {
+        console.log('[auth/telegram] User is already admin');
+      } else {
+        console.log('[auth/telegram] User is not admin, current role:', user.role);
       }
       
       await userRepository.save(user);
