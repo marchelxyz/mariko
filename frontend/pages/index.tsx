@@ -39,8 +39,10 @@ export default function Home({ initialBanners, restaurantId }: HomeProps) {
     <Layout>
       <Header />
       <ActionButtons />
-      <div className="px-4 py-6 space-y-6">
-        <Banners restaurantId={selectedRestaurant?.id || restaurantId} initialBanners={initialBanners} />
+      <div className="py-6 space-y-6">
+        <div className="px-4">
+          <Banners restaurantId={selectedRestaurant?.id || restaurantId} initialBanners={initialBanners} />
+        </div>
         <MenuBlock restaurantId={selectedRestaurant?.id || restaurantId} />
       </div>
     </Layout>
