@@ -138,8 +138,8 @@ export default function BottomNavigation() {
   }, [router.pathname, navItems, user]);
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0" style={{ backgroundColor: '#ffffff', height: '100vh', top: 0, pointerEvents: 'none' }}>
-      <div className="flex justify-center items-center h-16 absolute bottom-[30px] left-0 right-0 gap-4 overflow-hidden" style={{ pointerEvents: 'auto' }}>
+    <nav className="fixed bottom-[30px] left-0 right-0" style={{ backgroundColor: '#ffffff' }}>
+      <div className="flex justify-center items-center h-16 relative gap-4 overflow-hidden">
         <div 
           ref={indicatorRef}
           className={`absolute top-0 h-1 rounded-sm ${enableTransition ? 'transition-all duration-700 ease-in-out' : ''}`}
