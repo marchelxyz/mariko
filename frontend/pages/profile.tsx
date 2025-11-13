@@ -95,6 +95,7 @@ export default function Profile() {
   }, []);
 
   const handleRestaurantSelect = (restaurant: Restaurant) => {
+    // Сохраняем ID ресторана и полный адрес
     setFormData({ ...formData, favoriteRestaurantId: restaurant.id });
     setRestaurantSearchTerm(`${restaurant.city}, ${restaurant.address}`);
     setShowSuggestions(false);
@@ -102,8 +103,49 @@ export default function Profile() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    await updateProfile(formData);
-    setIsEditing(false);
+    
+    let finalFormData = { ...formData };
+    
+    // Если есть текст в поле поиска, но нет выбранного ресторана,
+    // пытаемся найти ресторан по адресу
+    if (restaurantSearchTerm.trim() && !finalFormData.favoriteRestaurantId) {
+      const searchResults = await searchRestaurants(restaurantSearchTerm);
+      if (searchResults.length === 1) {
+        // Если найден ровно один ресторан, используем его
+        finalFormData.favoriteRestaurantId = searchResults[0].id;
+        setRestaurantSearchTerm(`${searchResults[0].city}, ${searchResults[0].address}`);
+      } else if (searchResults.length > 1) {
+        // Если найдено несколько ресторанов, проверяем точное совпадение
+        const exactMatch = searchResults.find(
+          r => `${r.city}, ${r.address}` === restaurantSearchTerm.trim()
+        );
+        if (exactMatch) {
+          finalFormData.favoriteRestaurantId = exactMatch.id;
+          setRestaurantSearchTerm(`${exactMatch.city}, ${exactMatch.address}`);
+        } else {
+          alert('Найдено несколько ресторанов. Пожалуйста, выберите ресторан из списка.');
+          return;
+        }
+      } else {
+        alert('Ресторан не найден. Пожалуйста, выберите ресторан из списка.');
+        return;
+      }
+    }
+    
+    try {
+      await updateProfile(finalFormData);
+      setIsEditing(false);
+    } catch (error: any) {
+      console.error('Failed to update profile:', error);
+      // Если ошибка связана с рестораном, показываем сообщение
+      if (error?.response?.data?.message?.includes('Restaurant not found')) {
+        alert('Выбранный ресторан не найден. Пожалуйста, выберите ресторан из списка.');
+      } else {
+        // Показываем общую ошибку, если она есть
+        const errorMessage = error?.response?.data?.message || 'Не удалось сохранить профиль';
+        alert(errorMessage);
+      }
+    }
   };
 
   return (
@@ -210,10 +252,16 @@ export default function Profile() {
                   type="text"
                   value={restaurantSearchTerm}
                   onChange={(e) => {
-                    setRestaurantSearchTerm(e.target.value);
-                    if (!e.target.value) {
+                    const newValue = e.target.value;
+                    setRestaurantSearchTerm(newValue);
+                    // Очищаем ID только если поле полностью пустое
+                    // Это позволяет пользователю редактировать адрес без потери выбранного ресторана
+                    if (!newValue.trim()) {
                       setFormData({ ...formData, favoriteRestaurantId: '' });
                     }
+                    // Если пользователь редактирует поле после выбора ресторана,
+                    // мы НЕ очищаем ID автоматически - это позволит сохранить выбранный ресторан
+                    // даже если пользователь немного изменит текст в поле поиска
                   }}
                   disabled={!isEditing}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md disabled:bg-gray-100"
