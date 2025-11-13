@@ -20,9 +20,33 @@ interface MenuBlockProps {
 export default function MenuBlock({ restaurantId }: MenuBlockProps) {
   const { selectedRestaurant } = useStore();
   const router = useRouter();
-  const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
+  const [allMenuItems, setAllMenuItems] = useState<MenuItem[]>([]);
+  const [displayCount, setDisplayCount] = useState(2);
   const [isLoading, setIsLoading] = useState(false);
 
+  // Определяем количество блюд в зависимости от размера экрана
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
+    const getItemsCount = () => {
+      const width = window.innerWidth;
+      if (width >= 1024) return 6; // lg и больше
+      if (width >= 768) return 4; // md
+      if (width >= 640) return 3; // sm
+      return 2; // мобильные
+    };
+    
+    setDisplayCount(getItemsCount());
+    
+    const handleResize = () => {
+      setDisplayCount(getItemsCount());
+    };
+    
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // Загружаем меню
   useEffect(() => {
     // Пропускаем запрос на сервере
     if (typeof window === 'undefined') return;
@@ -44,8 +68,7 @@ export default function MenuBlock({ restaurantId }: MenuBlockProps) {
           }
         });
         
-        // Берем первые 2 позиции
-        setMenuItems(allItems.slice(0, 2));
+        setAllMenuItems(allItems);
       } catch (error) {
         console.error('Failed to fetch menu:', error);
       } finally {
@@ -56,16 +79,19 @@ export default function MenuBlock({ restaurantId }: MenuBlockProps) {
     fetchMenu();
   }, [restaurantId, selectedRestaurant]);
 
+  // Получаем блюда для отображения
+  const menuItems = allMenuItems.slice(0, displayCount);
+
   const handleMenuClick = () => {
     router.push('/menu');
   };
 
-  if (isLoading || menuItems.length === 0) {
+  if (isLoading || allMenuItems.length === 0) {
     return null;
   }
 
   return (
-    <div className="bg-white rounded-lg py-6">
+    <div className="bg-white rounded-lg py-6 w-full">
       {/* Заголовок "Рекомендуем попробовать" с стрелкой */}
       <button
         onClick={handleMenuClick}
@@ -91,95 +117,57 @@ export default function MenuBlock({ restaurantId }: MenuBlockProps) {
       </button>
 
       {/* Блюда */}
-      <div className="flex gap-4 px-4">
-        {menuItems.map((item) => (
-          <div
-            key={item.id}
-            className="flex-shrink-0"
-            style={{
-              width: '180px',
-              backgroundColor: '#F7F7F7',
-              borderRadius: '12px',
-              padding: '12px',
-            }}
-          >
-            {/* Фото блюда */}
-            {item.imageUrl ? (
-              <div
-                style={{
-                  width: '100%',
-                  borderRadius: '8px',
-                  overflow: 'hidden',
-                  position: 'relative',
-                  aspectRatio: '4/3',
-                  marginBottom: '12px',
-                }}
-              >
-                <img
-                  src={item.imageUrl}
-                  alt={item.name}
+      <div className="px-4 w-full overflow-x-hidden">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 w-full">
+          {menuItems.map((item) => (
+            <div
+              key={item.id}
+              className="bg-[#F7F7F7] rounded-xl p-3 flex flex-col w-full min-w-0"
+            >
+              {/* Фото блюда */}
+              {item.imageUrl ? (
+                <div
+                  className="w-full rounded-lg overflow-hidden mb-3"
                   style={{
-                    width: '100%',
-                    height: '100%',
-                    objectFit: 'cover',
+                    aspectRatio: '4/3',
                   }}
-                />
-              </div>
-            ) : (
-              <div
-                style={{
-                  width: '100%',
-                  borderRadius: '8px',
-                  backgroundColor: '#E5E5E5',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  aspectRatio: '4/3',
-                  marginBottom: '12px',
-                }}
-              >
-                <span className="text-3xl">🍽️</span>
-              </div>
-            )}
+                >
+                  <img
+                    src={item.imageUrl}
+                    alt={item.name}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              ) : (
+                <div
+                  className="w-full rounded-lg bg-[#E5E5E5] flex items-center justify-center mb-3"
+                  style={{
+                    aspectRatio: '4/3',
+                  }}
+                >
+                  <span className="text-3xl">🍽️</span>
+                </div>
+              )}
 
-            {/* Цена */}
-            <div
-              style={{
-                fontSize: '14px',
-                fontWeight: 'bold',
-                color: '#000000',
-                marginBottom: '2px',
-              }}
-            >
-              {item.price} ₽
+              {/* Цена */}
+              <div className="text-sm font-bold text-black mb-1">
+                {item.price} ₽
+              </div>
+
+              {/* Название блюда */}
+              <div className="text-sm font-medium text-black mb-1 line-clamp-2">
+                {item.name}
+              </div>
+
+              {/* Калорийность */}
+              {item.calories && (
+                <div className="text-xs font-normal text-[rgba(27,31,59,0.4)] mt-auto">
+                  {item.calories} ккал
+                </div>
+              )}
             </div>
-
-            {/* Название блюда */}
-            <div
-              style={{
-                fontSize: '14px',
-                fontWeight: 500, // Medium
-                color: '#000000',
-                marginBottom: '2px',
-              }}
-            >
-              {item.name}
-            </div>
-
-            {/* Калорийность */}
-            {item.calories && (
-              <div
-                style={{
-                  fontSize: '12px',
-                  fontWeight: 'normal',
-                  color: 'rgba(27, 31, 59, 0.4)', // #1B1F3B с прозрачностью 40%
-                }}
-              >
-                {item.calories} ккал
-              </div>
-            )}
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
     </div>
   );
