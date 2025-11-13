@@ -5,7 +5,7 @@ import api from '@/lib/api';
 
 export default function TelegramAuth() {
   const router = useRouter();
-  const { setToken, setUser, fetchProfile } = useStore();
+  const { setToken, setUser, fetchProfile, fetchFavoriteRestaurant } = useStore();
 
   useEffect(() => {
     const initTelegramAuth = async () => {
@@ -20,6 +20,8 @@ export default function TelegramAuth() {
         if (existingToken && !user) {
           try {
             await fetchProfile();
+            // Загружаем любимый ресторан после загрузки профиля
+            await fetchFavoriteRestaurant();
           } catch (error) {
             console.error('Failed to fetch profile with existing token:', error);
             // Если токен невалидный, удаляем его
@@ -70,6 +72,8 @@ export default function TelegramAuth() {
             // Загружаем актуальные данные профиля, чтобы убедиться, что роль обновлена
             try {
               await fetchProfile();
+              // Загружаем любимый ресторан после авторизации
+              await fetchFavoriteRestaurant();
             } catch (error) {
               console.error('Failed to fetch profile after auth:', error);
             }
@@ -81,7 +85,7 @@ export default function TelegramAuth() {
     };
 
     initTelegramAuth();
-  }, [setToken, setUser, fetchProfile]);
+  }, [setToken, setUser, fetchProfile, fetchFavoriteRestaurant]);
 
   return null;
 }
