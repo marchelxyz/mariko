@@ -138,44 +138,48 @@ export default function BottomNavigation() {
   }, [router.pathname, navItems, user]);
 
   return (
-    <nav className="fixed bottom-[30px] left-0 right-0" style={{ backgroundColor: '#ffffff' }}>
-      <div className="flex justify-center items-center h-16 relative gap-4 overflow-hidden">
-        <div 
-          ref={indicatorRef}
-          className={`absolute top-0 h-1 rounded-sm ${enableTransition ? 'transition-all duration-700 ease-in-out' : ''}`}
-          style={{ 
-            backgroundColor: '#8E1A1A',
-            width: `${indicatorStyle.width}px`,
-            left: `${indicatorStyle.left}px`,
-          }}
-        />
-        {navItems.map((item, index) => {
-          const isActive = router.pathname === item.path;
-          const isHomePage = item.path === '/';
-          
-          return (
-            <button
-              key={item.path}
-              ref={(el) => { buttonRefs.current[index] = el; }}
-              onClick={() => router.push(item.path)}
-              onMouseEnter={() => {
-                // Предзагружаем баннеры при наведении на главную страницу
-                if (isHomePage) {
-                  const restaurantId = selectedRestaurant?.id;
-                  prefetchBanners(restaurantId);
-                }
-              }}
-              className="flex flex-col items-center justify-center h-full relative px-4 transition-colors duration-300"
-              style={{
-                color: isActive ? '#8E1A1A' : '#8E8E93'
-              }}
-            >
-              <span className="mb-1">{item.icon}</span>
-              <span className="text-xs">{item.label}</span>
-            </button>
-          );
-        })}
-      </div>
-    </nav>
+    <>
+      {/* Белый блок для заполнения пространства между навигацией и низом экрана */}
+      <div className="fixed bottom-0 left-0 right-0 h-[30px] bg-white z-40" />
+      <nav className="fixed bottom-[30px] left-0 right-0 z-50" style={{ backgroundColor: '#ffffff' }}>
+        <div className="flex justify-center items-center h-16 relative gap-4 overflow-hidden">
+          <div 
+            ref={indicatorRef}
+            className={`absolute top-0 h-1 rounded-sm ${enableTransition ? 'transition-all duration-700 ease-in-out' : ''}`}
+            style={{ 
+              backgroundColor: '#8E1A1A',
+              width: `${indicatorStyle.width}px`,
+              left: `${indicatorStyle.left}px`,
+            }}
+          />
+          {navItems.map((item, index) => {
+            const isActive = router.pathname === item.path;
+            const isHomePage = item.path === '/';
+            
+            return (
+              <button
+                key={item.path}
+                ref={(el) => { buttonRefs.current[index] = el; }}
+                onClick={() => router.push(item.path)}
+                onMouseEnter={() => {
+                  // Предзагружаем баннеры при наведении на главную страницу
+                  if (isHomePage) {
+                    const restaurantId = selectedRestaurant?.id;
+                    prefetchBanners(restaurantId);
+                  }
+                }}
+                className="flex flex-col items-center justify-center h-full relative px-4 transition-colors duration-300"
+                style={{
+                  color: isActive ? '#8E1A1A' : '#8E8E93'
+                }}
+              >
+                <span className="mb-1">{item.icon}</span>
+                <span className="text-xs">{item.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      </nav>
+    </>
   );
 }
