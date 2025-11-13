@@ -20,7 +20,7 @@ interface HomeProps {
 }
 
 export default function Home({ initialBanners, restaurantId }: HomeProps) {
-  const { selectedRestaurant, fetchRestaurants, setBannersForRestaurant } = useStore();
+  const { selectedRestaurant, fetchRestaurants, setBannersForRestaurant, fetchFavoriteRestaurant, token } = useStore();
 
   // Инициализируем store с предзагруженными баннерами при первом рендере
   useEffect(() => {
@@ -31,7 +31,19 @@ export default function Home({ initialBanners, restaurantId }: HomeProps) {
   }, [initialBanners, restaurantId, setBannersForRestaurant]);
 
   useEffect(() => {
-    fetchRestaurants();
+    const initializeApp = async () => {
+      // Если пользователь авторизован, сначала загружаем его любимый ресторан
+      // Это нужно сделать до загрузки ресторанов, чтобы при загрузке ресторанов
+      // автоматически выбрался любимый ресторан
+      if (token) {
+        await fetchFavoriteRestaurant();
+      }
+      
+      // Затем загружаем рестораны (они автоматически выберут любимый ресторан, если он есть)
+      await fetchRestaurants();
+    };
+    
+    initializeApp();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
