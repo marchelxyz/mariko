@@ -138,7 +138,13 @@ export default function BottomNavigation() {
   }, [router.pathname, navItems, user]);
 
   return (
-    <nav className="fixed bottom-[30px] left-0 right-0" style={{ backgroundColor: '#ffffff' }}>
+    <nav 
+      className="fixed bottom-0 left-0 right-0" 
+      style={{ 
+        backgroundColor: '#ffffff',
+        paddingBottom: 'env(safe-area-inset-bottom, 0px)'
+      }}
+    >
       <div className="flex justify-center items-center h-16 relative gap-4 overflow-hidden">
         <div 
           ref={indicatorRef}
