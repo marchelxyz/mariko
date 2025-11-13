@@ -12,6 +12,8 @@ interface User {
   dateOfBirth?: string;
   gender?: string;
   role: string;
+  favoriteRestaurantId?: string;
+  favoriteRestaurant?: Restaurant;
 }
 
 interface Restaurant {
@@ -42,6 +44,7 @@ interface Store {
   setToken: (token: string | null) => void;
   setUser: (user: User | null) => void;
   fetchRestaurants: () => Promise<void>;
+  searchRestaurants: (searchTerm: string) => Promise<Restaurant[]>;
   setSelectedRestaurant: (restaurant: Restaurant | null) => void;
   fetchProfile: () => Promise<void>;
   updateProfile: (data: Partial<User>) => Promise<void>;
@@ -50,10 +53,26 @@ interface Store {
   setBannersForRestaurant: (restaurantId: string | null, banners: Banner[]) => void;
 }
 
+// Инициализация из кэша при загрузке store
+const getInitialRestaurant = (): Restaurant | null => {
+  if (typeof window === 'undefined') return null;
+  
+  try {
+    const cachedRestaurantStr = localStorage.getItem('cachedRestaurant');
+    if (cachedRestaurantStr) {
+      return JSON.parse(cachedRestaurantStr);
+    }
+  } catch (error) {
+    console.error('Failed to parse cached restaurant:', error);
+  }
+  
+  return null;
+};
+
 export const useStore = create<Store>((set, get) => ({
   user: null,
   restaurants: [],
-  selectedRestaurant: null,
+  selectedRestaurant: getInitialRestaurant(),
   banners: [],
   bannersByRestaurant: {},
   token: typeof window !== 'undefined' ? localStorage.getItem('token') : null,
@@ -104,6 +123,27 @@ export const useStore = create<Store>((set, get) => ({
       console.log('Processed restaurants:', restaurants);
       set({ restaurants, isLoading: false });
       
+      // Проверяем кэш любимого ресторана
+      const cachedRestaurantId = typeof window !== 'undefined' 
+        ? localStorage.getItem('favoriteRestaurantId') 
+        : null;
+      
+      // Проверяем любимый ресторан из профиля пользователя
+      const favoriteRestaurantId = get().user?.favoriteRestaurantId || cachedRestaurantId;
+      
+      if (favoriteRestaurantId) {
+        const favoriteRestaurant = restaurants.find(r => r.id === favoriteRestaurantId);
+        if (favoriteRestaurant) {
+          set({ selectedRestaurant: favoriteRestaurant });
+          // Кэшируем полную информацию о ресторане
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('cachedRestaurant', JSON.stringify(favoriteRestaurant));
+            localStorage.setItem('favoriteRestaurantId', favoriteRestaurantId);
+          }
+          return;
+        }
+      }
+      
       // Автоматически выбираем первый ресторан, если не выбран
       if (!get().selectedRestaurant && restaurants.length > 0) {
         set({ selectedRestaurant: restaurants[0] });
@@ -118,14 +158,52 @@ export const useStore = create<Store>((set, get) => ({
     }
   },
 
-  setSelectedRestaurant: (restaurant) => set({ selectedRestaurant: restaurant }),
+  searchRestaurants: async (searchTerm: string) => {
+    if (typeof window === 'undefined' || !searchTerm.trim()) return [];
+    
+    try {
+      const response = await api.get('/restaurants', {
+        params: { search: searchTerm },
+      });
+      const restaurantsData = response.data?.data || [];
+      return restaurantsData.map((r: any) => ({
+        ...r,
+        id: r.id || r._id,
+      })).filter((r: any): r is Restaurant => typeof r.id === 'string' && r.id.length > 0);
+    } catch (error: any) {
+      console.error('Failed to search restaurants:', error);
+      return [];
+    }
+  },
+
+  setSelectedRestaurant: (restaurant) => {
+    if (restaurant && typeof window !== 'undefined') {
+      // Кэшируем выбранный ресторан
+      localStorage.setItem('cachedRestaurant', JSON.stringify(restaurant));
+      localStorage.setItem('favoriteRestaurantId', restaurant.id);
+    }
+    set({ selectedRestaurant: restaurant });
+  },
 
   fetchProfile: async () => {
     if (typeof window === 'undefined') return;
     
     try {
       const response = await api.get('/profile');
-      set({ user: response.data.data });
+      const userData = response.data.data;
+      set({ user: userData });
+      
+      // Если у пользователя есть любимый ресторан, кэшируем его
+      if (userData.favoriteRestaurant) {
+        const favoriteRestaurant = userData.favoriteRestaurant;
+        localStorage.setItem('cachedRestaurant', JSON.stringify(favoriteRestaurant));
+        localStorage.setItem('favoriteRestaurantId', favoriteRestaurant.id);
+        
+        // Автоматически выбираем любимый ресторан, если он еще не выбран
+        if (!get().selectedRestaurant || get().selectedRestaurant?.id !== favoriteRestaurant.id) {
+          set({ selectedRestaurant: favoriteRestaurant });
+        }
+      }
     } catch (error: any) {
       console.error('Failed to fetch profile:', error);
       set({ error: error?.response?.data?.message || 'Не удалось загрузить профиль' });
@@ -135,7 +213,24 @@ export const useStore = create<Store>((set, get) => ({
   updateProfile: async (data) => {
     try {
       const response = await api.put('/profile', data);
-      set({ user: response.data.data });
+      const userData = response.data.data;
+      set({ user: userData });
+      
+      // Если обновлен любимый ресторан, кэшируем его и выбираем
+      if (userData.favoriteRestaurant) {
+        const favoriteRestaurant = userData.favoriteRestaurant;
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('cachedRestaurant', JSON.stringify(favoriteRestaurant));
+          localStorage.setItem('favoriteRestaurantId', favoriteRestaurant.id);
+        }
+        set({ selectedRestaurant: favoriteRestaurant });
+      } else if (data.favoriteRestaurantId === null || data.favoriteRestaurantId === '') {
+        // Если любимый ресторан удален, очищаем кэш
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('cachedRestaurant');
+          localStorage.removeItem('favoriteRestaurantId');
+        }
+      }
     } catch (error: any) {
       console.error('Failed to update profile:', error);
       throw error;
