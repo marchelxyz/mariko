@@ -62,7 +62,7 @@ function MyApp({ Component, pageProps }: AppProps) {
     // Загружаем рестораны, если они еще не загружены
     fetchRestaurants().then(() => {
       // После загрузки ресторанов предзагружаем баннеры для выбранного ресторана
-      const restaurantId = selectedRestaurant?.id || cachedRestaurantId;
+      const restaurantId = selectedRestaurant?.id || cachedRestaurantId || undefined;
       prefetchBanners(restaurantId);
     });
   }, [mounted, token, fetchProfile, fetchRestaurants, selectedRestaurant, prefetchBanners]);
