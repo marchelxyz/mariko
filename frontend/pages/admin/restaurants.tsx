@@ -4,6 +4,17 @@ import Header from '@/components/Header';
 import { useStore } from '@/store/useStore';
 import api from '@/lib/api';
 
+interface DeliveryAggregator {
+  name: string;
+  url: string;
+  imageUrl?: string;
+}
+
+interface SocialNetwork {
+  name: string;
+  url: string;
+}
+
 interface Restaurant {
   id: string;
   name: string;
@@ -12,6 +23,10 @@ interface Restaurant {
   phoneNumber: string;
   isActive: boolean;
   googleSheetName?: string;
+  deliveryAggregators?: DeliveryAggregator[];
+  yandexMapsUrl?: string;
+  twoGisUrl?: string;
+  socialNetworks?: SocialNetwork[];
   createdAt?: string;
   updatedAt?: string;
 }
@@ -29,6 +44,10 @@ export default function AdminRestaurants() {
     address: '',
     phoneNumber: '',
     isActive: true,
+    deliveryAggregators: [] as DeliveryAggregator[],
+    yandexMapsUrl: '',
+    twoGisUrl: '',
+    socialNetworks: [] as SocialNetwork[],
   });
 
   const fetchRestaurants = useCallback(async () => {
@@ -71,6 +90,10 @@ export default function AdminRestaurants() {
       address: '',
       phoneNumber: '',
       isActive: true,
+      deliveryAggregators: [],
+      yandexMapsUrl: '',
+      twoGisUrl: '',
+      socialNetworks: [],
     });
     setIsFormOpen(true);
   };
@@ -83,6 +106,10 @@ export default function AdminRestaurants() {
       address: restaurant.address,
       phoneNumber: restaurant.phoneNumber,
       isActive: restaurant.isActive,
+      deliveryAggregators: restaurant.deliveryAggregators || [],
+      yandexMapsUrl: restaurant.yandexMapsUrl || '',
+      twoGisUrl: restaurant.twoGisUrl || '',
+      socialNetworks: restaurant.socialNetworks || [],
     });
     setIsFormOpen(true);
   };
@@ -105,10 +132,18 @@ export default function AdminRestaurants() {
     e.preventDefault();
     
     try {
+      const submitData = {
+        ...formData,
+        deliveryAggregators: formData.deliveryAggregators.length > 0 ? formData.deliveryAggregators : undefined,
+        socialNetworks: formData.socialNetworks.length > 0 ? formData.socialNetworks : undefined,
+        yandexMapsUrl: formData.yandexMapsUrl || undefined,
+        twoGisUrl: formData.twoGisUrl || undefined,
+      };
+      
       if (editingRestaurant) {
-        await api.put(`/admin/restaurants/${editingRestaurant.id}`, formData);
+        await api.put(`/admin/restaurants/${editingRestaurant.id}`, submitData);
       } else {
-        await api.post('/admin/restaurants', formData);
+        await api.post('/admin/restaurants', submitData);
       }
       setIsFormOpen(false);
       fetchRestaurants();
@@ -117,6 +152,54 @@ export default function AdminRestaurants() {
       const errorMessage = error?.response?.data?.message || 'Не удалось сохранить ресторан';
       alert(errorMessage);
     }
+  };
+
+  const addDeliveryAggregator = () => {
+    if (formData.deliveryAggregators.length >= 5) {
+      alert('Можно добавить максимум 5 агрегаторов доставки');
+      return;
+    }
+    setFormData({
+      ...formData,
+      deliveryAggregators: [...formData.deliveryAggregators, { name: '', url: '', imageUrl: '' }],
+    });
+  };
+
+  const removeDeliveryAggregator = (index: number) => {
+    setFormData({
+      ...formData,
+      deliveryAggregators: formData.deliveryAggregators.filter((_, i) => i !== index),
+    });
+  };
+
+  const updateDeliveryAggregator = (index: number, field: keyof DeliveryAggregator, value: string) => {
+    const updated = [...formData.deliveryAggregators];
+    updated[index] = { ...updated[index], [field]: value };
+    setFormData({ ...formData, deliveryAggregators: updated });
+  };
+
+  const addSocialNetwork = () => {
+    if (formData.socialNetworks.length >= 4) {
+      alert('Можно добавить максимум 4 социальные сети');
+      return;
+    }
+    setFormData({
+      ...formData,
+      socialNetworks: [...formData.socialNetworks, { name: '', url: '' }],
+    });
+  };
+
+  const removeSocialNetwork = (index: number) => {
+    setFormData({
+      ...formData,
+      socialNetworks: formData.socialNetworks.filter((_, i) => i !== index),
+    });
+  };
+
+  const updateSocialNetwork = (index: number, field: keyof SocialNetwork, value: string) => {
+    const updated = [...formData.socialNetworks];
+    updated[index] = { ...updated[index], [field]: value };
+    setFormData({ ...formData, socialNetworks: updated });
   };
 
   const handleToggleActive = async (restaurant: Restaurant) => {
@@ -332,6 +415,146 @@ export default function AdminRestaurants() {
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                       placeholder="Например: +7 (495) 123-45-67"
                     />
+                  </div>
+
+                  {/* Доставка */}
+                  <div className="border-t pt-4">
+                    <div className="flex justify-between items-center mb-3">
+                      <label className="block text-sm font-medium text-text-primary">
+                        Доставка (до 5 агрегаторов)
+                      </label>
+                      <button
+                        type="button"
+                        onClick={addDeliveryAggregator}
+                        disabled={formData.deliveryAggregators.length >= 5}
+                        className="text-sm text-primary hover:text-primary/80 disabled:text-gray-400 disabled:cursor-not-allowed"
+                      >
+                        + Добавить агрегатор
+                      </button>
+                    </div>
+                    {formData.deliveryAggregators.map((aggregator, index) => (
+                      <div key={index} className="mb-3 p-3 bg-gray-50 rounded-lg">
+                        <div className="flex justify-between items-center mb-2">
+                          <span className="text-sm font-medium text-text-primary">Агрегатор {index + 1}</span>
+                          <button
+                            type="button"
+                            onClick={() => removeDeliveryAggregator(index)}
+                            className="text-red-500 hover:text-red-700 text-sm"
+                          >
+                            Удалить
+                          </button>
+                        </div>
+                        <div className="space-y-2">
+                          <input
+                            type="text"
+                            value={aggregator.name}
+                            onChange={(e) => updateDeliveryAggregator(index, 'name', e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-sm"
+                            placeholder="Название (например: Яндекс.Еда)"
+                          />
+                          <input
+                            type="url"
+                            value={aggregator.url}
+                            onChange={(e) => updateDeliveryAggregator(index, 'url', e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-sm"
+                            placeholder="Ссылка на агрегатор"
+                          />
+                          <input
+                            type="url"
+                            value={aggregator.imageUrl || ''}
+                            onChange={(e) => updateDeliveryAggregator(index, 'imageUrl', e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-sm"
+                            placeholder="URL изображения кнопки (необязательно)"
+                          />
+                        </div>
+                      </div>
+                    ))}
+                    {formData.deliveryAggregators.length === 0 && (
+                      <p className="text-sm text-text-secondary">Агрегаторы доставки не добавлены</p>
+                    )}
+                  </div>
+
+                  {/* Карты */}
+                  <div className="border-t pt-4">
+                    <label className="block text-sm font-medium text-text-primary mb-3">
+                      Карты
+                    </label>
+                    <div className="space-y-3">
+                      <div>
+                        <label className="block text-xs text-text-secondary mb-1">
+                          Яндекс.Карты
+                        </label>
+                        <input
+                          type="url"
+                          value={formData.yandexMapsUrl}
+                          onChange={(e) => setFormData({ ...formData, yandexMapsUrl: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-sm"
+                          placeholder="Ссылка на Яндекс.Карты"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-text-secondary mb-1">
+                          2ГИС
+                        </label>
+                        <input
+                          type="url"
+                          value={formData.twoGisUrl}
+                          onChange={(e) => setFormData({ ...formData, twoGisUrl: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-sm"
+                          placeholder="Ссылка на 2ГИС"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Социальные сети */}
+                  <div className="border-t pt-4">
+                    <div className="flex justify-between items-center mb-3">
+                      <label className="block text-sm font-medium text-text-primary">
+                        Социальные сети (до 4)
+                      </label>
+                      <button
+                        type="button"
+                        onClick={addSocialNetwork}
+                        disabled={formData.socialNetworks.length >= 4}
+                        className="text-sm text-primary hover:text-primary/80 disabled:text-gray-400 disabled:cursor-not-allowed"
+                      >
+                        + Добавить сеть
+                      </button>
+                    </div>
+                    {formData.socialNetworks.map((network, index) => (
+                      <div key={index} className="mb-3 p-3 bg-gray-50 rounded-lg">
+                        <div className="flex justify-between items-center mb-2">
+                          <span className="text-sm font-medium text-text-primary">Сеть {index + 1}</span>
+                          <button
+                            type="button"
+                            onClick={() => removeSocialNetwork(index)}
+                            className="text-red-500 hover:text-red-700 text-sm"
+                          >
+                            Удалить
+                          </button>
+                        </div>
+                        <div className="space-y-2">
+                          <input
+                            type="text"
+                            value={network.name}
+                            onChange={(e) => updateSocialNetwork(index, 'name', e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-sm"
+                            placeholder="Название (например: Instagram)"
+                          />
+                          <input
+                            type="url"
+                            value={network.url}
+                            onChange={(e) => updateSocialNetwork(index, 'url', e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-sm"
+                            placeholder="Ссылка на профиль"
+                          />
+                        </div>
+                      </div>
+                    ))}
+                    {formData.socialNetworks.length === 0 && (
+                      <p className="text-sm text-text-secondary">Социальные сети не добавлены</p>
+                    )}
                   </div>
 
                   <div className="flex items-center pt-2">
