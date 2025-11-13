@@ -61,6 +61,9 @@ export class User {
   })
   role!: UserRole;
 
+  @Column({ nullable: true })
+  favoriteRestaurantId?: string;
+
   @CreateDateColumn()
   createdAt!: Date;
 
