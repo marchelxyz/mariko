@@ -14,6 +14,17 @@ interface User {
   role: string;
 }
 
+interface DeliveryAggregator {
+  name: string;
+  url: string;
+  imageUrl?: string;
+}
+
+interface SocialNetwork {
+  name: string;
+  url: string;
+}
+
 interface Restaurant {
   id: string;
   _id?: string;
@@ -21,6 +32,10 @@ interface Restaurant {
   city: string;
   address: string;
   phoneNumber: string;
+  deliveryAggregators?: DeliveryAggregator[];
+  yandexMapsUrl?: string;
+  twoGisUrl?: string;
+  socialNetworks?: SocialNetwork[];
 }
 
 interface Banner {

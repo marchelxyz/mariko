@@ -38,6 +38,28 @@ export class Restaurant {
   @Column({ nullable: true })
   lastSyncAt?: Date;
 
+  // Доставка: массив агрегаторов (до 5), каждый содержит название, ссылку и URL изображения
+  @Column({ type: 'jsonb', nullable: true })
+  deliveryAggregators?: Array<{
+    name: string;
+    url: string;
+    imageUrl?: string;
+  }>;
+
+  // Карты: ссылки на Яндекс карты и 2ГИС
+  @Column({ nullable: true })
+  yandexMapsUrl?: string;
+
+  @Column({ nullable: true })
+  twoGisUrl?: string;
+
+  // Социальные сети: до 4 штук, каждая содержит название и ссылку
+  @Column({ type: 'jsonb', nullable: true })
+  socialNetworks?: Array<{
+    name: string;
+    url: string;
+  }>;
+
   @CreateDateColumn()
   createdAt!: Date;
 

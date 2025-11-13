@@ -84,10 +84,32 @@ router.get('/restaurants', requireRole('admin'), async (req: AuthRequest, res: R
 
 router.post('/restaurants', requireRole('admin'), async (req: AuthRequest, res: Response) => {
   try {
-    const { name, city, address, phoneNumber, googleSheetId } = req.body;
+    const { 
+      name, 
+      city, 
+      address, 
+      phoneNumber, 
+      googleSheetId,
+      deliveryAggregators,
+      yandexMapsUrl,
+      twoGisUrl,
+      socialNetworks
+    } = req.body;
     
     if (!name || !city || !address || !phoneNumber) {
       res.status(400).json({ success: false, message: 'Missing required fields' });
+      return;
+    }
+    
+    // Валидация доставки (до 5 агрегаторов)
+    if (deliveryAggregators && (!Array.isArray(deliveryAggregators) || deliveryAggregators.length > 5)) {
+      res.status(400).json({ success: false, message: 'Доставка может содержать максимум 5 агрегаторов' });
+      return;
+    }
+    
+    // Валидация социальных сетей (до 4)
+    if (socialNetworks && (!Array.isArray(socialNetworks) || socialNetworks.length > 4)) {
+      res.status(400).json({ success: false, message: 'Социальных сетей может быть максимум 4' });
       return;
     }
     
@@ -112,6 +134,10 @@ router.post('/restaurants', requireRole('admin'), async (req: AuthRequest, res: 
       isActive: true,
       googleSheetId: sheetId,
       googleSheetUrl: `https://docs.google.com/spreadsheets/d/${sheetId}`,
+      deliveryAggregators: deliveryAggregators || null,
+      yandexMapsUrl: yandexMapsUrl || null,
+      twoGisUrl: twoGisUrl || null,
+      socialNetworks: socialNetworks || null,
     });
     
     const savedRestaurant = await restaurantRepository.save(restaurant);
@@ -138,7 +164,34 @@ router.post('/restaurants', requireRole('admin'), async (req: AuthRequest, res: 
 
 router.put('/restaurants/:id', requireRole('admin'), async (req: AuthRequest, res: Response) => {
   try {
-    const { name, city, address, phoneNumber, isActive } = req.body;
+    const { 
+      name, 
+      city, 
+      address, 
+      phoneNumber, 
+      isActive,
+      deliveryAggregators,
+      yandexMapsUrl,
+      twoGisUrl,
+      socialNetworks
+    } = req.body;
+    
+    // Валидация доставки (до 5 агрегаторов)
+    if (deliveryAggregators !== undefined) {
+      if (!Array.isArray(deliveryAggregators) || deliveryAggregators.length > 5) {
+        res.status(400).json({ success: false, message: 'Доставка может содержать максимум 5 агрегаторов' });
+        return;
+      }
+    }
+    
+    // Валидация социальных сетей (до 4)
+    if (socialNetworks !== undefined) {
+      if (!Array.isArray(socialNetworks) || socialNetworks.length > 4) {
+        res.status(400).json({ success: false, message: 'Социальных сетей может быть максимум 4' });
+        return;
+      }
+    }
+    
     const restaurantRepository = AppDataSource.getRepository(Restaurant);
     const restaurant = await restaurantRepository.findOne({
       where: { id: req.params.id },
@@ -154,6 +207,10 @@ router.put('/restaurants/:id', requireRole('admin'), async (req: AuthRequest, re
     if (address) restaurant.address = address;
     if (phoneNumber) restaurant.phoneNumber = phoneNumber;
     if (typeof isActive === 'boolean') restaurant.isActive = isActive;
+    if (deliveryAggregators !== undefined) restaurant.deliveryAggregators = deliveryAggregators.length > 0 ? deliveryAggregators : null;
+    if (yandexMapsUrl !== undefined) restaurant.yandexMapsUrl = yandexMapsUrl || null;
+    if (twoGisUrl !== undefined) restaurant.twoGisUrl = twoGisUrl || null;
+    if (socialNetworks !== undefined) restaurant.socialNetworks = socialNetworks.length > 0 ? socialNetworks : null;
     
     const updatedRestaurant = await restaurantRepository.save(restaurant);
     res.json({ success: true, data: updatedRestaurant });
