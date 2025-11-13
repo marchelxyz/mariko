@@ -6,7 +6,6 @@ import { useStore } from '@/store/useStore';
 export default function ActionButtons() {
   const router = useRouter();
   const { selectedRestaurant } = useStore();
-  const [isDeliveryModalOpen, setIsDeliveryModalOpen] = useState(false);
   const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
 
   const MapPinIcon = () => (
@@ -17,11 +16,7 @@ export default function ActionButtons() {
   );
 
   const handleDeliveryClick = () => {
-    if (selectedRestaurant?.deliveryAggregators && selectedRestaurant.deliveryAggregators.length > 0) {
-      setIsDeliveryModalOpen(true);
-    } else {
-      alert('Доставка для этого ресторана не настроена');
-    }
+    router.push('/delivery');
   };
 
   const handleLocationClick = () => {
@@ -60,63 +55,6 @@ export default function ActionButtons() {
           ))}
         </div>
       </div>
-
-      {/* Модальное окно доставки */}
-      {isDeliveryModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg max-w-md w-full p-6">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-bold text-text-primary">Доставка</h2>
-              <button
-                onClick={() => setIsDeliveryModalOpen(false)}
-                className="text-text-secondary hover:text-text-primary text-2xl"
-              >
-                ✕
-              </button>
-            </div>
-            <div className="space-y-3">
-              {selectedRestaurant?.deliveryAggregators?.map((aggregator, index) => (
-                <a
-                  key={index}
-                  href={aggregator.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-3 p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
-                >
-                  {aggregator.imageUrl ? (
-                    <img
-                      src={aggregator.imageUrl}
-                      alt={aggregator.name}
-                      className="w-12 h-12 object-contain rounded"
-                    />
-                  ) : (
-                    <div className="w-12 h-12 bg-gray-200 rounded flex items-center justify-center">
-                      <span className="text-lg">📦</span>
-                    </div>
-                  )}
-                  <span className="flex-1 font-medium text-text-primary">{aggregator.name}</span>
-                  <svg
-                    width="20"
-                    height="20"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="text-text-secondary"
-                  >
-                    <path
-                      d="M7 17L17 7M17 7H7M17 7V17"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                </a>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Модальное окно "Как нас найти" */}
       {isLocationModalOpen && (
