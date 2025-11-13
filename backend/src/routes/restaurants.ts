@@ -7,25 +7,6 @@ const router = Router();
 router.get('/', async (req: Request, res: Response) => {
   try {
     const restaurantRepository = AppDataSource.getRepository(Restaurant);
-    const { search } = req.query;
-    
-    // Если есть параметр search, ищем рестораны по адресу или городу
-    if (search && typeof search === 'string') {
-      const searchTerm = `%${search.toLowerCase()}%`;
-      const restaurants = await restaurantRepository
-        .createQueryBuilder('restaurant')
-        .where('restaurant.isActive = :isActive', { isActive: true })
-        .andWhere(
-          '(LOWER(restaurant.city) LIKE :search OR LOWER(restaurant.address) LIKE :search)',
-          { search: searchTerm }
-        )
-        .orderBy('restaurant.city', 'ASC')
-        .addOrderBy('restaurant.name', 'ASC')
-        .getMany();
-      
-      res.json({ success: true, data: restaurants });
-      return;
-    }
     
     // Получаем все рестораны для отладки
     const allRestaurants = await restaurantRepository.find();

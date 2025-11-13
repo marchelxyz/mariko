@@ -13,7 +13,7 @@ const TelegramAuth = dynamic(() => import('@/components/TelegramAuth'), {
 function MyApp({ Component, pageProps }: AppProps) {
   const [mounted, setMounted] = useState(false);
   const router = useRouter();
-  const { selectedRestaurant, prefetchBanners, fetchRestaurants, fetchProfile, token } = useStore();
+  const { selectedRestaurant, prefetchBanners, fetchRestaurants } = useStore();
 
   useEffect(() => {
     setMounted(true);
@@ -31,41 +31,13 @@ function MyApp({ Component, pageProps }: AppProps) {
   useEffect(() => {
     if (!mounted || typeof window === 'undefined') return;
 
-    // Если пользователь авторизован, загружаем его профиль для получения любимого ресторана
-    const loadUserProfile = async () => {
-      if (token) {
-        try {
-          await fetchProfile();
-        } catch (error) {
-          console.error('Failed to fetch profile on app init:', error);
-        }
-      }
-    };
-
-    loadUserProfile();
-
-    // Проверяем кэш любимого ресторана перед загрузкой
-    const cachedRestaurantStr = localStorage.getItem('cachedRestaurant');
-    const cachedRestaurantId = localStorage.getItem('favoriteRestaurantId');
-    
-    if (cachedRestaurantStr && cachedRestaurantId) {
-      try {
-        const cachedRestaurant = JSON.parse(cachedRestaurantStr);
-        // Устанавливаем кэшированный ресторан сразу для быстрой загрузки
-        const { setSelectedRestaurant } = useStore.getState();
-        setSelectedRestaurant(cachedRestaurant);
-      } catch (error) {
-        console.error('Failed to parse cached restaurant:', error);
-      }
-    }
-
     // Загружаем рестораны, если они еще не загружены
     fetchRestaurants().then(() => {
       // После загрузки ресторанов предзагружаем баннеры для выбранного ресторана
-      const restaurantId = selectedRestaurant?.id || cachedRestaurantId || undefined;
+      const restaurantId = selectedRestaurant?.id;
       prefetchBanners(restaurantId);
     });
-  }, [mounted, token, fetchProfile, fetchRestaurants, selectedRestaurant, prefetchBanners]);
+  }, [mounted, fetchRestaurants, selectedRestaurant, prefetchBanners]);
 
   // Предзагрузка баннеров при переключении на главную страницу
   useEffect(() => {
