@@ -180,14 +180,15 @@ export default function VerticalBanners({ restaurantId, initialBanners }: Vertic
     <div className="relative flex items-start" ref={bannerRef}>
       {/* Баннер */}
       <div 
-        className="relative overflow-hidden rounded-[15px] flex-shrink"
+        className="relative overflow-hidden rounded-[15px] flex-shrink-0"
         style={bannerHeight && bannerWidth ? { 
           height: `${bannerHeight}px`, 
           width: `${bannerWidth}px`,
           maxHeight: `${bannerHeight}px`,
+          maxWidth: `${bannerWidth}px`,
           minWidth: 0,
           aspectRatio: '3/4'
-        } : { aspectRatio: '3/4', minWidth: 0 }}
+        } : { aspectRatio: '3/4', minWidth: 0, maxWidth: '100%' }}
       >
         <div
           className="flex transition-transform duration-500 ease-in-out h-full"
@@ -213,7 +214,11 @@ export default function VerticalBanners({ restaurantId, initialBanners }: Vertic
                     src={banner.imageUrl}
                     alt={banner.title || 'Banner'}
                     className="w-full h-full object-cover rounded-[15px]"
-                    style={{ display: 'block', objectPosition: 'center' }}
+                    style={{ 
+                      display: 'block', 
+                      objectPosition: 'center',
+                      objectFit: 'cover'
+                    }}
                   />
                 ) : (
                   <div className="w-full h-full bg-secondary flex items-center justify-center rounded-[15px]">
