@@ -178,6 +178,40 @@ export default function VerticalBanners({ restaurantId, initialBanners }: Vertic
 
   return (
     <div className="relative flex items-start" ref={bannerRef}>
+      {/* Защитные поля слева от баннера */}
+      <div 
+        className="relative flex-shrink-0" 
+        style={bannerHeight ? { 
+          height: `${bannerHeight}px`,
+          paddingLeft: '16px',
+          paddingRight: '16px'
+        } : {
+          paddingLeft: '16px',
+          paddingRight: '16px'
+        }}
+      >
+        {/* Индикаторы точек - на защитных полях, налезая на них, по центру вертикально */}
+        {banners.length > 1 && (
+          <div 
+            className="absolute top-1/2 -translate-y-1/2 flex flex-col justify-center gap-2"
+            style={{ left: '16px' }}
+          >
+            {banners.map((_, index) => (
+              <button
+                key={index}
+                onClick={() => goToSlide(index)}
+                className={`rounded-full transition-all duration-300 ${
+                  index === currentIndex
+                    ? 'w-2 h-8 bg-primary'
+                    : 'w-2 h-2 bg-gray-300 hover:bg-gray-400'
+                }`}
+                aria-label={`Перейти к слайду ${index + 1}`}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+
       {/* Баннер */}
       <div 
         className="relative overflow-hidden rounded-[15px] flex-shrink-0"
@@ -229,40 +263,6 @@ export default function VerticalBanners({ restaurantId, initialBanners }: Vertic
             </div>
           ))}
         </div>
-      </div>
-
-      {/* Защитные поля справа от баннера */}
-      <div 
-        className="relative flex-shrink-0" 
-        style={bannerHeight ? { 
-          height: `${bannerHeight}px`,
-          paddingLeft: '16px',
-          paddingRight: '16px'
-        } : {
-          paddingLeft: '16px',
-          paddingRight: '16px'
-        }}
-      >
-        {/* Индикаторы точек - на защитных полях, налезая на них, по центру вертикально */}
-        {banners.length > 1 && (
-          <div 
-            className="absolute top-1/2 -translate-y-1/2 flex flex-col justify-center gap-2"
-            style={{ right: '16px' }}
-          >
-            {banners.map((_, index) => (
-              <button
-                key={index}
-                onClick={() => goToSlide(index)}
-                className={`rounded-full transition-all duration-300 ${
-                  index === currentIndex
-                    ? 'w-2 h-8 bg-primary'
-                    : 'w-2 h-2 bg-gray-300 hover:bg-gray-400'
-                }`}
-                aria-label={`Перейти к слайду ${index + 1}`}
-              />
-            ))}
-          </div>
-        )}
       </div>
     </div>
   );
