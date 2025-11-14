@@ -10,22 +10,32 @@ router.get('/', async (req: Request, res: Response) => {
     const { restaurantId, type } = req.query;
     const bannerRepository = AppDataSource.getRepository(Banner);
     
-    const where: any = { isActive: true };
+    // Используем QueryBuilder для гибких условий
+    const queryBuilder = bannerRepository.createQueryBuilder('banner');
+    
+    // Всегда фильтруем по активным баннерам
+    queryBuilder.where('banner.isActive = :isActive', { isActive: true });
+    
+    // Если restaurantId передан, возвращаем баннеры для этого ресторана И для всех ресторанов (restaurantId = null)
+    // Если restaurantId не передан, возвращаем только баннеры для всех ресторанов
     if (restaurantId) {
-      where.restaurantId = restaurantId;
+      queryBuilder.andWhere(
+        '(banner.restaurantId = :restaurantId OR banner.restaurantId IS NULL)',
+        { restaurantId }
+      );
     } else {
-      where.restaurantId = null;
+      queryBuilder.andWhere('banner.restaurantId IS NULL');
     }
     
     // Фильтрация по типу баннера (horizontal или vertical)
     if (type) {
-      where.type = type;
+      queryBuilder.andWhere('banner.type = :type', { type });
     }
+    
+    // Сортировка по порядку
+    queryBuilder.orderBy('banner.order', 'ASC');
 
-    const banners = await bannerRepository.find({
-      where,
-      order: { order: 'ASC' },
-    });
+    const banners = await queryBuilder.getMany();
     
     res.json({ success: true, data: banners });
   } catch (error) {
