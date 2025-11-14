@@ -25,7 +25,8 @@ export default function Home({ initialBanners, restaurantId }: HomeProps) {
   // Инициализируем store с предзагруженными баннерами при первом рендере
   useEffect(() => {
     if (initialBanners && initialBanners.length > 0) {
-      const key = restaurantId || 'default';
+      // Используем ключ с префиксом для горизонтальных баннеров
+      const key = restaurantId ? `horizontal_${restaurantId}` : 'horizontal_default';
       setBannersForRestaurant(key, initialBanners);
     }
   }, [initialBanners, restaurantId, setBannersForRestaurant]);
@@ -83,10 +84,13 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
       timeout: 10000,
     });
 
-    // Загружаем баннеры для дефолтного ресторана (без restaurantId)
+    // Загружаем горизонтальные баннеры для дефолтного ресторана (без restaurantId)
     // Это баннеры, которые показываются всем пользователям
     const bannersResponse = await serverApi.get('/banners', {
-      params: {}, // Без restaurantId - получаем общие баннеры
+      params: {
+        type: 'horizontal', // Загружаем только горизонтальные баннеры
+        // Без restaurantId - получаем общие баннеры для всех ресторанов
+      },
     });
 
     const banners = bannersResponse.data.data || [];

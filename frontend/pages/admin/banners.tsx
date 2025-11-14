@@ -20,11 +20,11 @@ interface Restaurant {
   name: string;
 }
 
-type TabType = 'horizontal' | 'vertical-all' | 'vertical-restaurant';
+type TabType = 'horizontal-all' | 'horizontal-restaurant' | 'vertical-all' | 'vertical-restaurant';
 
 export default function AdminBanners() {
   const { user } = useStore();
-  const [activeTab, setActiveTab] = useState<TabType>('horizontal');
+  const [activeTab, setActiveTab] = useState<TabType>('horizontal-all');
   const [banners, setBanners] = useState<Banner[]>([]);
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
   const [selectedRestaurantId, setSelectedRestaurantId] = useState<string>('');
@@ -55,8 +55,14 @@ export default function AdminBanners() {
     try {
       const params: any = {};
       
-      if (activeTab === 'horizontal') {
+      if (activeTab === 'horizontal-all') {
         params.type = 'horizontal';
+        // Для всех ресторанов - без restaurantId (null)
+      } else if (activeTab === 'horizontal-restaurant') {
+        params.type = 'horizontal';
+        if (selectedRestaurantId) {
+          params.restaurantId = selectedRestaurantId;
+        }
       } else if (activeTab === 'vertical-all') {
         params.type = 'vertical';
         // Для всех ресторанов - без restaurantId
@@ -103,7 +109,7 @@ export default function AdminBanners() {
 
   const handleCreate = () => {
     setEditingBanner(null);
-    const bannerType = activeTab === 'horizontal' ? 'horizontal' : 'vertical';
+    const bannerType = activeTab.startsWith('horizontal') ? 'horizontal' : 'vertical';
     setFormData({
       title: '',
       imageUrl: '',
@@ -111,7 +117,7 @@ export default function AdminBanners() {
       isActive: true,
       order: banners.length,
       type: bannerType,
-      restaurantId: activeTab === 'vertical-restaurant' ? selectedRestaurantId : undefined,
+      restaurantId: (activeTab === 'vertical-restaurant' || activeTab === 'horizontal-restaurant') ? selectedRestaurantId : undefined,
     });
     setIsFormOpen(true);
   };
@@ -150,9 +156,9 @@ export default function AdminBanners() {
     try {
       const submitData: any = {
         ...formData,
-        restaurantId: activeTab === 'vertical-restaurant' && formData.restaurantId 
+        restaurantId: (activeTab === 'vertical-restaurant' || activeTab === 'horizontal-restaurant') && formData.restaurantId 
           ? formData.restaurantId 
-          : (activeTab === 'vertical-all' ? null : formData.restaurantId),
+          : ((activeTab === 'vertical-all' || activeTab === 'horizontal-all') ? null : formData.restaurantId),
       };
       
       if (editingBanner) {
@@ -181,11 +187,11 @@ export default function AdminBanners() {
   };
 
   const getAspectRatio = () => {
-    return activeTab === 'horizontal' ? '16/9' : '4/5';
+    return activeTab.startsWith('horizontal') ? '16/9' : '4/5';
   };
 
   const getFormatLabel = () => {
-    return activeTab === 'horizontal' ? '16:9 (горизонтальный)' : '4:5 (вертикальный)';
+    return activeTab.startsWith('horizontal') ? '16:9 (горизонтальный)' : '4:5 (вертикальный)';
   };
 
   return (
@@ -195,14 +201,24 @@ export default function AdminBanners() {
         {/* Вкладки */}
         <div className="mb-6 flex flex-wrap gap-2 border-b border-gray-200">
           <button
-            onClick={() => setActiveTab('horizontal')}
+            onClick={() => setActiveTab('horizontal-all')}
             className={`px-4 py-2 font-medium transition-colors ${
-              activeTab === 'horizontal'
+              activeTab === 'horizontal-all'
                 ? 'border-b-2 border-primary text-primary'
                 : 'text-[#8E8E93] hover:text-text-primary'
             }`}
           >
-            Горизонтальные (16:9)
+            Горизонтальные (16:9) - Все рестораны
+          </button>
+          <button
+            onClick={() => setActiveTab('horizontal-restaurant')}
+            className={`px-4 py-2 font-medium transition-colors ${
+              activeTab === 'horizontal-restaurant'
+                ? 'border-b-2 border-primary text-primary'
+                : 'text-[#8E8E93] hover:text-text-primary'
+            }`}
+          >
+            Горизонтальные (16:9) - По ресторанам
           </button>
           <button
             onClick={() => setActiveTab('vertical-all')}
@@ -227,7 +243,7 @@ export default function AdminBanners() {
         </div>
 
         {/* Выбор ресторана для вкладки "По ресторанам" */}
-        {activeTab === 'vertical-restaurant' && (
+        {(activeTab === 'vertical-restaurant' || activeTab === 'horizontal-restaurant') && (
           <div className="mb-4">
             <label className="block text-sm font-medium text-text-primary mb-2">
               Выберите ресторан
@@ -250,13 +266,14 @@ export default function AdminBanners() {
         <div className="mb-4 flex justify-between items-center">
           <p className="text-sm text-text-secondary">
             Баннеры отображаются в формате {getFormatLabel()}
-            {activeTab === 'horizontal' && ' на главной странице'}
+            {activeTab === 'horizontal-all' && ' на главной странице для всех ресторанов'}
+            {activeTab === 'horizontal-restaurant' && selectedRestaurantId && ` на главной странице для выбранного ресторана`}
             {activeTab === 'vertical-all' && ' на странице доставки для всех ресторанов'}
             {activeTab === 'vertical-restaurant' && selectedRestaurantId && ` на странице доставки для выбранного ресторана`}
           </p>
           <button
             onClick={handleCreate}
-            disabled={activeTab === 'vertical-restaurant' && !selectedRestaurantId}
+            disabled={(activeTab === 'vertical-restaurant' || activeTab === 'horizontal-restaurant') && !selectedRestaurantId}
             className="bg-primary text-white px-4 py-2 rounded-lg font-medium hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             + Создать баннер
@@ -267,7 +284,7 @@ export default function AdminBanners() {
           <div className="text-center py-8">
             <p className="text-text-secondary">Загрузка...</p>
           </div>
-        ) : activeTab === 'vertical-restaurant' && !selectedRestaurantId ? (
+        ) : (activeTab === 'vertical-restaurant' || activeTab === 'horizontal-restaurant') && !selectedRestaurantId ? (
           <div className="bg-white rounded-lg shadow-sm p-6 text-center">
             <p className="text-text-secondary">Выберите ресторан для просмотра баннеров</p>
           </div>
@@ -284,7 +301,7 @@ export default function AdminBanners() {
               >
                 <div className="flex">
                   {/* Превью баннера */}
-                  <div className={`${activeTab === 'horizontal' ? 'w-32' : 'w-24'} flex-shrink-0 bg-gray-100 relative`}>
+                  <div className={`${activeTab.startsWith('horizontal') ? 'w-32' : 'w-24'} flex-shrink-0 bg-gray-100 relative`}>
                     <div
                       className="absolute inset-0 bg-cover bg-center"
                       style={{
@@ -411,7 +428,7 @@ export default function AdminBanners() {
                     {formData.imageUrl && (
                       <div className="mt-2">
                         <p className="text-xs text-text-secondary mb-2">Превью ({getFormatLabel()}):</p>
-                        <div className={`${activeTab === 'horizontal' ? 'w-32' : 'w-24'} bg-gray-100 rounded overflow-hidden`}>
+                        <div className={`${activeTab.startsWith('horizontal') ? 'w-32' : 'w-24'} bg-gray-100 rounded overflow-hidden`}>
                           <div
                             className="bg-cover bg-center"
                             style={{
@@ -438,7 +455,7 @@ export default function AdminBanners() {
                     />
                   </div>
 
-                  {activeTab === 'vertical-restaurant' && (
+                  {(activeTab === 'vertical-restaurant' || activeTab === 'horizontal-restaurant') && (
                     <div>
                       <label className="block text-sm font-medium text-text-primary mb-1">
                         Ресторан *
