@@ -101,9 +101,9 @@ export default function Delivery() {
                 </div>
               )}
 
-              {/* Остальные агрегаторы сеткой */}
+              {/* Остальные агрегаторы сеткой - адаптивная сетка */}
               {remainingAggregators.length > 0 && (
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
                   {remainingAggregators.map((aggregator, index) => (
                     <a
                       key={index + 2}
