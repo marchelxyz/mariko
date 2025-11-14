@@ -111,7 +111,7 @@ export default function Delivery() {
                       target="_blank"
                       rel="noopener noreferrer"
                       className="bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow overflow-hidden block"
-                      style={{ height: '120px', minHeight: '120px', maxHeight: '120px' }}
+                      style={{ aspectRatio: '4/3' }}
                     >
                       {aggregator.imageUrl ? (
                         <img
