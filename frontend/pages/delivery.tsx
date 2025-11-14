@@ -61,23 +61,18 @@ export default function Delivery() {
           <span className="text-base font-medium">Назад</span>
         </button>
 
-        {/* Основной контент: баннер слева, сетка блоков справа */}
+        {/* Основной контент: сетка блоков слева, баннер справа */}
         {deliveryAggregators.length === 0 ? (
           <div className="bg-white rounded-lg shadow-sm p-6 text-center">
             <p className="text-text-primary">Доставка для этого ресторана не настроена</p>
           </div>
         ) : (
           <div className="flex flex-row items-start max-w-7xl mx-auto">
-            {/* Левая часть: вертикальный баннер с защитными полями и индикатором */}
-            <div className="flex-shrink-0">
-              <VerticalBanners restaurantId={selectedRestaurant?.id} />
-            </div>
-
-            {/* Правая часть: сетка агрегаторов доставки */}
-            <div className="flex-1 min-w-0 ml-4">
-              {/* Первые 2 агрегатора в ряд */}
+            {/* Левая часть: сетка агрегаторов доставки */}
+            <div className="flex-1 min-w-0 mr-4">
+              {/* Первые 2 агрегатора друг под другом */}
               {firstTwoAggregators.length > 0 && (
-                <div className="grid grid-cols-2 gap-3 mb-3" id="delivery-buttons-container">
+                <div className="grid grid-cols-1 gap-3 mb-3" id="delivery-buttons-container">
                   {firstTwoAggregators.map((aggregator, index) => (
                     <a
                       key={index}
@@ -136,6 +131,11 @@ export default function Delivery() {
                   ))}
                 </div>
               )}
+            </div>
+
+            {/* Правая часть: вертикальный баннер с защитными полями и индикатором */}
+            <div className="flex-shrink-0">
+              <VerticalBanners restaurantId={selectedRestaurant?.id} />
             </div>
           </div>
         )}
