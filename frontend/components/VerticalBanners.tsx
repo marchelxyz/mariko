@@ -173,8 +173,8 @@ export default function VerticalBanners({ restaurantId, initialBanners }: Vertic
     return null;
   }
 
-  // Вычисляем ширину на основе высоты и соотношения сторон 4/5
-  const bannerWidth = bannerHeight ? (bannerHeight * 4) / 5 : null;
+  // Вычисляем ширину на основе высоты и соотношения сторон 3/4
+  const bannerWidth = bannerHeight ? (bannerHeight * 3) / 4 : null;
 
   return (
     <div className="relative flex items-center" style={{ gap: '1px' }} ref={bannerRef}>
