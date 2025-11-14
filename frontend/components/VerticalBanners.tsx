@@ -18,8 +18,13 @@ export default function VerticalBanners({ restaurantId, initialBanners }: Vertic
   const { bannersByRestaurant, setBannersForRestaurant } = useStore();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
-  const [bannerHeight, setBannerHeight] = useState<number | null>(null);
   const bannerRef = useRef<HTMLDivElement>(null);
+  
+  // Фиксированные размеры: высота двух кнопок (120px каждая) + gap (12px) = 252px
+  const BANNER_HEIGHT = 252;
+  // Ширина баннера: соотношение сторон 3/4, поэтому ширина = высота * 3/4 = 189px
+  // Но учитывая ограничение контейнера 160px, делаем баннер 120px шириной
+  const BANNER_WIDTH = 120;
 
   // Получаем баннеры из кэша для конкретного ресторана
   const key = restaurantId ? `vertical_${restaurantId}` : 'vertical_default';
@@ -87,83 +92,6 @@ export default function VerticalBanners({ restaurantId, initialBanners }: Vertic
     return () => clearInterval(interval);
   }, [banners.length]);
 
-  // Вычисляем высоту баннера на основе высоты двух кнопок доставки
-  useEffect(() => {
-    // Пропускаем на сервере
-    if (typeof window === 'undefined') return;
-
-    const calculateBannerHeight = () => {
-      const deliveryContainer = document.getElementById('delivery-buttons-container');
-      if (deliveryContainer) {
-        const buttons = deliveryContainer.querySelectorAll('a');
-        if (buttons.length >= 2) {
-          // Высота первой кнопки
-          const firstButtonHeight = buttons[0].offsetHeight;
-          // Высота второй кнопки
-          const secondButtonHeight = buttons[1].offsetHeight;
-          // Получаем отступ из computed styles (gap-3 = 0.75rem)
-          const computedStyle = window.getComputedStyle(deliveryContainer);
-          const gap = parseFloat(computedStyle.gap) || 12; // fallback на 12px если не удалось получить
-          // Общая высота двух кнопок с отступом
-          const totalHeight = firstButtonHeight + secondButtonHeight + gap;
-          if (totalHeight > 0) {
-            setBannerHeight(totalHeight);
-          }
-        }
-      }
-    };
-
-    // Вычисляем высоту при загрузке и изменении размера окна
-    calculateBannerHeight();
-    window.addEventListener('resize', calculateBannerHeight);
-    
-    // Проверяем несколько раз с задержками, чтобы убедиться, что изображения загрузились
-    const timeouts = [
-      setTimeout(calculateBannerHeight, 100),
-      setTimeout(calculateBannerHeight, 300),
-      setTimeout(calculateBannerHeight, 500),
-    ];
-
-    // Используем ResizeObserver для отслеживания изменений размера контейнера с кнопками
-    let resizeObserver: ResizeObserver | null = null;
-    let observedContainer: HTMLElement | null = null;
-    
-    // Пытаемся найти контейнер с задержкой, если его еще нет
-    const setupResizeObserver = () => {
-      // Отписываемся от предыдущего observer, если он был
-      if (resizeObserver && observedContainer) {
-        resizeObserver.unobserve(observedContainer);
-        resizeObserver.disconnect();
-      }
-      
-      const deliveryContainer = document.getElementById('delivery-buttons-container');
-      if (deliveryContainer && typeof ResizeObserver !== 'undefined') {
-        observedContainer = deliveryContainer;
-        resizeObserver = new ResizeObserver(() => {
-          calculateBannerHeight();
-        });
-        resizeObserver.observe(deliveryContainer);
-      }
-    };
-
-    setupResizeObserver();
-    // Также пробуем установить observer после небольших задержек
-    const observerTimeouts = [
-      setTimeout(setupResizeObserver, 100),
-      setTimeout(setupResizeObserver, 300),
-    ];
-
-    return () => {
-      window.removeEventListener('resize', calculateBannerHeight);
-      timeouts.forEach(timeout => clearTimeout(timeout));
-      observerTimeouts.forEach(timeout => clearTimeout(timeout));
-      if (resizeObserver && observedContainer) {
-        resizeObserver.unobserve(observedContainer);
-        resizeObserver.disconnect();
-      }
-    };
-  }, [banners.length]);
-
   // Обработка клика на индикатор
   const goToSlide = (index: number) => {
     setCurrentIndex(index);
@@ -173,56 +101,19 @@ export default function VerticalBanners({ restaurantId, initialBanners }: Vertic
     return null;
   }
 
-  // Вычисляем ширину на основе высоты и соотношения сторон 3/4
-  const bannerWidth = bannerHeight ? (bannerHeight * 3) / 4 : null;
-
   return (
-    <div className="relative flex items-start" ref={bannerRef}>
-      {/* Защитные поля слева от баннера */}
-      <div 
-        className="relative flex-shrink-0" 
-        style={bannerHeight ? { 
-          height: `${bannerHeight}px`,
-          paddingLeft: '16px',
-          paddingRight: '16px'
-        } : {
-          paddingLeft: '16px',
-          paddingRight: '16px'
-        }}
-      >
-        {/* Индикаторы точек - на защитных полях, налезая на них, по центру вертикально */}
-        {banners.length > 1 && (
-          <div 
-            className="absolute top-1/2 -translate-y-1/2 flex flex-col justify-center gap-2"
-            style={{ left: '16px' }}
-          >
-            {banners.map((_, index) => (
-              <button
-                key={index}
-                onClick={() => goToSlide(index)}
-                className={`rounded-full transition-all duration-300 ${
-                  index === currentIndex
-                    ? 'w-2 h-8 bg-primary'
-                    : 'w-2 h-2 bg-gray-300 hover:bg-gray-400'
-                }`}
-                aria-label={`Перейти к слайду ${index + 1}`}
-              />
-            ))}
-          </div>
-        )}
-      </div>
-
+    <div className="relative flex items-start" ref={bannerRef} style={{ width: '160px', height: `${BANNER_HEIGHT}px` }}>
       {/* Баннер */}
       <div 
         className="relative overflow-hidden rounded-[15px] flex-shrink-0"
-        style={bannerHeight && bannerWidth ? { 
-          height: `${bannerHeight}px`, 
-          width: `${bannerWidth}px`,
-          maxHeight: `${bannerHeight}px`,
-          maxWidth: `${bannerWidth}px`,
-          minWidth: 0,
-          aspectRatio: '3/4'
-        } : { aspectRatio: '3/4', minWidth: 0, maxWidth: '100%' }}
+        style={{ 
+          height: `${BANNER_HEIGHT}px`, 
+          width: `${BANNER_WIDTH}px`,
+          minHeight: `${BANNER_HEIGHT}px`,
+          maxHeight: `${BANNER_HEIGHT}px`,
+          minWidth: `${BANNER_WIDTH}px`,
+          maxWidth: `${BANNER_WIDTH}px`
+        }}
       >
         <div
           className="flex transition-transform duration-500 ease-in-out h-full"
@@ -264,6 +155,27 @@ export default function VerticalBanners({ restaurantId, initialBanners }: Vertic
           ))}
         </div>
       </div>
+
+      {/* Индикаторы точек - справа от баннера, по центру вертикально */}
+      {banners.length > 1 && (
+        <div 
+          className="absolute top-1/2 -translate-y-1/2 flex flex-col justify-center gap-2"
+          style={{ left: `${BANNER_WIDTH + 8}px` }}
+        >
+          {banners.map((_, index) => (
+            <button
+              key={index}
+              onClick={() => goToSlide(index)}
+              className={`rounded-full transition-all duration-300 ${
+                index === currentIndex
+                  ? 'w-2 h-8 bg-primary'
+                  : 'w-2 h-2 bg-gray-300 hover:bg-gray-400'
+              }`}
+              aria-label={`Перейти к слайду ${index + 1}`}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
