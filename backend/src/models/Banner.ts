@@ -36,6 +36,9 @@ export class Banner {
   @Column({ default: 0 })
   order!: number;
 
+  @Column({ type: 'varchar', default: 'horizontal' })
+  type!: 'horizontal' | 'vertical'; // horizontal = 16:9, vertical = 4:5
+
   @CreateDateColumn()
   createdAt!: Date;
 

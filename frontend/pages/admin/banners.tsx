@@ -12,11 +12,22 @@ interface Banner {
   isActive: boolean;
   order: number;
   restaurantId?: string;
+  type?: 'horizontal' | 'vertical';
 }
+
+interface Restaurant {
+  id: string;
+  name: string;
+}
+
+type TabType = 'horizontal' | 'vertical-all' | 'vertical-restaurant';
 
 export default function AdminBanners() {
   const { user } = useStore();
+  const [activeTab, setActiveTab] = useState<TabType>('horizontal');
   const [banners, setBanners] = useState<Banner[]>([]);
+  const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
+  const [selectedRestaurantId, setSelectedRestaurantId] = useState<string>('');
   const [isLoading, setIsLoading] = useState(false);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingBanner, setEditingBanner] = useState<Banner | null>(null);
@@ -26,19 +37,50 @@ export default function AdminBanners() {
     linkUrl: '',
     isActive: true,
     order: 0,
+    type: 'horizontal' as 'horizontal' | 'vertical',
+    restaurantId: undefined as string | undefined,
   });
+
+  const fetchRestaurants = useCallback(async () => {
+    try {
+      const response = await api.get('/admin/restaurants');
+      setRestaurants(response.data.data || []);
+    } catch (error) {
+      console.error('Failed to fetch restaurants:', error);
+    }
+  }, []);
 
   const fetchBanners = useCallback(async () => {
     setIsLoading(true);
     try {
-      const response = await api.get('/admin/banners');
+      const params: any = {};
+      
+      if (activeTab === 'horizontal') {
+        params.type = 'horizontal';
+      } else if (activeTab === 'vertical-all') {
+        params.type = 'vertical';
+        // Для всех ресторанов - без restaurantId
+      } else if (activeTab === 'vertical-restaurant') {
+        params.type = 'vertical';
+        if (selectedRestaurantId) {
+          params.restaurantId = selectedRestaurantId;
+        }
+      }
+      
+      const response = await api.get('/admin/banners', { params });
       setBanners(response.data.data || []);
     } catch (error) {
       console.error('Failed to fetch banners:', error);
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [activeTab, selectedRestaurantId]);
+
+  useEffect(() => {
+    if (user && user.role === 'admin') {
+      fetchRestaurants();
+    }
+  }, [user, fetchRestaurants]);
 
   useEffect(() => {
     if (user && user.role === 'admin') {
@@ -61,12 +103,15 @@ export default function AdminBanners() {
 
   const handleCreate = () => {
     setEditingBanner(null);
+    const bannerType = activeTab === 'horizontal' ? 'horizontal' : 'vertical';
     setFormData({
       title: '',
       imageUrl: '',
       linkUrl: '',
       isActive: true,
       order: banners.length,
+      type: bannerType,
+      restaurantId: activeTab === 'vertical-restaurant' ? selectedRestaurantId : undefined,
     });
     setIsFormOpen(true);
   };
@@ -79,6 +124,8 @@ export default function AdminBanners() {
       linkUrl: banner.linkUrl || '',
       isActive: banner.isActive,
       order: banner.order,
+      type: banner.type || 'horizontal',
+      restaurantId: banner.restaurantId,
     });
     setIsFormOpen(true);
   };
@@ -101,10 +148,17 @@ export default function AdminBanners() {
     e.preventDefault();
     
     try {
+      const submitData: any = {
+        ...formData,
+        restaurantId: activeTab === 'vertical-restaurant' && formData.restaurantId 
+          ? formData.restaurantId 
+          : (activeTab === 'vertical-all' ? null : formData.restaurantId),
+      };
+      
       if (editingBanner) {
-        await api.put(`/banners/${editingBanner.id}`, formData);
+        await api.put(`/banners/${editingBanner.id}`, submitData);
       } else {
-        await api.post('/banners', formData);
+        await api.post('/banners', submitData);
       }
       setIsFormOpen(false);
       fetchBanners();
@@ -126,17 +180,84 @@ export default function AdminBanners() {
     }
   };
 
+  const getAspectRatio = () => {
+    return activeTab === 'horizontal' ? '16/9' : '4/5';
+  };
+
+  const getFormatLabel = () => {
+    return activeTab === 'horizontal' ? '16:9 (горизонтальный)' : '4:5 (вертикальный)';
+  };
+
   return (
     <Layout>
       <Header title="Управление баннерами" />
       <div className="px-4 py-6">
+        {/* Вкладки */}
+        <div className="mb-6 flex flex-wrap gap-2 border-b border-gray-200">
+          <button
+            onClick={() => setActiveTab('horizontal')}
+            className={`px-4 py-2 font-medium transition-colors ${
+              activeTab === 'horizontal'
+                ? 'border-b-2 border-primary text-primary'
+                : 'text-text-secondary hover:text-text-primary'
+            }`}
+          >
+            Горизонтальные (16:9)
+          </button>
+          <button
+            onClick={() => setActiveTab('vertical-all')}
+            className={`px-4 py-2 font-medium transition-colors ${
+              activeTab === 'vertical-all'
+                ? 'border-b-2 border-primary text-primary'
+                : 'text-text-secondary hover:text-text-primary'
+            }`}
+          >
+            Вертикальные (4:5) - Все рестораны
+          </button>
+          <button
+            onClick={() => setActiveTab('vertical-restaurant')}
+            className={`px-4 py-2 font-medium transition-colors ${
+              activeTab === 'vertical-restaurant'
+                ? 'border-b-2 border-primary text-primary'
+                : 'text-text-secondary hover:text-text-primary'
+            }`}
+          >
+            Вертикальные (4:5) - По ресторанам
+          </button>
+        </div>
+
+        {/* Выбор ресторана для вкладки "По ресторанам" */}
+        {activeTab === 'vertical-restaurant' && (
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-text-primary mb-2">
+              Выберите ресторан
+            </label>
+            <select
+              value={selectedRestaurantId}
+              onChange={(e) => setSelectedRestaurantId(e.target.value)}
+              className="w-full max-w-md px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+            >
+              <option value="">-- Выберите ресторан --</option>
+              {restaurants.map((restaurant) => (
+                <option key={restaurant.id} value={restaurant.id}>
+                  {restaurant.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
         <div className="mb-4 flex justify-between items-center">
           <p className="text-sm text-text-secondary">
-            Баннеры отображаются на главной странице в формате 16:9 (горизонтальный)
+            Баннеры отображаются в формате {getFormatLabel()}
+            {activeTab === 'horizontal' && ' на главной странице'}
+            {activeTab === 'vertical-all' && ' на странице доставки для всех ресторанов'}
+            {activeTab === 'vertical-restaurant' && selectedRestaurantId && ` на странице доставки для выбранного ресторана`}
           </p>
           <button
             onClick={handleCreate}
-            className="bg-primary text-white px-4 py-2 rounded-lg font-medium hover:bg-primary/90 transition-colors"
+            disabled={activeTab === 'vertical-restaurant' && !selectedRestaurantId}
+            className="bg-primary text-white px-4 py-2 rounded-lg font-medium hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             + Создать баннер
           </button>
@@ -145,6 +266,10 @@ export default function AdminBanners() {
         {isLoading ? (
           <div className="text-center py-8">
             <p className="text-text-secondary">Загрузка...</p>
+          </div>
+        ) : activeTab === 'vertical-restaurant' && !selectedRestaurantId ? (
+          <div className="bg-white rounded-lg shadow-sm p-6 text-center">
+            <p className="text-text-secondary">Выберите ресторан для просмотра баннеров</p>
           </div>
         ) : banners.length === 0 ? (
           <div className="bg-white rounded-lg shadow-sm p-6 text-center">
@@ -158,13 +283,13 @@ export default function AdminBanners() {
                 className="bg-white rounded-lg shadow-sm overflow-hidden"
               >
                 <div className="flex">
-                  {/* Превью баннера 16:9 */}
-                  <div className="w-32 flex-shrink-0 bg-gray-100 relative">
+                  {/* Превью баннера */}
+                  <div className={`${activeTab === 'horizontal' ? 'w-32' : 'w-24'} flex-shrink-0 bg-gray-100 relative`}>
                     <div
                       className="absolute inset-0 bg-cover bg-center"
                       style={{
                         backgroundImage: banner.imageUrl ? `url(${banner.imageUrl})` : 'none',
-                        aspectRatio: '16/9',
+                        aspectRatio: getAspectRatio(),
                       }}
                     >
                       {!banner.imageUrl && (
@@ -187,7 +312,7 @@ export default function AdminBanners() {
                             Ссылка: {banner.linkUrl}
                           </p>
                         )}
-                        <div className="flex items-center gap-4 text-sm">
+                        <div className="flex items-center gap-4 text-sm flex-wrap">
                           <span className={`px-2 py-1 rounded ${
                             banner.isActive
                               ? 'bg-green-100 text-green-800'
@@ -198,12 +323,17 @@ export default function AdminBanners() {
                           <span className="text-text-secondary">
                             Порядок: {banner.order}
                           </span>
+                          {banner.restaurantId && (
+                            <span className="text-text-secondary">
+                              Ресторан: {restaurants.find(r => r.id === banner.restaurantId)?.name || banner.restaurantId}
+                            </span>
+                          )}
                         </div>
                       </div>
                     </div>
 
                     {/* Кнопки управления */}
-                    <div className="mt-4 flex gap-2">
+                    <div className="mt-4 flex gap-2 flex-wrap">
                       <button
                         onClick={() => handleEdit(banner)}
                         className="px-3 py-1.5 bg-blue-500 text-white rounded text-sm hover:bg-blue-600 transition-colors"
@@ -268,7 +398,7 @@ export default function AdminBanners() {
 
                   <div>
                     <label className="block text-sm font-medium text-text-primary mb-1">
-                      URL изображения * (формат 16:9)
+                      URL изображения * (формат {getFormatLabel()})
                     </label>
                     <input
                       type="url"
@@ -280,13 +410,13 @@ export default function AdminBanners() {
                     />
                     {formData.imageUrl && (
                       <div className="mt-2">
-                        <p className="text-xs text-text-secondary mb-2">Превью (16:9):</p>
-                        <div className="w-32 bg-gray-100 rounded overflow-hidden">
+                        <p className="text-xs text-text-secondary mb-2">Превью ({getFormatLabel()}):</p>
+                        <div className={`${activeTab === 'horizontal' ? 'w-32' : 'w-24'} bg-gray-100 rounded overflow-hidden`}>
                           <div
                             className="bg-cover bg-center"
                             style={{
                               backgroundImage: `url(${formData.imageUrl})`,
-                              aspectRatio: '16/9',
+                              aspectRatio: getAspectRatio(),
                               width: '100%',
                             }}
                           />
@@ -307,6 +437,27 @@ export default function AdminBanners() {
                       placeholder="https://example.com"
                     />
                   </div>
+
+                  {activeTab === 'vertical-restaurant' && (
+                    <div>
+                      <label className="block text-sm font-medium text-text-primary mb-1">
+                        Ресторан *
+                      </label>
+                      <select
+                        required
+                        value={formData.restaurantId || ''}
+                        onChange={(e) => setFormData({ ...formData, restaurantId: e.target.value || undefined })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                      >
+                        <option value="">-- Выберите ресторан --</option>
+                        {restaurants.map((restaurant) => (
+                          <option key={restaurant.id} value={restaurant.id}>
+                            {restaurant.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
 
                   <div className="grid grid-cols-2 gap-4">
                     <div>

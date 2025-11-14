@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import Layout from '@/components/Layout';
 import Header from '@/components/Header';
+import VerticalBanners from '@/components/VerticalBanners';
 import { useStore } from '@/store/useStore';
 
 export default function Delivery() {
@@ -28,6 +29,8 @@ export default function Delivery() {
   }
 
   const deliveryAggregators = selectedRestaurant?.deliveryAggregators || [];
+  const firstTwoAggregators = deliveryAggregators.slice(0, 2);
+  const remainingAggregators = deliveryAggregators.slice(2);
 
   return (
     <Layout>
@@ -58,51 +61,83 @@ export default function Delivery() {
           <span className="text-base font-medium">Назад</span>
         </button>
 
-        {/* Список агрегаторов доставки */}
+        {/* Основной контент: агрегаторы слева, баннер справа */}
         {deliveryAggregators.length === 0 ? (
           <div className="bg-white rounded-lg shadow-sm p-6 text-center">
             <p className="text-text-primary">Доставка для этого ресторана не настроена</p>
           </div>
         ) : (
-          <div className="space-y-3">
-            {deliveryAggregators.map((aggregator, index) => (
-              <a
-                key={index}
-                href={aggregator.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-3 p-4 bg-white rounded-lg shadow-sm hover:bg-gray-50 transition-colors"
-              >
-                {aggregator.imageUrl ? (
-                  <img
-                    src={aggregator.imageUrl}
-                    alt={aggregator.name}
-                    className="w-16 h-16 object-contain rounded-lg"
-                  />
-                ) : (
-                  <div className="w-16 h-16 bg-gray-200 rounded-lg flex items-center justify-center">
-                    <span className="text-2xl">📦</span>
-                  </div>
-                )}
-                <span className="flex-1 font-medium text-text-primary text-lg">{aggregator.name}</span>
-                <svg
-                  width="24"
-                  height="24"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="text-text-secondary"
-                >
-                  <path
-                    d="M7 17L17 7M17 7H7M17 7V17"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-              </a>
-            ))}
+          <div className="flex flex-col lg:flex-row gap-4 items-start max-w-7xl mx-auto">
+            {/* Левая часть: агрегаторы доставки */}
+            <div className="flex-1 w-full lg:w-auto min-w-0">
+              {/* Первые 2 агрегатора в ряд */}
+              {firstTwoAggregators.length > 0 && (
+                <div className="grid grid-cols-2 gap-3 mb-3">
+                  {firstTwoAggregators.map((aggregator, index) => (
+                    <a
+                      key={index}
+                      href={aggregator.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow overflow-hidden"
+                    >
+                      {aggregator.imageUrl ? (
+                        <img
+                          src={aggregator.imageUrl}
+                          alt={aggregator.name}
+                          className="w-full object-cover"
+                          style={{ aspectRatio: '4/3' }}
+                        />
+                      ) : (
+                        <div 
+                          className="w-full bg-gray-200 flex items-center justify-center"
+                          style={{ aspectRatio: '4/3' }}
+                        >
+                          <span className="text-4xl">📦</span>
+                        </div>
+                      )}
+                    </a>
+                  ))}
+                </div>
+              )}
+
+              {/* Остальные агрегаторы сеткой */}
+              {remainingAggregators.length > 0 && (
+                <div className="grid grid-cols-2 gap-3">
+                  {remainingAggregators.map((aggregator, index) => (
+                    <a
+                      key={index + 2}
+                      href={aggregator.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow overflow-hidden"
+                    >
+                      {aggregator.imageUrl ? (
+                        <img
+                          src={aggregator.imageUrl}
+                          alt={aggregator.name}
+                          className="w-full object-cover"
+                          style={{ aspectRatio: '4/3' }}
+                        />
+                      ) : (
+                        <div 
+                          className="w-full bg-gray-200 flex items-center justify-center"
+                          style={{ aspectRatio: '4/3' }}
+                        >
+                          <span className="text-4xl">📦</span>
+                        </div>
+                      )}
+                    </a>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Правая часть: вертикальный баннер с индикаторами */}
+            {/* Высота баннера должна быть равна высоте 2 кнопок доставки с отступом между ними */}
+            <div className="w-full lg:w-auto flex-shrink-0 lg:self-start">
+              <VerticalBanners restaurantId={selectedRestaurant?.id} />
+            </div>
           </div>
         )}
       </div>
