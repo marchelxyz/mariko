@@ -22,9 +22,8 @@ export default function VerticalBanners({ restaurantId, initialBanners }: Vertic
   
   // Фиксированные размеры: высота двух кнопок (120px каждая) + gap (12px) = 252px
   const BANNER_HEIGHT = 252;
-  // Ширина баннера: соотношение сторон 3/4, поэтому ширина = высота * 3/4 = 189px
-  // Но учитывая ограничение контейнера 160px, делаем баннер 120px шириной
-  const BANNER_WIDTH = 120;
+  // Ширина баннера: до защитных полей контейнера (160px)
+  const BANNER_WIDTH = 160;
 
   // Получаем баннеры из кэша для конкретного ресторана
   const key = restaurantId ? `vertical_${restaurantId}` : 'vertical_default';
@@ -154,28 +153,28 @@ export default function VerticalBanners({ restaurantId, initialBanners }: Vertic
             </div>
           ))}
         </div>
-      </div>
 
-      {/* Индикаторы точек - справа от баннера, по центру вертикально */}
-      {banners.length > 1 && (
-        <div 
-          className="absolute top-1/2 -translate-y-1/2 flex flex-col justify-center gap-2"
-          style={{ left: `${BANNER_WIDTH + 8}px` }}
-        >
-          {banners.map((_, index) => (
-            <button
-              key={index}
-              onClick={() => goToSlide(index)}
-              className={`rounded-full transition-all duration-300 ${
-                index === currentIndex
-                  ? 'w-2 h-8 bg-primary'
-                  : 'w-2 h-2 bg-gray-300 hover:bg-gray-400'
-              }`}
-              aria-label={`Перейти к слайду ${index + 1}`}
-            />
-          ))}
-        </div>
-      )}
+        {/* Индикаторы точек - на баннере, справа с отступом 1px от правого края */}
+        {banners.length > 1 && (
+          <div 
+            className="absolute top-1/2 -translate-y-1/2 flex flex-col justify-center gap-2 z-10"
+            style={{ right: '1px' }}
+          >
+            {banners.map((_, index) => (
+              <button
+                key={index}
+                onClick={() => goToSlide(index)}
+                className={`rounded-full transition-all duration-300 ${
+                  index === currentIndex
+                    ? 'w-2 h-8 bg-primary'
+                    : 'w-2 h-2 bg-gray-300 hover:bg-gray-400'
+                }`}
+                aria-label={`Перейти к слайду ${index + 1}`}
+              />
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
