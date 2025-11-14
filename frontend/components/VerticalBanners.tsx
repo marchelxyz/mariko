@@ -184,8 +184,9 @@ export default function VerticalBanners({ restaurantId, initialBanners }: Vertic
         style={bannerHeight && bannerWidth ? { 
           height: `${bannerHeight}px`, 
           width: `${bannerWidth}px`,
-          maxHeight: `${bannerHeight}px`
-        } : {}}
+          maxHeight: `${bannerHeight}px`,
+          aspectRatio: '3/4'
+        } : { aspectRatio: '3/4' }}
       >
         <div
           className="flex transition-transform duration-500 ease-in-out h-full"
@@ -211,7 +212,7 @@ export default function VerticalBanners({ restaurantId, initialBanners }: Vertic
                     src={banner.imageUrl}
                     alt={banner.title || 'Banner'}
                     className="w-full h-full object-cover rounded-[15px]"
-                    style={{ display: 'block' }}
+                    style={{ display: 'block', objectPosition: 'center' }}
                   />
                 ) : (
                   <div className="w-full h-full bg-secondary flex items-center justify-center rounded-[15px]">
