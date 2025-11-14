@@ -16,11 +16,12 @@ router.use(authenticate);
 // Управление баннерами (только для администраторов)
 router.get('/banners', requireRole('admin'), async (req: AuthRequest, res: Response) => {
   try {
-    const { restaurantId } = req.query;
+    const { restaurantId, type } = req.query;
     const bannerRepository = AppDataSource.getRepository(Banner);
     
     const where: any = {};
     if (restaurantId) where.restaurantId = restaurantId;
+    if (type) where.type = type;
     
     const banners = await bannerRepository.find({
       where,

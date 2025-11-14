@@ -7,7 +7,7 @@ const router = Router();
 
 router.get('/', async (req: Request, res: Response) => {
   try {
-    const { restaurantId } = req.query;
+    const { restaurantId, type } = req.query;
     const bannerRepository = AppDataSource.getRepository(Banner);
     
     const where: any = { isActive: true };
@@ -15,6 +15,11 @@ router.get('/', async (req: Request, res: Response) => {
       where.restaurantId = restaurantId;
     } else {
       where.restaurantId = null;
+    }
+    
+    // Фильтрация по типу баннера (horizontal или vertical)
+    if (type) {
+      where.type = type;
     }
 
     const banners = await bannerRepository.find({
