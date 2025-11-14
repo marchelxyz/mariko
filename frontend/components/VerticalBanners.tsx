@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useStore } from '@/store/useStore';
 import api from '@/lib/api';
 
@@ -18,6 +18,8 @@ export default function VerticalBanners({ restaurantId, initialBanners }: Vertic
   const { bannersByRestaurant, setBannersForRestaurant } = useStore();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
+  const [bannerHeight, setBannerHeight] = useState<number | null>(null);
+  const bannerRef = useRef<HTMLDivElement>(null);
 
   // Получаем баннеры из кэша для конкретного ресторана
   const key = restaurantId ? `vertical_${restaurantId}` : 'vertical_default';
@@ -85,6 +87,83 @@ export default function VerticalBanners({ restaurantId, initialBanners }: Vertic
     return () => clearInterval(interval);
   }, [banners.length]);
 
+  // Вычисляем высоту баннера на основе высоты двух кнопок доставки
+  useEffect(() => {
+    // Пропускаем на сервере
+    if (typeof window === 'undefined') return;
+
+    const calculateBannerHeight = () => {
+      const deliveryContainer = document.getElementById('delivery-buttons-container');
+      if (deliveryContainer) {
+        const buttons = deliveryContainer.querySelectorAll('a');
+        if (buttons.length >= 2) {
+          // Высота первой кнопки
+          const firstButtonHeight = buttons[0].offsetHeight;
+          // Высота второй кнопки
+          const secondButtonHeight = buttons[1].offsetHeight;
+          // Получаем отступ из computed styles (gap-3 = 0.75rem)
+          const computedStyle = window.getComputedStyle(deliveryContainer);
+          const gap = parseFloat(computedStyle.gap) || 12; // fallback на 12px если не удалось получить
+          // Общая высота двух кнопок с отступом
+          const totalHeight = firstButtonHeight + secondButtonHeight + gap;
+          if (totalHeight > 0) {
+            setBannerHeight(totalHeight);
+          }
+        }
+      }
+    };
+
+    // Вычисляем высоту при загрузке и изменении размера окна
+    calculateBannerHeight();
+    window.addEventListener('resize', calculateBannerHeight);
+    
+    // Проверяем несколько раз с задержками, чтобы убедиться, что изображения загрузились
+    const timeouts = [
+      setTimeout(calculateBannerHeight, 100),
+      setTimeout(calculateBannerHeight, 300),
+      setTimeout(calculateBannerHeight, 500),
+    ];
+
+    // Используем ResizeObserver для отслеживания изменений размера контейнера с кнопками
+    let resizeObserver: ResizeObserver | null = null;
+    let observedContainer: HTMLElement | null = null;
+    
+    // Пытаемся найти контейнер с задержкой, если его еще нет
+    const setupResizeObserver = () => {
+      // Отписываемся от предыдущего observer, если он был
+      if (resizeObserver && observedContainer) {
+        resizeObserver.unobserve(observedContainer);
+        resizeObserver.disconnect();
+      }
+      
+      const deliveryContainer = document.getElementById('delivery-buttons-container');
+      if (deliveryContainer && typeof ResizeObserver !== 'undefined') {
+        observedContainer = deliveryContainer;
+        resizeObserver = new ResizeObserver(() => {
+          calculateBannerHeight();
+        });
+        resizeObserver.observe(deliveryContainer);
+      }
+    };
+
+    setupResizeObserver();
+    // Также пробуем установить observer после небольших задержек
+    const observerTimeouts = [
+      setTimeout(setupResizeObserver, 100),
+      setTimeout(setupResizeObserver, 300),
+    ];
+
+    return () => {
+      window.removeEventListener('resize', calculateBannerHeight);
+      timeouts.forEach(timeout => clearTimeout(timeout));
+      observerTimeouts.forEach(timeout => clearTimeout(timeout));
+      if (resizeObserver && observedContainer) {
+        resizeObserver.unobserve(observedContainer);
+        resizeObserver.disconnect();
+      }
+    };
+  }, [banners.length]);
+
   // Обработка клика на индикатор
   const goToSlide = (index: number) => {
     setCurrentIndex(index);
@@ -94,12 +173,22 @@ export default function VerticalBanners({ restaurantId, initialBanners }: Vertic
     return null;
   }
 
+  // Вычисляем ширину на основе высоты и соотношения сторон 4/5
+  const bannerWidth = bannerHeight ? (bannerHeight * 4) / 5 : null;
+
   return (
-    <div className="relative flex items-center" style={{ gap: '1px' }}>
+    <div className="relative flex items-center" style={{ gap: '1px' }} ref={bannerRef}>
       {/* Баннер */}
-      <div className="relative overflow-hidden rounded-[15px] flex-shrink-0">
+      <div 
+        className="relative overflow-hidden rounded-[15px] flex-shrink-0"
+        style={bannerHeight && bannerWidth ? { 
+          height: `${bannerHeight}px`, 
+          width: `${bannerWidth}px`,
+          maxHeight: `${bannerHeight}px`
+        } : {}}
+      >
         <div
-          className="flex transition-transform duration-500 ease-in-out"
+          className="flex transition-transform duration-500 ease-in-out h-full"
           style={{
             transform: `translateX(-${currentIndex * 100}%)`,
           }}
@@ -107,10 +196,10 @@ export default function VerticalBanners({ restaurantId, initialBanners }: Vertic
           {banners.map((banner) => (
             <div
               key={banner.id}
-              className="min-w-full flex-shrink-0 w-full"
+              className="min-w-full flex-shrink-0 w-full h-full"
             >
               <div
-                className={`bg-white rounded-[15px] shadow-sm overflow-hidden relative ${banner.linkUrl ? 'cursor-pointer hover:shadow-md transition-shadow' : ''}`}
+                className={`bg-white rounded-[15px] shadow-sm overflow-hidden relative h-full ${banner.linkUrl ? 'cursor-pointer hover:shadow-md transition-shadow' : ''}`}
                 onClick={() => {
                   if (banner.linkUrl) {
                     window.open(banner.linkUrl, '_blank');
@@ -121,11 +210,11 @@ export default function VerticalBanners({ restaurantId, initialBanners }: Vertic
                   <img
                     src={banner.imageUrl}
                     alt={banner.title || 'Banner'}
-                    className="w-full object-cover rounded-[15px]"
-                    style={{ aspectRatio: '4/5', display: 'block' }}
+                    className="w-full h-full object-cover rounded-[15px]"
+                    style={{ display: 'block' }}
                   />
                 ) : (
-                  <div className="w-full bg-secondary flex items-center justify-center rounded-[15px]" style={{ aspectRatio: '4/5' }}>
+                  <div className="w-full h-full bg-secondary flex items-center justify-center rounded-[15px]">
                     <span className="text-4xl">🖼️</span>
                   </div>
                 )}

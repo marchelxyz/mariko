@@ -72,7 +72,7 @@ export default function Delivery() {
             <div className="flex-1 min-w-0">
               {/* Первые 2 агрегатора в ряд */}
               {firstTwoAggregators.length > 0 && (
-                <div className="grid grid-cols-2 gap-3 mb-3">
+                <div className="grid grid-cols-2 gap-3 mb-3" id="delivery-buttons-container">
                   {firstTwoAggregators.map((aggregator, index) => (
                     <a
                       key={index}
