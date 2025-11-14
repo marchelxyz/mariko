@@ -67,9 +67,9 @@ export default function Delivery() {
             <p className="text-text-primary">Доставка для этого ресторана не настроена</p>
           </div>
         ) : (
-          <div className="flex flex-col lg:flex-row gap-4 items-start max-w-7xl mx-auto">
+          <div className="flex flex-row gap-4 items-start max-w-7xl mx-auto">
             {/* Левая часть: агрегаторы доставки */}
-            <div className="flex-1 w-full lg:w-auto min-w-0">
+            <div className="flex-1 min-w-0">
               {/* Первые 2 агрегатора в ряд */}
               {firstTwoAggregators.length > 0 && (
                 <div className="grid grid-cols-2 gap-3 mb-3">
@@ -134,8 +134,7 @@ export default function Delivery() {
             </div>
 
             {/* Правая часть: вертикальный баннер с индикаторами */}
-            {/* Высота баннера должна быть равна высоте 2 кнопок доставки с отступом между ними */}
-            <div className="w-full lg:w-auto flex-shrink-0 lg:self-start">
+            <div className="flex-shrink-0 self-start">
               <VerticalBanners restaurantId={selectedRestaurant?.id} />
             </div>
           </div>
