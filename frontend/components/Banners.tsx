@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useStore } from '@/store/useStore';
+import api from '@/lib/api';
 
 interface Banner {
   id: string;
@@ -14,12 +15,13 @@ interface BannersProps {
 }
 
 export default function Banners({ restaurantId, initialBanners }: BannersProps) {
-  const { bannersByRestaurant, fetchBanners } = useStore();
+  const { bannersByRestaurant, setBannersForRestaurant } = useStore();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
 
   // Получаем баннеры из кэша для конкретного ресторана
-  const key = restaurantId || 'default';
+  // Используем ключ с префиксом для горизонтальных баннеров
+  const key = restaurantId ? `horizontal_${restaurantId}` : 'horizontal_default';
   const cachedBanners = bannersByRestaurant[key] || [];
   
   // Используем предзагруженные баннеры, если они есть и кэш пуст
@@ -30,7 +32,7 @@ export default function Banners({ restaurantId, initialBanners }: BannersProps) 
     if (typeof window === 'undefined') return;
 
     const loadBanners = async () => {
-      const key = restaurantId || 'default';
+      const key = restaurantId ? `horizontal_${restaurantId}` : 'horizontal_default';
       const cachedBanners = bannersByRestaurant[key];
       
       // Если баннеры уже есть в кэше или есть initialBanners, не показываем загрузку
@@ -47,10 +49,19 @@ export default function Banners({ restaurantId, initialBanners }: BannersProps) 
 
       setIsLoading(true);
       try {
-        // Используем функцию из store, которая проверяет кэш
-        await fetchBanners(restaurantId);
+        // Загружаем горизонтальные баннеры через API
+        const response = await api.get('/banners', {
+          params: {
+            type: 'horizontal',
+            ...(restaurantId && { restaurantId }),
+          },
+        });
+        const horizontalBanners = response.data.data || [];
+        
+        // Сохраняем в кэш через store с правильным ключом для горизонтальных баннеров
+        setBannersForRestaurant(key, horizontalBanners);
       } catch (error) {
-        console.error('Failed to fetch banners:', error);
+        console.error('Failed to fetch horizontal banners:', error);
         // Не показываем ошибку пользователю, просто не отображаем баннеры
       } finally {
         setIsLoading(false);
@@ -58,7 +69,7 @@ export default function Banners({ restaurantId, initialBanners }: BannersProps) 
     };
 
     loadBanners();
-  }, [restaurantId, fetchBanners, bannersByRestaurant, initialBanners]);
+  }, [restaurantId, bannersByRestaurant, initialBanners, setBannersForRestaurant]);
 
   // Автоматическое переключение слайдов
   useEffect(() => {

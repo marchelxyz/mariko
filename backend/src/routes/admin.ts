@@ -20,7 +20,13 @@ router.get('/banners', requireRole('admin'), async (req: AuthRequest, res: Respo
     const bannerRepository = AppDataSource.getRepository(Banner);
     
     const where: any = {};
-    if (restaurantId) where.restaurantId = restaurantId;
+    // Если restaurantId не указан, получаем баннеры для всех ресторанов (restaurantId = null)
+    if (restaurantId) {
+      where.restaurantId = restaurantId;
+    } else {
+      // Для "всех ресторанов" - баннеры без привязки к ресторану
+      where.restaurantId = null;
+    }
     if (type) where.type = type;
     
     const banners = await bannerRepository.find({
