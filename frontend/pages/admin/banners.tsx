@@ -199,7 +199,7 @@ export default function AdminBanners() {
             className={`px-4 py-2 font-medium transition-colors ${
               activeTab === 'horizontal'
                 ? 'border-b-2 border-primary text-primary'
-                : 'text-text-secondary hover:text-text-primary'
+                : 'text-[#8E8E93] hover:text-text-primary'
             }`}
           >
             Горизонтальные (16:9)
@@ -209,7 +209,7 @@ export default function AdminBanners() {
             className={`px-4 py-2 font-medium transition-colors ${
               activeTab === 'vertical-all'
                 ? 'border-b-2 border-primary text-primary'
-                : 'text-text-secondary hover:text-text-primary'
+                : 'text-[#8E8E93] hover:text-text-primary'
             }`}
           >
             Вертикальные (4:5) - Все рестораны
@@ -219,7 +219,7 @@ export default function AdminBanners() {
             className={`px-4 py-2 font-medium transition-colors ${
               activeTab === 'vertical-restaurant'
                 ? 'border-b-2 border-primary text-primary'
-                : 'text-text-secondary hover:text-text-primary'
+                : 'text-[#8E8E93] hover:text-text-primary'
             }`}
           >
             Вертикальные (4:5) - По ресторанам
