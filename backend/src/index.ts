@@ -32,15 +32,36 @@ const allowedOrigins = [
   'http://localhost:3001',
 ].filter(Boolean) as string[];
 
+// Паттерны для разрешенных доменов (например, все домены Vercel)
+const allowedOriginPatterns = [
+  /^https:\/\/.*\.vercel\.app$/,
+  /^https:\/\/.*\.vercel\.app\/.*$/,
+];
+
 app.use(cors({
   origin: (origin, callback) => {
     // Разрешаем запросы без origin (например, мобильные приложения, Postman, curl)
-    if (!origin || allowedOrigins.includes(origin)) {
+    if (!origin) {
       callback(null, true);
-    } else {
-      console.warn(`CORS: Blocked origin ${origin}`);
-      callback(new Error('Not allowed by CORS'));
+      return;
     }
+
+    // Проверяем точное совпадение с разрешенными origins
+    if (allowedOrigins.includes(origin)) {
+      callback(null, true);
+      return;
+    }
+
+    // Проверяем паттерны (например, для Vercel доменов)
+    const matchesPattern = allowedOriginPatterns.some(pattern => pattern.test(origin));
+    if (matchesPattern) {
+      callback(null, true);
+      return;
+    }
+
+    // Если не прошло проверку - блокируем
+    console.warn(`CORS: Blocked origin ${origin}`);
+    callback(new Error('Not allowed by CORS'));
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
