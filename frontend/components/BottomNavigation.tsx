@@ -140,8 +140,8 @@ export default function BottomNavigation() {
   return (
     <>
       {/* Белый блок для заполнения пространства между навигацией и низом экрана */}
-      <div className="fixed bottom-0 left-0 right-0 h-[30px] bg-white z-40 md:hidden" />
-      <nav className="fixed bottom-[30px] left-0 right-0 z-50 md:hidden" style={{ backgroundColor: '#ffffff' }}>
+      <div className="fixed bottom-0 left-0 right-0 h-[30px] bg-white z-40 sm:hidden" />
+      <nav className="fixed bottom-[30px] left-0 right-0 z-50 sm:hidden" style={{ backgroundColor: '#ffffff' }}>
         <div className="flex justify-center items-center h-16 relative gap-4 overflow-hidden">
           <div 
             ref={indicatorRef}

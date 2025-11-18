@@ -8,7 +8,7 @@ interface LayoutProps {
 
 export default function Layout({ children }: LayoutProps) {
   return (
-    <div className="min-h-screen bg-white pb-20 md:pb-0 md:pl-20">
+    <div className="min-h-screen bg-white pb-20 sm:pb-0 sm:pl-32">
       <SideNavigation />
       {children}
       <BottomNavigation />

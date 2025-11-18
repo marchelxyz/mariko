@@ -137,7 +137,7 @@ export default function SideNavigation() {
   }, [router.pathname, navItems, user]);
 
   return (
-    <nav className="hidden md:flex fixed left-0 top-0 bottom-0 w-20 z-50 flex-col items-center justify-center bg-white border-r border-gray-200">
+    <nav className="hidden sm:flex fixed left-0 top-0 bottom-0 w-32 z-50 flex-col items-center justify-center bg-white border-r border-gray-200">
       <div className="flex flex-col items-center justify-center gap-6 relative w-full py-8">
         <div 
           ref={indicatorRef}
