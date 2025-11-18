@@ -56,19 +56,19 @@ export default function ActionButtons() {
           ))}
         </div>
 
-        {/* Десктопная версия - сетка 2x2 */}
-        <div className="hidden md:grid md:grid-cols-2 md:gap-4 md:mb-6">
+        {/* Десктопная версия - сетка 2x2, меньший размер */}
+        <div className="hidden md:grid md:grid-cols-2 md:gap-3 md:mb-6 md:max-w-xs">
           {actions.map((action, index) => (
             <div key={index} className="flex flex-col items-center">
               <button
                 onClick={action.action}
-                className="bg-[#F7F7F7] rounded-[10px] p-4 flex items-center justify-center hover:opacity-90 transition-opacity aspect-square w-full"
+                className="bg-[#F7F7F7] rounded-[10px] p-3 flex items-center justify-center hover:opacity-90 transition-opacity aspect-square w-full"
               >
                 <div className="flex items-center justify-center">
                   {action.icon}
                 </div>
               </button>
-              <span className="text-sm font-medium text-[#000000] text-center leading-tight mt-2">
+              <span className="text-xs font-medium text-[#000000] text-center leading-tight mt-1.5">
                 {action.label}
               </span>
             </div>
