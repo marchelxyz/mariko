@@ -30,6 +30,7 @@ const allowedOrigins = [
   process.env.FRONTEND_URL,
   'http://localhost:3000',
   'http://localhost:3001',
+  'https://mariko-azure.vercel.app',
 ].filter(Boolean) as string[];
 
 // Паттерны для разрешенных доменов (например, все домены Vercel)
