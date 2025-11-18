@@ -39,6 +39,9 @@ export class User {
   username?: string;
 
   @Column({ nullable: true })
+  photoUrl?: string;
+
+  @Column({ nullable: true })
   phoneNumber?: string;
 
   @Column({ type: 'date', nullable: true })
@@ -57,6 +60,9 @@ export class User {
     default: UserRole.USER,
   })
   role!: UserRole;
+
+  @Column({ nullable: true })
+  favoriteRestaurantId?: string;
 
   @CreateDateColumn()
   createdAt!: Date;

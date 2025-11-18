@@ -1,9 +1,24 @@
+import { useRouter } from 'next/router';
+import { useState } from 'react';
 import Layout from '@/components/Layout';
 import Header from '@/components/Header';
 import { useStore } from '@/store/useStore';
+import api from '@/lib/api';
+
+interface AdminSection {
+  id: string;
+  title: string;
+  description: string;
+  icon: string;
+  path: string;
+  roles: string[];
+  available: boolean;
+}
 
 export default function Admin() {
   const { user } = useStore();
+  const router = useRouter();
+  const [isSyncing, setIsSyncing] = useState(false);
 
   if (!user || !['admin', 'marketing', 'manager'].includes(user.role)) {
     return (
@@ -17,32 +32,136 @@ export default function Admin() {
     );
   }
 
+  const sections: AdminSection[] = [
+    {
+      id: 'restaurants',
+      title: 'Управление ресторанами',
+      description: 'Просмотр и управление ресторанами, активация/деактивация',
+      icon: '🏢',
+      path: '/admin/restaurants',
+      roles: ['admin'],
+      available: true,
+    },
+    {
+      id: 'banners',
+      title: 'Управление баннерами',
+      description: 'Создание и редактирование баннеров для главной страницы',
+      icon: '🖼️',
+      path: '/admin/banners',
+      roles: ['admin'],
+      available: true,
+    },
+    {
+      id: 'roles',
+      title: 'Управление ролями',
+      description: 'Назначение ролей пользователям',
+      icon: '👥',
+      path: '/admin/roles',
+      roles: ['admin'],
+      available: false,
+    },
+    {
+      id: 'notifications',
+      title: 'Настройка рассылок',
+      description: 'Управление уведомлениями и рассылками',
+      icon: '📢',
+      path: '/admin/notifications',
+      roles: ['admin', 'marketing'],
+      available: false,
+    },
+    {
+      id: 'menu-images',
+      title: 'Изображения блюд',
+      description: 'Добавление и управление изображениями блюд',
+      icon: '🍽️',
+      path: '/admin/menu-images',
+      roles: ['admin', 'manager'],
+      available: true,
+    },
+  ];
+
+  // Фильтруем разделы по роли пользователя
+  const availableSections = sections.filter(
+    (section) => section.roles.includes(user.role)
+  );
+
+  const handleSectionClick = (section: AdminSection) => {
+    if (section.available) {
+      router.push(section.path);
+    } else {
+      alert('Этот раздел находится в разработке');
+    }
+  };
+
+  const handleSyncAll = async () => {
+    if (!confirm('Обновить меню всех ресторанов из Google Sheets?')) {
+      return;
+    }
+
+    try {
+      setIsSyncing(true);
+      await api.post('/admin/restaurants/sync-all');
+      alert('Синхронизация всех ресторанов завершена успешно!');
+    } catch (error: any) {
+      console.error('Failed to sync all restaurants:', error);
+      const errorMessage = error?.response?.data?.message || 'Не удалось синхронизировать меню';
+      alert(errorMessage);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
   return (
     <Layout>
       <Header title="Админ панель" />
-      <div className="px-4 py-6 space-y-4">
-        <div className="bg-white rounded-lg shadow-sm p-6">
-          <h2 className="text-xl font-bold text-text-primary mb-4">Управление баннерами</h2>
-          <p className="text-text-primary">Функционал в разработке</p>
+      <div className="px-4 py-6">
+        {user?.role === 'admin' && (
+          <div className="mb-6">
+            <button
+              onClick={handleSyncAll}
+              disabled={isSyncing}
+              className={`w-full py-3 px-4 rounded-lg font-medium transition-colors ${
+                isSyncing
+                  ? 'bg-gray-400 text-white cursor-not-allowed'
+                  : 'bg-green-500 text-white hover:bg-green-600'
+              }`}
+            >
+              {isSyncing ? '⏳ Синхронизация меню всех ресторанов...' : '🔄 Обновить меню всех ресторанов'}
+            </button>
+          </div>
+        )}
+        <div className="grid grid-cols-2 gap-4">
+          {availableSections.map((section) => (
+            <button
+              key={section.id}
+              onClick={() => handleSectionClick(section)}
+              disabled={!section.available}
+              className={`
+                bg-white rounded-lg shadow-sm p-6 text-left
+                transition-all duration-200
+                ${section.available
+                  ? 'hover:shadow-md hover:scale-105 cursor-pointer active:scale-100'
+                  : 'opacity-60 cursor-not-allowed'
+                }
+              `}
+            >
+              <div className="flex flex-col items-center text-center space-y-3">
+                <div className="text-4xl mb-2">{section.icon}</div>
+                <h3 className="text-lg font-bold text-text-primary">
+                  {section.title}
+                </h3>
+                <p className="text-sm text-text-secondary">
+                  {section.description}
+                </p>
+                {!section.available && (
+                  <span className="text-xs text-gray-400 mt-2">
+                    В разработке
+                  </span>
+                )}
+              </div>
+            </button>
+          ))}
         </div>
-        {user.role === 'admin' && (
-          <div className="bg-white rounded-lg shadow-sm p-6">
-            <h2 className="text-xl font-bold text-text-primary mb-4">Управление ролями</h2>
-            <p className="text-text-primary">Функционал в разработке</p>
-          </div>
-        )}
-        {(user.role === 'admin' || user.role === 'marketing') && (
-          <div className="bg-white rounded-lg shadow-sm p-6">
-            <h2 className="text-xl font-bold text-text-primary mb-4">Настройка рассылок</h2>
-            <p className="text-text-primary">Функционал в разработке</p>
-          </div>
-        )}
-        {(user.role === 'admin' || user.role === 'manager') && (
-          <div className="bg-white rounded-lg shadow-sm p-6">
-            <h2 className="text-xl font-bold text-text-primary mb-4">Добавление изображений блюд</h2>
-            <p className="text-text-primary">Функционал в разработке</p>
-          </div>
-        )}
       </div>
     </Layout>
   );

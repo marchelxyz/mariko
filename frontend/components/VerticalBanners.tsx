@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useStore } from '@/store/useStore';
 import api from '@/lib/api';
 
@@ -9,19 +9,24 @@ interface Banner {
   linkUrl?: string;
 }
 
-interface BannersProps {
+interface VerticalBannersProps {
   restaurantId?: string;
   initialBanners?: Banner[];
 }
 
-export default function Banners({ restaurantId, initialBanners }: BannersProps) {
+export default function VerticalBanners({ restaurantId, initialBanners }: VerticalBannersProps) {
   const { bannersByRestaurant, setBannersForRestaurant } = useStore();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
+  const bannerRef = useRef<HTMLDivElement>(null);
+  
+  // Фиксированные размеры: высота двух кнопок (120px каждая) + gap (12px) = 252px
+  const BANNER_HEIGHT = 252;
+  // Ширина баннера: до защитных полей контейнера (160px)
+  const BANNER_WIDTH = 160;
 
   // Получаем баннеры из кэша для конкретного ресторана
-  // Используем ключ с префиксом для горизонтальных баннеров
-  const key = restaurantId ? `horizontal_${restaurantId}` : 'horizontal_default';
+  const key = restaurantId ? `vertical_${restaurantId}` : 'vertical_default';
   const cachedBanners = bannersByRestaurant[key] || [];
   
   // Используем предзагруженные баннеры, если они есть и кэш пуст
@@ -32,7 +37,7 @@ export default function Banners({ restaurantId, initialBanners }: BannersProps) 
     if (typeof window === 'undefined') return;
 
     const loadBanners = async () => {
-      const key = restaurantId ? `horizontal_${restaurantId}` : 'horizontal_default';
+      const key = restaurantId ? `vertical_${restaurantId}` : 'vertical_default';
       const cachedBanners = bannersByRestaurant[key];
       
       // Если баннеры уже есть в кэше или есть initialBanners, не показываем загрузку
@@ -49,20 +54,24 @@ export default function Banners({ restaurantId, initialBanners }: BannersProps) 
 
       setIsLoading(true);
       try {
-        // Загружаем горизонтальные баннеры через API
+        // Загружаем вертикальные баннеры через API
         const response = await api.get('/banners', {
           params: {
-            type: 'horizontal',
+            type: 'vertical',
             ...(restaurantId && { restaurantId }),
           },
         });
-        const horizontalBanners = response.data.data || [];
-        
-        // Сохраняем в кэш через store с правильным ключом для горизонтальных баннеров
-        setBannersForRestaurant(key, horizontalBanners);
+        const verticalBanners = response.data.data || [];
+        // Сохраняем в кэш через store с правильным ключом для вертикальных баннеров
+        const key = restaurantId ? `vertical_${restaurantId}` : 'vertical_default';
+        useStore.setState((state) => ({
+          bannersByRestaurant: {
+            ...state.bannersByRestaurant,
+            [key]: verticalBanners,
+          },
+        }));
       } catch (error) {
-        console.error('Failed to fetch horizontal banners:', error);
-        // Не показываем ошибку пользователю, просто не отображаем баннеры
+        console.error('Failed to fetch vertical banners:', error);
       } finally {
         setIsLoading(false);
       }
@@ -92,10 +101,21 @@ export default function Banners({ restaurantId, initialBanners }: BannersProps) 
   }
 
   return (
-    <div className="relative">
-      <div className="overflow-hidden rounded-[15px] relative">
+    <div className="relative flex items-start" ref={bannerRef} style={{ width: '160px', height: `${BANNER_HEIGHT}px` }}>
+      {/* Баннер */}
+      <div 
+        className="relative overflow-hidden rounded-[15px] flex-shrink-0"
+        style={{ 
+          height: `${BANNER_HEIGHT}px`, 
+          width: `${BANNER_WIDTH}px`,
+          minHeight: `${BANNER_HEIGHT}px`,
+          maxHeight: `${BANNER_HEIGHT}px`,
+          minWidth: `${BANNER_WIDTH}px`,
+          maxWidth: `${BANNER_WIDTH}px`
+        }}
+      >
         <div
-          className="flex transition-transform duration-500 ease-in-out"
+          className="flex transition-transform duration-500 ease-in-out h-full"
           style={{
             transform: `translateX(-${currentIndex * 100}%)`,
           }}
@@ -103,10 +123,10 @@ export default function Banners({ restaurantId, initialBanners }: BannersProps) 
           {banners.map((banner) => (
             <div
               key={banner.id}
-              className="min-w-full flex-shrink-0 w-full"
+              className="min-w-full flex-shrink-0 w-full h-full"
             >
               <div
-                className={`bg-white rounded-[15px] shadow-sm overflow-hidden relative ${banner.linkUrl ? 'cursor-pointer hover:shadow-md transition-shadow' : ''}`}
+                className={`bg-white rounded-[15px] shadow-sm overflow-hidden relative h-full ${banner.linkUrl ? 'cursor-pointer hover:shadow-md transition-shadow' : ''}`}
                 onClick={() => {
                   if (banner.linkUrl) {
                     window.open(banner.linkUrl, '_blank');
@@ -117,11 +137,15 @@ export default function Banners({ restaurantId, initialBanners }: BannersProps) 
                   <img
                     src={banner.imageUrl}
                     alt={banner.title || 'Banner'}
-                    className="w-full object-cover rounded-[15px]"
-                    style={{ aspectRatio: '16/9', display: 'block' }}
+                    className="w-full h-full object-cover rounded-[15px]"
+                    style={{ 
+                      display: 'block', 
+                      objectPosition: 'center',
+                      objectFit: 'cover'
+                    }}
                   />
                 ) : (
-                  <div className="w-full bg-secondary flex items-center justify-center rounded-[15px]" style={{ aspectRatio: '16/9' }}>
+                  <div className="w-full h-full bg-secondary flex items-center justify-center rounded-[15px]">
                     <span className="text-4xl">🖼️</span>
                   </div>
                 )}
@@ -130,17 +154,20 @@ export default function Banners({ restaurantId, initialBanners }: BannersProps) 
           ))}
         </div>
 
-        {/* Индикаторы точек - на баннере, 1px выше нижнего края */}
+        {/* Индикаторы точек - на баннере, справа с отступом 1px от правого края */}
         {banners.length > 1 && (
-          <div className="absolute bottom-[1px] left-0 right-0 flex justify-center gap-2">
+          <div 
+            className="absolute top-1/2 -translate-y-1/2 flex flex-col justify-center gap-2 z-10"
+            style={{ right: '1px' }}
+          >
             {banners.map((_, index) => (
               <button
                 key={index}
                 onClick={() => goToSlide(index)}
-                className={`h-2 rounded-full transition-all duration-300 ${
+                className={`rounded-full transition-all duration-300 ${
                   index === currentIndex
-                    ? 'w-8 bg-primary'
-                    : 'w-2 bg-white/70 hover:bg-white/90'
+                    ? 'w-2 h-8 bg-primary'
+                    : 'w-2 h-2 bg-gray-300 hover:bg-gray-400'
                 }`}
                 aria-label={`Перейти к слайду ${index + 1}`}
               />
