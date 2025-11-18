@@ -118,7 +118,7 @@ export default function MenuBlock({ restaurantId }: MenuBlockProps) {
 
       {/* Блюда */}
       <div className="px-4 w-full overflow-x-hidden md:px-0">
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 gap-4 w-full">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 gap-4 md:justify-items-start">
           {menuItems.map((item) => (
             <div
               key={item.id}
