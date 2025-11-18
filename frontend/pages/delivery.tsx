@@ -67,17 +67,17 @@ export default function Delivery() {
             <p className="text-text-primary">Доставка для этого ресторана не настроена</p>
           </div>
         ) : (
-          <div className="flex flex-row flex-wrap items-start gap-3 max-w-7xl mx-auto">
+          <div className="flex flex-col md:flex-row flex-wrap items-start gap-3 max-w-7xl mx-auto">
             {/* Левая колонка: первые 2 агрегатора друг под другом - фиксированного размера */}
             {firstTwoAggregators.length > 0 && (
-              <div className="flex flex-col gap-3 flex-shrink-0" id="delivery-buttons-container">
+              <div className="flex flex-col gap-3 flex-shrink-0 w-full md:w-auto" id="delivery-buttons-container">
                 {firstTwoAggregators.map((aggregator, index) => (
                   <a
                     key={index}
                     href={aggregator.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow overflow-hidden block flex-shrink-0"
+                    className="bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow overflow-hidden block flex-shrink-0 mx-auto md:mx-0"
                     style={{ 
                       width: '160px', 
                       height: '120px',
@@ -107,15 +107,15 @@ export default function Delivery() {
             )}
 
             {/* Правая часть: баннер и остальные агрегаторы */}
-            <div className="flex flex-col md:flex-row flex-wrap items-start gap-3 flex-1 min-w-0">
+            <div className="flex flex-col md:flex-row flex-wrap items-start gap-3 flex-1 min-w-0 w-full md:w-auto">
               {/* Вертикальный баннер с защитными полями и индикатором */}
-              <div className="flex-shrink-0" style={{ width: '160px', minWidth: '160px', maxWidth: '160px' }}>
+              <div className="flex-shrink-0 mx-auto md:mx-0" style={{ width: '160px', minWidth: '160px', maxWidth: '160px' }}>
                 <VerticalBanners restaurantId={selectedRestaurant?.id} />
               </div>
 
               {/* Остальные агрегаторы - фиксированного размера, переносятся справа от баннера на больших экранах */}
               {remainingAggregators.length > 0 && (
-                <div className="grid grid-cols-2 gap-3 flex-shrink-0 w-full md:w-auto md:grid-cols-none md:flex md:flex-wrap">
+                <div className="flex flex-wrap gap-3 flex-shrink-0 w-full md:w-auto justify-center md:justify-start">
                   {remainingAggregators.map((aggregator, index) => (
                     <a
                       key={index + 2}
