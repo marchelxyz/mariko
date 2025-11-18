@@ -67,17 +67,62 @@ export default function Delivery() {
             <p className="text-text-primary">Доставка для этого ресторана не настроена</p>
           </div>
         ) : (
-          <div className="flex flex-col md:flex-row flex-wrap items-start gap-3 max-w-7xl mx-auto">
-            {/* Левая колонка: первые 2 агрегатора друг под другом - фиксированного размера */}
-            {firstTwoAggregators.length > 0 && (
-              <div className="flex flex-col gap-3 flex-shrink-0 w-full md:w-auto" id="delivery-buttons-container">
-                {firstTwoAggregators.map((aggregator, index) => (
+          <div className="max-w-7xl mx-auto">
+            {/* Мобильная версия: первые 2 кнопки слева, баннер справа, остальные заполняют пространство */}
+            <div className="md:hidden">
+              {/* Контейнер с flex-wrap для правильного размещения */}
+              <div className="flex flex-wrap gap-3 items-start">
+                {/* Левая колонка: первые 2 агрегатора друг под другом */}
+                {firstTwoAggregators.length > 0 && (
+                  <div className="flex flex-col gap-3 flex-shrink-0" id="delivery-buttons-container">
+                    {firstTwoAggregators.map((aggregator, index) => (
+                      <a
+                        key={index}
+                        href={aggregator.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow overflow-hidden block flex-shrink-0"
+                        style={{ 
+                          width: '160px', 
+                          height: '120px',
+                          minWidth: '160px',
+                          maxWidth: '160px',
+                          minHeight: '120px',
+                          maxHeight: '120px'
+                        }}
+                      >
+                        {aggregator.imageUrl ? (
+                          <img
+                            src={aggregator.imageUrl}
+                            alt={aggregator.name}
+                            className="w-full h-full object-cover"
+                            style={{ display: 'block' }}
+                          />
+                        ) : (
+                          <div 
+                            className="w-full h-full bg-gray-200 flex items-center justify-center"
+                          >
+                            <span className="text-4xl">📦</span>
+                          </div>
+                        )}
+                      </a>
+                    ))}
+                  </div>
+                )}
+
+                {/* Баннер справа от первых 2 кнопок */}
+                <div className="flex-shrink-0" style={{ width: '160px', minWidth: '160px', maxWidth: '160px' }}>
+                  <VerticalBanners restaurantId={selectedRestaurant?.id} />
+                </div>
+
+                {/* Остальные агрегаторы - заполняют пространство слева от баннера */}
+                {remainingAggregators.map((aggregator, index) => (
                   <a
-                    key={index}
+                    key={index + 2}
                     href={aggregator.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow overflow-hidden block flex-shrink-0 mx-auto md:mx-0"
+                    className="bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow overflow-hidden block flex-shrink-0"
                     style={{ 
                       width: '160px', 
                       height: '120px',
@@ -104,18 +149,56 @@ export default function Delivery() {
                   </a>
                 ))}
               </div>
-            )}
+            </div>
 
-            {/* Правая часть: баннер и остальные агрегаторы */}
-            <div className="flex flex-col md:flex-row flex-wrap items-start gap-3 flex-1 min-w-0 w-full md:w-auto">
-              {/* Вертикальный баннер с защитными полями и индикатором */}
-              <div className="flex-shrink-0 mx-auto md:mx-0" style={{ width: '160px', minWidth: '160px', maxWidth: '160px' }}>
+            {/* Десктопная версия: все элементы в одной сетке */}
+            <div className="hidden md:flex md:flex-row md:flex-wrap md:items-start md:gap-3">
+              {/* Первые 2 агрегатора друг под другом */}
+              {firstTwoAggregators.length > 0 && (
+                <div className="flex flex-col gap-3 flex-shrink-0">
+                  {firstTwoAggregators.map((aggregator, index) => (
+                    <a
+                      key={index}
+                      href={aggregator.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow overflow-hidden block flex-shrink-0"
+                      style={{ 
+                        width: '160px', 
+                        height: '120px',
+                        minWidth: '160px',
+                        maxWidth: '160px',
+                        minHeight: '120px',
+                        maxHeight: '120px'
+                      }}
+                    >
+                      {aggregator.imageUrl ? (
+                        <img
+                          src={aggregator.imageUrl}
+                          alt={aggregator.name}
+                          className="w-full h-full object-cover"
+                          style={{ display: 'block' }}
+                        />
+                      ) : (
+                        <div 
+                          className="w-full h-full bg-gray-200 flex items-center justify-center"
+                        >
+                          <span className="text-4xl">📦</span>
+                        </div>
+                      )}
+                    </a>
+                  ))}
+                </div>
+              )}
+
+              {/* Баннер */}
+              <div className="flex-shrink-0" style={{ width: '160px', minWidth: '160px', maxWidth: '160px' }}>
                 <VerticalBanners restaurantId={selectedRestaurant?.id} />
               </div>
 
-              {/* Остальные агрегаторы - фиксированного размера, переносятся справа от баннера на больших экранах */}
+              {/* Остальные агрегаторы */}
               {remainingAggregators.length > 0 && (
-                <div className="flex flex-wrap gap-3 flex-shrink-0 w-full md:w-auto justify-center md:justify-start">
+                <>
                   {remainingAggregators.map((aggregator, index) => (
                     <a
                       key={index + 2}
@@ -148,7 +231,7 @@ export default function Delivery() {
                       )}
                     </a>
                   ))}
-                </div>
+                </>
               )}
             </div>
           </div>
