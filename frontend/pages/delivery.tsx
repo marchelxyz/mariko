@@ -122,7 +122,15 @@ export default function Delivery() {
                       href={aggregator.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow overflow-hidden block flex-shrink-0 w-full aspect-[4/3] md:w-[160px] md:h-[120px] md:min-w-[160px] md:max-w-[160px] md:min-h-[120px] md:max-h-[120px]"
+                      className="bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow overflow-hidden block flex-shrink-0"
+                      style={{ 
+                        width: '160px', 
+                        height: '120px',
+                        minWidth: '160px',
+                        maxWidth: '160px',
+                        minHeight: '120px',
+                        maxHeight: '120px'
+                      }}
                     >
                       {aggregator.imageUrl ? (
                         <img
