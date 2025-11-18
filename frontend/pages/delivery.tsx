@@ -107,7 +107,7 @@ export default function Delivery() {
             )}
 
             {/* Правая часть: баннер и остальные агрегаторы */}
-            <div className="flex flex-row flex-wrap items-start gap-3 flex-1 min-w-0">
+            <div className="flex flex-col md:flex-row flex-wrap items-start gap-3 flex-1 min-w-0">
               {/* Вертикальный баннер с защитными полями и индикатором */}
               <div className="flex-shrink-0" style={{ width: '160px', minWidth: '160px', maxWidth: '160px' }}>
                 <VerticalBanners restaurantId={selectedRestaurant?.id} />
@@ -115,7 +115,7 @@ export default function Delivery() {
 
               {/* Остальные агрегаторы - фиксированного размера, переносятся справа от баннера на больших экранах */}
               {remainingAggregators.length > 0 && (
-                <div className="flex flex-wrap gap-3 flex-shrink-0">
+                <div className="grid grid-cols-2 gap-3 flex-shrink-0 w-full md:w-auto md:grid-cols-none md:flex md:flex-wrap">
                   {remainingAggregators.map((aggregator, index) => (
                     <a
                       key={index + 2}
