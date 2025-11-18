@@ -36,8 +36,9 @@ export default function ActionButtons() {
 
   return (
     <>
-      <div className="bg-white px-4 py-4">
-        <div className="grid grid-cols-4 gap-2">
+      <div className="bg-white px-4 py-4 md:px-0 md:py-0 md:bg-transparent">
+        {/* Мобильная версия - 4 колонки */}
+        <div className="grid grid-cols-4 gap-2 md:hidden">
           {actions.map((action, index) => (
             <div key={index} className="flex flex-col items-center">
               <button
@@ -49,6 +50,25 @@ export default function ActionButtons() {
                 </div>
               </button>
               <span className="text-xs font-medium text-[#000000] text-center leading-tight mt-1">
+                {action.label}
+              </span>
+            </div>
+          ))}
+        </div>
+
+        {/* Десктопная версия - сетка 2x2 */}
+        <div className="hidden md:grid md:grid-cols-2 md:gap-4 md:mb-6">
+          {actions.map((action, index) => (
+            <div key={index} className="flex flex-col items-center">
+              <button
+                onClick={action.action}
+                className="bg-[#F7F7F7] rounded-[10px] p-4 flex items-center justify-center hover:opacity-90 transition-opacity aspect-square w-full"
+              >
+                <div className="flex items-center justify-center">
+                  {action.icon}
+                </div>
+              </button>
+              <span className="text-sm font-medium text-[#000000] text-center leading-tight mt-2">
                 {action.label}
               </span>
             </div>
