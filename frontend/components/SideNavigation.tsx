@@ -44,17 +44,17 @@ const adminNavItem = {
   )
 };
 
-export default function BottomNavigation() {
+export default function SideNavigation() {
   const router = useRouter();
   const { user, selectedRestaurant, prefetchBanners } = useStore();
-  const [indicatorStyle, setIndicatorStyle] = useState({ left: 0, width: 30 });
+  const [indicatorStyle, setIndicatorStyle] = useState({ top: 0, height: 40 });
   const [isInitialized, setIsInitialized] = useState(false);
   const [enableTransition, setEnableTransition] = useState(false);
   const buttonRefs = useRef<(HTMLButtonElement | null)[]>([]);
   const indicatorRef = useRef<HTMLDivElement | null>(null);
   const isInitializedRef = useRef(false);
   const previousIndexRef = useRef<number>(-1);
-  const currentLeftRef = useRef<number>(0);
+  const currentTopRef = useRef<number>(0);
 
   // Формируем список пунктов меню в зависимости от роли пользователя
   const navItems = [
@@ -74,13 +74,13 @@ export default function BottomNavigation() {
           const buttonRect = button.getBoundingClientRect();
           
           // Проверяем, что кнопка действительно отрисована (имеет валидные размеры)
-          if (buttonRect.width > 0 && containerRect.width > 0) {
-            const newLeft = buttonRect.left - containerRect.left + (buttonRect.width / 2) - 15;
+          if (buttonRect.height > 0 && containerRect.height > 0) {
+            const newTop = buttonRect.top - containerRect.top + (buttonRect.height / 2) - 20;
             
             if (!isInitializedRef.current) {
               // При первой инициализации устанавливаем позицию без анимации
-              setIndicatorStyle({ left: newLeft, width: 30 });
-              currentLeftRef.current = newLeft;
+              setIndicatorStyle({ top: newTop, height: 40 });
+              currentTopRef.current = newTop;
               setIsInitialized(true);
               isInitializedRef.current = true;
               previousIndexRef.current = activeIndex;
@@ -88,29 +88,28 @@ export default function BottomNavigation() {
               // При последующих изменениях применяем анимацию
               if (previousIndexRef.current !== activeIndex) {
                 // Читаем текущую позицию индикатора из DOM перед анимацией
-                // Это гарантирует, что анимация начинается от реальной текущей позиции
-                let startLeft = currentLeftRef.current;
+                let startTop = currentTopRef.current;
                 if (indicatorRef.current) {
                   const indicatorRect = indicatorRef.current.getBoundingClientRect();
                   const containerRectCurrent = container.getBoundingClientRect();
-                  const currentLeft = indicatorRect.left - containerRectCurrent.left;
+                  const currentTop = indicatorRect.top - containerRectCurrent.top;
                   // Используем текущую позицию из DOM, если она валидна
-                  if (currentLeft >= 0) {
-                    startLeft = currentLeft;
-                    currentLeftRef.current = currentLeft;
+                  if (currentTop >= 0) {
+                    startTop = currentTop;
+                    currentTopRef.current = currentTop;
                   }
                 }
                 
                 // Отключаем transition и устанавливаем текущую позицию синхронно
                 setEnableTransition(false);
-                setIndicatorStyle({ left: startLeft, width: 30 });
+                setIndicatorStyle({ top: startTop, height: 40 });
                 
                 // Затем в следующем кадре включаем transition и устанавливаем новую позицию
                 requestAnimationFrame(() => {
                   setEnableTransition(true);
                   requestAnimationFrame(() => {
-                    setIndicatorStyle({ left: newLeft, width: 30 });
-                    currentLeftRef.current = newLeft;
+                    setIndicatorStyle({ top: newTop, height: 40 });
+                    currentTopRef.current = newTop;
                   });
                 });
                 previousIndexRef.current = activeIndex;
@@ -138,48 +137,44 @@ export default function BottomNavigation() {
   }, [router.pathname, navItems, user]);
 
   return (
-    <>
-      {/* Белый блок для заполнения пространства между навигацией и низом экрана */}
-      <div className="fixed bottom-0 left-0 right-0 h-[30px] bg-white z-40 sm:hidden" />
-      <nav className="fixed bottom-[30px] left-0 right-0 z-50 sm:hidden" style={{ backgroundColor: '#ffffff' }}>
-        <div className="flex justify-center items-center h-16 relative gap-4 overflow-hidden">
-          <div 
-            ref={indicatorRef}
-            className={`absolute top-0 h-1 rounded-sm ${enableTransition ? 'transition-all duration-700 ease-in-out' : ''}`}
-            style={{ 
-              backgroundColor: '#8E1A1A',
-              width: `${indicatorStyle.width}px`,
-              left: `${indicatorStyle.left}px`,
-            }}
-          />
-          {navItems.map((item, index) => {
-            const isActive = router.pathname === item.path;
-            const isHomePage = item.path === '/';
-            
-            return (
-              <button
-                key={item.path}
-                ref={(el) => { buttonRefs.current[index] = el; }}
-                onClick={() => router.push(item.path)}
-                onMouseEnter={() => {
-                  // Предзагружаем баннеры при наведении на главную страницу
-                  if (isHomePage) {
-                    const restaurantId = selectedRestaurant?.id;
-                    prefetchBanners(restaurantId);
-                  }
-                }}
-                className="flex flex-col items-center justify-center h-full relative px-4 transition-colors duration-300"
-                style={{
-                  color: isActive ? '#8E1A1A' : '#8E8E93'
-                }}
-              >
-                <span className="mb-1">{item.icon}</span>
-                <span className="text-xs">{item.label}</span>
-              </button>
-            );
-          })}
-        </div>
-      </nav>
-    </>
+    <nav className="hidden sm:flex fixed left-0 top-0 bottom-0 w-32 z-50 flex-col items-center justify-center bg-white border-r border-gray-200">
+      <div className="flex flex-col items-center justify-center gap-6 relative w-full py-8">
+        <div 
+          ref={indicatorRef}
+          className={`absolute left-0 w-1 rounded-sm ${enableTransition ? 'transition-all duration-700 ease-in-out' : ''}`}
+          style={{ 
+            backgroundColor: '#8E1A1A',
+            height: `${indicatorStyle.height}px`,
+            top: `${indicatorStyle.top}px`,
+          }}
+        />
+        {navItems.map((item, index) => {
+          const isActive = router.pathname === item.path;
+          const isHomePage = item.path === '/';
+          
+          return (
+            <button
+              key={item.path}
+              ref={(el) => { buttonRefs.current[index] = el; }}
+              onClick={() => router.push(item.path)}
+              onMouseEnter={() => {
+                // Предзагружаем баннеры при наведении на главную страницу
+                if (isHomePage) {
+                  const restaurantId = selectedRestaurant?.id;
+                  prefetchBanners(restaurantId);
+                }
+              }}
+              className="flex flex-col items-center justify-center relative px-4 py-3 transition-colors duration-300 w-full"
+              style={{
+                color: isActive ? '#8E1A1A' : '#8E8E93'
+              }}
+            >
+              <span className="mb-2">{item.icon}</span>
+              <span className="text-xs text-center">{item.label}</span>
+            </button>
+          );
+        })}
+      </div>
+    </nav>
   );
 }

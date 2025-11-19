@@ -51,12 +51,31 @@ export default function Home({ initialBanners, restaurantId }: HomeProps) {
   return (
     <Layout>
       <Header />
-      <ActionButtons />
-      <div className="py-6 space-y-6">
-        <div className="px-4">
-          <Banners restaurantId={selectedRestaurant?.id || restaurantId} initialBanners={initialBanners} />
+      {/* Мобильная версия */}
+      <div className="md:hidden">
+        <ActionButtons />
+        <div className="py-6 space-y-6">
+          <div className="px-4">
+            <Banners restaurantId={selectedRestaurant?.id || restaurantId} initialBanners={initialBanners} />
+          </div>
+          <MenuBlock restaurantId={selectedRestaurant?.id || restaurantId} />
         </div>
-        <MenuBlock restaurantId={selectedRestaurant?.id || restaurantId} />
+      </div>
+
+      {/* Десктопная версия */}
+      <div className="hidden md:block py-6 px-4">
+        <div className="flex gap-6 max-w-7xl mx-auto">
+          {/* Левая колонка - кнопки, заголовок и блюда */}
+          <div className="flex-1 flex flex-col">
+            <ActionButtons />
+            <MenuBlock restaurantId={selectedRestaurant?.id || restaurantId} />
+          </div>
+
+          {/* Правая колонка - баннер */}
+          <div className="flex-shrink-0 w-1/3">
+            <Banners restaurantId={selectedRestaurant?.id || restaurantId} initialBanners={initialBanners} />
+          </div>
+        </div>
       </div>
     </Layout>
   );

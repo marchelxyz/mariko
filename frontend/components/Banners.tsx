@@ -92,7 +92,7 @@ export default function Banners({ restaurantId, initialBanners }: BannersProps) 
   }
 
   return (
-    <div className="relative">
+    <div className="relative w-full">
       <div className="overflow-hidden rounded-[15px] relative">
         <div
           className="flex transition-transform duration-500 ease-in-out"
