@@ -1,6 +1,7 @@
 import { AppDataSource } from '../config/database';
 import { Restaurant } from '../models/Restaurant';
 import { createGoogleSheetsService } from './GoogleSheetsService';
+import { invalidateMenuCache, invalidateAllMenuCache } from './cacheService';
 
 /**
  * Синхронизирует меню всех ресторанов из Google Sheets
@@ -31,6 +32,10 @@ export async function syncAllRestaurantsMenu(): Promise<void> {
         console.log(
           `Ресторан ${restaurant.name}: создано ${result.created}, обновлено ${result.updated}, удалено ${result.deleted}`
         );
+        
+        // Инвалидируем кэш меню для этого ресторана
+        await invalidateMenuCache(restaurant.id);
+        
         successCount++;
       } catch (error) {
         console.error(
@@ -40,6 +45,9 @@ export async function syncAllRestaurantsMenu(): Promise<void> {
         errorCount++;
       }
     }
+
+    // Инвалидируем весь кэш меню после синхронизации всех ресторанов
+    await invalidateAllMenuCache();
 
     console.log(
       `[${new Date().toISOString()}] Синхронизация завершена. Успешно: ${successCount}, Ошибок: ${errorCount}`
@@ -70,6 +78,9 @@ export async function syncRestaurantMenu(restaurantId: string): Promise<void> {
 
     const sheetsService = createGoogleSheetsService();
     const result = await sheetsService.syncMenuFromSheet(restaurant);
+    
+    // Инвалидируем кэш меню для этого ресторана
+    await invalidateMenuCache(restaurantId);
     
     console.log(
       `Синхронизация меню для ресторана ${restaurant.name} завершена: создано ${result.created}, обновлено ${result.updated}, удалено ${result.deleted}`
