@@ -3,12 +3,21 @@ import { In } from 'typeorm';
 import { AppDataSource } from '../config/database';
 import { MenuItem } from '../models/MenuItem';
 import { DishImage } from '../models/DishImage';
+import { getMenuFromCache, setMenuToCache } from '../services/cacheService';
 
 const router = Router();
 
 router.get('/:restaurantId', async (req: Request, res: Response) => {
   try {
     const { restaurantId } = req.params;
+    
+    // Пытаемся получить из кэша
+    const cached = await getMenuFromCache(restaurantId);
+    if (cached) {
+      console.log(`✅ Меню ресторана ${restaurantId} получено из кэша`);
+      return res.json({ success: true, data: cached, cached: true });
+    }
+
     const menuItemRepository = AppDataSource.getRepository(MenuItem);
     const dishImageRepository = AppDataSource.getRepository(DishImage);
     
@@ -58,7 +67,10 @@ router.get('/:restaurantId', async (req: Request, res: Response) => {
       return acc;
     }, {});
 
-    res.json({ success: true, data: groupedByCategory });
+    // Сохраняем в кэш
+    await setMenuToCache(restaurantId, groupedByCategory);
+
+    res.json({ success: true, data: groupedByCategory, cached: false });
   } catch (error) {
     console.error('Error fetching menu:', error);
     res.status(500).json({ success: false, message: 'Failed to fetch menu' });

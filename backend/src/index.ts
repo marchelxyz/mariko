@@ -7,6 +7,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import { connectDatabase } from './config/database';
+import { getRedisClient } from './config/redis';
 import { errorHandler } from './middleware/errorHandler';
 import { apiLimiter, authLimiter, writeLimiter } from './middleware/rateLimiter';
 import { performanceMonitor, getMetrics, resetMetrics } from './middleware/performanceMonitor';
@@ -87,25 +88,30 @@ app.use(express.urlencoded({ extended: true }));
 // Health check автоматически пропускается (настроено в rateLimiter.ts)
 app.use('/api', apiLimiter);
 
-// Health check с проверкой подключения к БД
+// Health check с проверкой подключения к БД и Redis
 app.get('/health', async (req, res) => {
   try {
     const { AppDataSource } = await import('./config/database');
-    const isDbConnected = AppDataSource.isInitialized;
+    const { isRedisAvailable } = await import('./config/redis');
     
-    if (isDbConnected) {
-      res.json({ 
-        status: 'ok', 
-        timestamp: new Date().toISOString(),
-        database: 'connected'
-      });
-    } else {
-      res.status(503).json({ 
-        status: 'unhealthy', 
-        timestamp: new Date().toISOString(),
-        database: 'disconnected'
+    const isDbConnected = AppDataSource.isInitialized;
+    const isRedisConnected = isRedisAvailable();
+    
+    const health = {
+      status: 'ok',
+      timestamp: new Date().toISOString(),
+      database: isDbConnected ? 'connected' : 'disconnected',
+      redis: process.env.REDIS_URL ? (isRedisConnected ? 'connected' : 'disconnected') : 'not configured'
+    };
+    
+    if (!isDbConnected) {
+      return res.status(503).json({ 
+        ...health,
+        status: 'unhealthy'
       });
     }
+    
+    res.json(health);
   } catch (error) {
     res.status(503).json({ 
       status: 'error', 
@@ -147,6 +153,15 @@ let server: any = null;
 const startServer = async () => {
   try {
     await connectDatabase();
+    
+    // Инициализируем Redis (если настроен)
+    const redis = getRedisClient();
+    if (redis) {
+      console.log('🔄 Инициализация Redis...');
+    } else {
+      console.log('⚠️  Redis не настроен (REDIS_URL не указан). Кэширование отключено.');
+    }
+    
     server = app.listen(PORT, '0.0.0.0', () => {
       console.log(`🚀 Server running on port ${PORT}`);
       console.log(`📡 Health check available at http://localhost:${PORT}/health`);
@@ -187,6 +202,14 @@ const gracefulShutdown = async (signal: string) => {
     server.close(() => {
       console.log('✅ HTTP server closed');
     });
+  }
+  
+  // Закрываем подключение к Redis
+  try {
+    const { closeRedis } = await import('./config/redis');
+    await closeRedis();
+  } catch (error) {
+    console.error('Error closing Redis:', error);
   }
   
   // Закрываем подключение к БД

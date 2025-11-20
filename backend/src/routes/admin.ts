@@ -8,6 +8,12 @@ import { Restaurant } from '../models/Restaurant';
 import { createGoogleSheetsService } from '../services/GoogleSheetsService';
 import { syncAllRestaurantsMenu } from '../services/syncService';
 import { getMetrics, resetMetrics } from '../middleware/performanceMonitor';
+import { 
+  invalidateRestaurantsCache, 
+  invalidateRestaurantCache,
+  invalidateMenuCache,
+  invalidateAllMenuCache 
+} from '../services/cacheService';
 
 const router = Router();
 
@@ -163,6 +169,9 @@ router.post('/restaurants', requireRole('admin'), async (req: AuthRequest, res: 
       // Администратор может создать лист вручную позже
     }
     
+    // Инвалидируем кэш ресторанов
+    await invalidateRestaurantsCache();
+    
     res.json({ success: true, data: savedRestaurant });
   } catch (error) {
     console.error('Error creating restaurant:', error);
@@ -221,6 +230,10 @@ router.put('/restaurants/:id', requireRole('admin'), async (req: AuthRequest, re
     if (socialNetworks !== undefined) restaurant.socialNetworks = socialNetworks.length > 0 ? socialNetworks : null;
     
     const updatedRestaurant = await restaurantRepository.save(restaurant);
+    
+    // Инвалидируем кэш ресторанов
+    await invalidateRestaurantCache(req.params.id);
+    
     res.json({ success: true, data: updatedRestaurant });
   } catch (error) {
     console.error('Error updating restaurant:', error);
@@ -243,6 +256,10 @@ router.delete('/restaurants/:id', requireRole('admin'), async (req: AuthRequest,
     // Мягкое удаление - просто деактивируем ресторан
     restaurant.isActive = false;
     await restaurantRepository.save(restaurant);
+    
+    // Инвалидируем кэш ресторанов
+    await invalidateRestaurantCache(req.params.id);
+    
     res.json({ success: true, message: 'Restaurant deactivated' });
   } catch (error) {
     console.error('Error deleting restaurant:', error);
@@ -274,6 +291,9 @@ router.post('/restaurants/:id/sync', requireRole('admin', 'manager'), async (req
     const sheetsService = createGoogleSheetsService();
     const result = await sheetsService.syncMenuFromSheet(restaurant);
     
+    // Инвалидируем кэш меню для этого ресторана
+    await invalidateMenuCache(req.params.id);
+    
     res.json({ 
       success: true, 
       message: 'Синхронизация завершена',
@@ -292,6 +312,10 @@ router.post('/restaurants/:id/sync', requireRole('admin', 'manager'), async (req
 router.post('/restaurants/sync-all', requireRole('admin'), async (req: AuthRequest, res: Response) => {
   try {
     await syncAllRestaurantsMenu();
+    
+    // Инвалидируем весь кэш меню
+    await invalidateAllMenuCache();
+    
     res.json({ 
       success: true, 
       message: 'Синхронизация всех ресторанов завершена'
