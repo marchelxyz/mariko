@@ -4,6 +4,7 @@ import {
   Column,
   CreateDateColumn,
   UpdateDateColumn,
+  Index,
 } from 'typeorm';
 
 @Entity('restaurants')
@@ -24,6 +25,7 @@ export class Restaurant {
   phoneNumber!: string;
 
   @Column({ default: true })
+  @Index() // ✅ Индекс для быстрого поиска активных ресторанов
   isActive!: boolean;
 
   @Column({ nullable: true })

@@ -30,6 +30,18 @@ const getDatabaseConfig = () => {
 
 const dbConfig = getDatabaseConfig();
 
+// Определяем размер пула в зависимости от плана Railway
+// Для Starter плана используем 30, для Pro - 100
+// Можно переопределить через переменную окружения DB_POOL_MAX
+const getPoolMax = (): number => {
+  if (process.env.DB_POOL_MAX) {
+    return parseInt(process.env.DB_POOL_MAX, 10);
+  }
+  // По умолчанию используем 30 (безопасно для Starter плана)
+  // Для Pro плана установите DB_POOL_MAX=100 в переменных окружения Railway
+  return 30;
+};
+
 export const AppDataSource = new DataSource({
   type: 'postgres',
   host: dbConfig.host,
@@ -41,6 +53,14 @@ export const AppDataSource = new DataSource({
   synchronize: true, // Включаем синхронизацию для автоматического создания таблиц
   logging: process.env.NODE_ENV === 'development',
   ssl: process.env.DB_SSL === 'true' || process.env.DATABASE_URL ? { rejectUnauthorized: false } : false,
+  
+  // ✅ Настройки пула соединений для улучшения производительности
+  extra: {
+    max: getPoolMax(), // Максимум соединений в пуле (30 для Starter, 100 для Pro)
+    min: 5, // Минимум соединений (создаются при старте)
+    idleTimeoutMillis: 30000, // Закрыть неиспользуемое соединение через 30 секунд
+    connectionTimeoutMillis: 2000, // Таймаут получения соединения из пула (2 секунды)
+  },
 });
 
 export const connectDatabase = async (): Promise<void> => {
@@ -63,6 +83,12 @@ export const connectDatabase = async (): Promise<void> => {
     await Promise.race([connectionPromise, timeoutPromise]);
     
     console.log('✅ PostgreSQL connected');
+    console.log('📊 Настройки пула соединений:', {
+      max: getPoolMax(),
+      min: 5,
+      idleTimeout: '30s',
+      connectionTimeout: '2s',
+    });
     console.log('📋 Доступные таблицы:', AppDataSource.entityMetadatas.map(e => e.tableName).join(', '));
     
     // Проверяем, что таблицы созданы

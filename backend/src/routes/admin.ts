@@ -7,6 +7,7 @@ import { MenuItem } from '../models/MenuItem';
 import { Restaurant } from '../models/Restaurant';
 import { createGoogleSheetsService } from '../services/GoogleSheetsService';
 import { syncAllRestaurantsMenu } from '../services/syncService';
+import { getMetrics, resetMetrics } from '../middleware/performanceMonitor';
 
 const router = Router();
 
@@ -300,6 +301,41 @@ router.post('/restaurants/sync-all', requireRole('admin'), async (req: AuthReque
     res.status(500).json({ 
       success: false, 
       message: error instanceof Error ? error.message : 'Failed to sync all restaurants' 
+    });
+  }
+});
+
+// ✅ Эндпоинт для просмотра метрик производительности (только для админов)
+router.get('/metrics', requireRole('admin'), async (req: AuthRequest, res: Response) => {
+  try {
+    const metrics = getMetrics();
+    res.json({
+      success: true,
+      data: metrics,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error('Error getting metrics:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get metrics',
+    });
+  }
+});
+
+// ✅ Эндпоинт для сброса метрик (только для админов)
+router.post('/metrics/reset', requireRole('admin'), async (req: AuthRequest, res: Response) => {
+  try {
+    resetMetrics();
+    res.json({
+      success: true,
+      message: 'Metrics reset',
+    });
+  } catch (error) {
+    console.error('Error resetting metrics:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to reset metrics',
     });
   }
 });
