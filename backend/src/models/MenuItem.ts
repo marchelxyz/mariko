@@ -6,10 +6,12 @@ import {
   UpdateDateColumn,
   ManyToOne,
   JoinColumn,
+  Index,
 } from 'typeorm';
 import { Restaurant } from './Restaurant';
 
 @Entity('menu_items')
+@Index(['restaurantId', 'isAvailable']) // ✅ Составной индекс для быстрого поиска доступных блюд ресторана
 export class MenuItem {
   @PrimaryGeneratedColumn('uuid')
   id!: string;

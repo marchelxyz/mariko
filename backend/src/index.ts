@@ -8,6 +8,8 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import { connectDatabase } from './config/database';
 import { errorHandler } from './middleware/errorHandler';
+import { apiLimiter, authLimiter, writeLimiter } from './middleware/rateLimiter';
+import { performanceMonitor, getMetrics, resetMetrics } from './middleware/performanceMonitor';
 import authRoutes from './routes/auth';
 import restaurantRoutes from './routes/restaurants';
 import menuRoutes from './routes/menu';
@@ -74,8 +76,16 @@ if (process.env.NODE_ENV === 'production') {
 } else {
   app.use(morgan('dev'));
 }
+
+// ✅ Применяем мониторинг производительности ко всем запросам
+app.use(performanceMonitor);
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// ✅ Применяем общий rate limiter ко всем API запросам
+// Health check автоматически пропускается (настроено в rateLimiter.ts)
+app.use('/api', apiLimiter);
 
 // Health check с проверкой подключения к БД
 app.get('/health', async (req, res) => {
@@ -106,13 +116,15 @@ app.get('/health', async (req, res) => {
 });
 
 // Routes
-app.use('/api/auth', authRoutes);
+// ✅ Строгий лимит для аутентификации (5 попыток за 15 минут)
+app.use('/api/auth', authLimiter, authRoutes);
 app.use('/api/restaurants', restaurantRoutes);
 app.use('/api/menu', menuRoutes);
 app.use('/api/banners', bannerRoutes);
 app.use('/api/profile', profileRoutes);
-app.use('/api/admin', adminRoutes);
-app.use('/api/booking', bookingRoutes);
+// ✅ Лимит для админских операций и бронирований (20 запросов в минуту)
+app.use('/api/admin', writeLimiter, adminRoutes);
+app.use('/api/booking', writeLimiter, bookingRoutes);
 app.use('/api/dish-images', dishImageRoutes);
 
 // 404 handler для неизвестных маршрутов
