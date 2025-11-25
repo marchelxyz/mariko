@@ -152,11 +152,11 @@ router.post('/restaurants', requireRole('admin'), async (req: AuthRequest, res: 
       isActive: true,
       googleSheetId: sheetId,
       googleSheetUrl: `https://docs.google.com/spreadsheets/d/${sheetId}`,
-      deliveryAggregators: deliveryAggregators || null,
-      yandexMapsUrl: yandexMapsUrl || null,
-      twoGisUrl: twoGisUrl || null,
-      socialNetworks: socialNetworks || null,
-      remarkedPointId: remarkedPointId ? Number(remarkedPointId) : null,
+      deliveryAggregators: deliveryAggregators || undefined,
+      yandexMapsUrl: yandexMapsUrl || undefined,
+      twoGisUrl: twoGisUrl || undefined,
+      socialNetworks: socialNetworks || undefined,
+      remarkedPointId: remarkedPointId ? Number(remarkedPointId) : undefined,
     });
     
     const savedRestaurant = await restaurantRepository.save(restaurant);
@@ -231,11 +231,11 @@ router.put('/restaurants/:id', requireRole('admin'), async (req: AuthRequest, re
     if (address) restaurant.address = address;
     if (phoneNumber) restaurant.phoneNumber = phoneNumber;
     if (typeof isActive === 'boolean') restaurant.isActive = isActive;
-    if (deliveryAggregators !== undefined) restaurant.deliveryAggregators = deliveryAggregators.length > 0 ? deliveryAggregators : null;
-    if (yandexMapsUrl !== undefined) restaurant.yandexMapsUrl = yandexMapsUrl || null;
-    if (twoGisUrl !== undefined) restaurant.twoGisUrl = twoGisUrl || null;
-    if (socialNetworks !== undefined) restaurant.socialNetworks = socialNetworks.length > 0 ? socialNetworks : null;
-    if (remarkedPointId !== undefined) restaurant.remarkedPointId = remarkedPointId ? Number(remarkedPointId) : null;
+    if (deliveryAggregators !== undefined) restaurant.deliveryAggregators = deliveryAggregators.length > 0 ? deliveryAggregators : undefined;
+    if (yandexMapsUrl !== undefined) restaurant.yandexMapsUrl = yandexMapsUrl || undefined;
+    if (twoGisUrl !== undefined) restaurant.twoGisUrl = twoGisUrl || undefined;
+    if (socialNetworks !== undefined) restaurant.socialNetworks = socialNetworks.length > 0 ? socialNetworks : undefined;
+    if (remarkedPointId !== undefined) restaurant.remarkedPointId = remarkedPointId ? Number(remarkedPointId) : undefined;
     
     const updatedRestaurant = await restaurantRepository.save(restaurant);
     
