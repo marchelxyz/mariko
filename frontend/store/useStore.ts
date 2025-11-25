@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import api from '@/lib/api';
-import { deviceStorage, secureStorage, STORAGE_KEYS, storageHelpers } from '@/lib/storage';
+import { deviceStorage, secureStorage, STORAGE_KEYS } from '@/lib/storage';
 
 interface User {
   id: string;
@@ -128,54 +128,6 @@ export const useStore = create<Store>((set, get) => {
       
       set({ isLoading: true, error: null });
       
-      // Сначала пытаемся загрузить из кэша
-      const cachedRestaurants = await storageHelpers.getJSON<Restaurant[]>(
-        deviceStorage,
-        STORAGE_KEYS.RESTAURANTS
-      );
-      const cachedTimestamp = await deviceStorage.getItem(STORAGE_KEYS.RESTAURANTS_TIMESTAMP);
-      const cacheAge = cachedTimestamp ? Date.now() - parseInt(cachedTimestamp, 10) : Infinity;
-      const CACHE_TTL = 24 * 60 * 60 * 1000; // 24 часа
-      
-      // Если есть свежий кэш (менее 24 часов), показываем его сразу
-      if (cachedRestaurants && cachedRestaurants.length > 0 && cacheAge < CACHE_TTL) {
-        set({ restaurants: cachedRestaurants, isLoading: false });
-        
-        // Восстанавливаем выбранный ресторан из кэша
-        const selectedRestaurantId = await deviceStorage.getItem(STORAGE_KEYS.SELECTED_RESTAURANT_ID);
-        if (selectedRestaurantId) {
-          const selected = cachedRestaurants.find(r => r.id === selectedRestaurantId);
-          if (selected) {
-            set({ selectedRestaurant: selected });
-          }
-        }
-        
-        // Обновляем данные в фоне
-        try {
-          const response = await api.get('/restaurants');
-          const restaurantsData = response.data?.data || response.data || [];
-          if (Array.isArray(restaurantsData)) {
-            const restaurants = restaurantsData
-              .map((r: any) => ({
-                ...r,
-                id: r.id || r._id,
-              }))
-              .filter((r: any): r is Restaurant => typeof r.id === 'string' && r.id.length > 0);
-            
-            // Сохраняем в кэш
-            await storageHelpers.setJSON(deviceStorage, STORAGE_KEYS.RESTAURANTS, restaurants);
-            await deviceStorage.setItem(STORAGE_KEYS.RESTAURANTS_TIMESTAMP, Date.now().toString());
-            
-            set({ restaurants });
-          }
-        } catch (error) {
-          // Игнорируем ошибки фонового обновления
-          console.debug('Background restaurants update failed:', error);
-        }
-        return;
-      }
-      
-      // Если кэша нет или он устарел, загружаем с сервера
       try {
         const response = await api.get('/restaurants');
         console.log('Restaurants API response:', response.data);
@@ -184,11 +136,6 @@ export const useStore = create<Store>((set, get) => {
         const restaurantsData = response.data?.data || response.data || [];
         if (!Array.isArray(restaurantsData)) {
           console.error('Invalid restaurants data format:', restaurantsData);
-          // Если есть старый кэш, используем его
-          if (cachedRestaurants && cachedRestaurants.length > 0) {
-            set({ restaurants: cachedRestaurants, isLoading: false });
-            return;
-          }
           set({ 
             restaurants: [], 
             isLoading: false,
@@ -205,10 +152,6 @@ export const useStore = create<Store>((set, get) => {
           .filter((r: any): r is Restaurant => typeof r.id === 'string' && r.id.length > 0);
         
         console.log('Processed restaurants:', restaurants);
-        
-        // Сохраняем в кэш
-        await storageHelpers.setJSON(deviceStorage, STORAGE_KEYS.RESTAURANTS, restaurants);
-        await deviceStorage.setItem(STORAGE_KEYS.RESTAURANTS_TIMESTAMP, Date.now().toString());
         
         set({ restaurants, isLoading: false });
         
@@ -234,11 +177,6 @@ export const useStore = create<Store>((set, get) => {
         }
       } catch (error: any) {
         console.error('Failed to fetch restaurants:', error);
-        // Если есть кэш, используем его даже если он устарел
-        if (cachedRestaurants && cachedRestaurants.length > 0) {
-          set({ restaurants: cachedRestaurants, isLoading: false });
-          return;
-        }
         set({ 
           restaurants: [],
           error: error?.response?.data?.message || 'Не удалось загрузить рестораны',
@@ -259,49 +197,13 @@ export const useStore = create<Store>((set, get) => {
     fetchProfile: async () => {
       if (typeof window === 'undefined') return;
       
-      // Сначала пытаемся загрузить из кэша
-      const cachedProfile = await storageHelpers.getJSON<User>(
-        deviceStorage,
-        STORAGE_KEYS.USER_PROFILE
-      );
-      const cachedTimestamp = await deviceStorage.getItem(STORAGE_KEYS.USER_PROFILE_TIMESTAMP);
-      const cacheAge = cachedTimestamp ? Date.now() - parseInt(cachedTimestamp, 10) : Infinity;
-      const CACHE_TTL = 60 * 60 * 1000; // 1 час
-      
-      // Если есть свежий кэш, показываем его сразу
-      if (cachedProfile && cacheAge < CACHE_TTL) {
-        set({ user: cachedProfile });
-        
-        // Обновляем в фоне
-        try {
-          const response = await api.get('/profile');
-          const userData = response.data.data;
-          await storageHelpers.setJSON(deviceStorage, STORAGE_KEYS.USER_PROFILE, userData);
-          await deviceStorage.setItem(STORAGE_KEYS.USER_PROFILE_TIMESTAMP, Date.now().toString());
-          set({ user: userData });
-        } catch (error) {
-          // Игнорируем ошибки фонового обновления
-          console.debug('Background profile update failed:', error);
-        }
-        return;
-      }
-      
       try {
         const response = await api.get('/profile');
         const userData = response.data.data;
         
-        // Сохраняем в кэш
-        await storageHelpers.setJSON(deviceStorage, STORAGE_KEYS.USER_PROFILE, userData);
-        await deviceStorage.setItem(STORAGE_KEYS.USER_PROFILE_TIMESTAMP, Date.now().toString());
-        
         set({ user: userData });
       } catch (error: any) {
         console.error('Failed to fetch profile:', error);
-        // Если есть старый кэш, используем его
-        if (cachedProfile) {
-          set({ user: cachedProfile });
-          return;
-        }
         set({ error: error?.response?.data?.message || 'Не удалось загрузить профиль' });
       }
     },
@@ -310,10 +212,6 @@ export const useStore = create<Store>((set, get) => {
       try {
         const response = await api.put('/profile', data);
         const userData = response.data.data;
-        
-        // Обновляем кэш
-        await storageHelpers.setJSON(deviceStorage, STORAGE_KEYS.USER_PROFILE, userData);
-        await deviceStorage.setItem(STORAGE_KEYS.USER_PROFILE_TIMESTAMP, Date.now().toString());
         
         set({ user: userData });
       } catch (error: any) {
@@ -325,19 +223,9 @@ export const useStore = create<Store>((set, get) => {
     fetchFavoriteRestaurant: async () => {
       if (typeof window === 'undefined') return;
       
-      // Сначала пытаемся загрузить из кэша
-      const cachedFavoriteId = await deviceStorage.getItem(STORAGE_KEYS.FAVORITE_RESTAURANT_ID);
-      
       try {
         const response = await api.get('/profile/favorite-restaurant');
         const restaurant = response.data.data;
-        
-        // Сохраняем в кэш
-        if (restaurant) {
-          await deviceStorage.setItem(STORAGE_KEYS.FAVORITE_RESTAURANT_ID, restaurant.id);
-        } else {
-          await deviceStorage.removeItem(STORAGE_KEYS.FAVORITE_RESTAURANT_ID);
-        }
         
         set({ favoriteRestaurant: restaurant });
         
@@ -360,14 +248,6 @@ export const useStore = create<Store>((set, get) => {
         }
       } catch (error: any) {
         console.error('Failed to fetch favorite restaurant:', error);
-        // Если есть кэш, используем его
-        if (cachedFavoriteId) {
-          const restaurants = get().restaurants;
-          const favorite = restaurants.find(r => r.id === cachedFavoriteId);
-          if (favorite) {
-            set({ favoriteRestaurant: favorite });
-          }
-        }
       }
     },
 
@@ -380,13 +260,6 @@ export const useStore = create<Store>((set, get) => {
           restaurantId: isRemoving ? null : restaurantId 
         });
         const restaurant = response.data.data;
-        
-        // Обновляем кэш
-        if (restaurant) {
-          await deviceStorage.setItem(STORAGE_KEYS.FAVORITE_RESTAURANT_ID, restaurant.id);
-        } else {
-          await deviceStorage.removeItem(STORAGE_KEYS.FAVORITE_RESTAURANT_ID);
-        }
         
         set({ favoriteRestaurant: restaurant });
         
@@ -407,49 +280,6 @@ export const useStore = create<Store>((set, get) => {
       if (typeof window === 'undefined') return;
       
       const key = restaurantId || 'default';
-      const cacheKey = `${STORAGE_KEYS.BANNERS_PREFIX}${key}`;
-      const timestampKey = `${STORAGE_KEYS.BANNERS_TIMESTAMP_PREFIX}${key}`;
-      
-      // Сначала пытаемся загрузить из кэша
-      const cachedBanners = await storageHelpers.getJSON<Banner[]>(deviceStorage, cacheKey);
-      const cachedTimestamp = await deviceStorage.getItem(timestampKey);
-      const cacheAge = cachedTimestamp ? Date.now() - parseInt(cachedTimestamp, 10) : Infinity;
-      const CACHE_TTL = 60 * 60 * 1000; // 1 час
-      
-      // Если есть свежий кэш, показываем его сразу
-      if (cachedBanners && cachedBanners.length > 0 && cacheAge < CACHE_TTL) {
-        set((state) => ({
-          banners: cachedBanners,
-          bannersByRestaurant: {
-            ...state.bannersByRestaurant,
-            [key]: cachedBanners,
-          },
-        }));
-        
-        // Обновляем в фоне
-        try {
-          const response = await api.get('/banners', {
-            params: restaurantId ? { restaurantId } : {},
-          });
-          const banners = response.data.data || [];
-          
-          // Сохраняем в кэш
-          await storageHelpers.setJSON(deviceStorage, cacheKey, banners);
-          await deviceStorage.setItem(timestampKey, Date.now().toString());
-          
-          set((state) => ({
-            banners,
-            bannersByRestaurant: {
-              ...state.bannersByRestaurant,
-              [key]: banners,
-            },
-          }));
-        } catch (error) {
-          // Игнорируем ошибки фонового обновления
-          console.debug('Background banners update failed:', error);
-        }
-        return;
-      }
       
       // Проверяем, есть ли баннеры в памяти
       const memoryBanners = get().bannersByRestaurant[key];
@@ -464,10 +294,6 @@ export const useStore = create<Store>((set, get) => {
         });
         const banners = response.data.data || [];
         
-        // Сохраняем в кэш
-        await storageHelpers.setJSON(deviceStorage, cacheKey, banners);
-        await deviceStorage.setItem(timestampKey, Date.now().toString());
-        
         // Сохраняем в память
         set((state) => ({
           banners,
@@ -478,17 +304,6 @@ export const useStore = create<Store>((set, get) => {
         }));
       } catch (error: any) {
         console.error('Failed to fetch banners:', error);
-        // Если есть кэш, используем его даже если он устарел
-        if (cachedBanners && cachedBanners.length > 0) {
-          set((state) => ({
-            banners: cachedBanners,
-            bannersByRestaurant: {
-              ...state.bannersByRestaurant,
-              [key]: cachedBanners,
-            },
-          }));
-          return;
-        }
       }
     },
 
@@ -497,14 +312,10 @@ export const useStore = create<Store>((set, get) => {
       if (typeof window === 'undefined') return;
       
       const key = restaurantId || 'default';
-      const cacheKey = `${STORAGE_KEYS.BANNERS_PREFIX}${key}`;
-      
-      // Проверяем кэш
-      const cachedBanners = await storageHelpers.getJSON<Banner[]>(deviceStorage, cacheKey);
       const memoryBanners = get().bannersByRestaurant[key];
       
-      // Если баннеры уже загружены в памяти или кэше, не делаем повторный запрос
-      if ((memoryBanners && memoryBanners.length > 0) || (cachedBanners && cachedBanners.length > 0)) {
+      // Если баннеры уже загружены в памяти, не делаем повторный запрос
+      if (memoryBanners && memoryBanners.length > 0) {
         return;
       }
 
@@ -513,10 +324,6 @@ export const useStore = create<Store>((set, get) => {
           params: restaurantId ? { restaurantId } : {},
         });
         const banners = response.data.data || [];
-        
-        const timestampKey = `${STORAGE_KEYS.BANNERS_TIMESTAMP_PREFIX}${key}`;
-        await storageHelpers.setJSON(deviceStorage, cacheKey, banners);
-        await deviceStorage.setItem(timestampKey, Date.now().toString());
         
         // Сохраняем в память без обновления текущих баннеров
         set((state) => ({

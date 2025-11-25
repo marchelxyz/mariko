@@ -146,13 +146,13 @@ function MyApp({ Component, pageProps }: AppProps) {
     }
   }, []);
 
-  // Инициализация данных из кэша при загрузке
+  // Восстановление выбранного ресторана из настроек при загрузке
   useEffect(() => {
     if (!mounted || typeof window === 'undefined') return;
 
-    const initializeFromCache = async () => {
+    const restoreSelectedRestaurant = async () => {
       try {
-        const { deviceStorage, secureStorage, STORAGE_KEYS, storageHelpers } = await import('@/lib/storage');
+        const { deviceStorage, secureStorage, STORAGE_KEYS } = await import('@/lib/storage');
         const { useStore } = await import('@/store/useStore');
         
         // Инициализация токена из SecureStorage
@@ -163,7 +163,7 @@ function MyApp({ Component, pageProps }: AppProps) {
           await useStore.getState().setToken(token);
         }
         
-        // Восстановление выбранного ресторана из кэша
+        // Восстановление выбранного ресторана из настроек (не кеширование данных)
         const selectedRestaurantId = await deviceStorage.getItem(STORAGE_KEYS.SELECTED_RESTAURANT_ID);
         const { selectedRestaurant, restaurants } = useStore.getState();
         
@@ -174,11 +174,11 @@ function MyApp({ Component, pageProps }: AppProps) {
           }
         }
       } catch (error) {
-        console.debug('Failed to initialize from cache:', error);
+        console.debug('Failed to restore selected restaurant:', error);
       }
     };
 
-    initializeFromCache();
+    restoreSelectedRestaurant();
   }, [mounted]);
 
   // Предзагрузка баннеров при инициализации приложения
