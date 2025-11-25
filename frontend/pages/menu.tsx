@@ -1,10 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/router';
+import { GetServerSideProps } from 'next';
 import Image from 'next/image';
 import Layout from '@/components/Layout';
 import Header from '@/components/Header';
 import { useStore } from '@/store/useStore';
-import api from '@/lib/api';
 
 interface MenuItem {
   id: string;
@@ -14,6 +14,11 @@ interface MenuItem {
   category: string;
   imageUrl?: string;
   calories?: number;
+}
+
+interface MenuProps {
+  initialMenuItems: Record<string, MenuItem[]>;
+  restaurantId: string;
 }
 
 const CATEGORIES = [
@@ -27,44 +32,15 @@ const CATEGORIES = [
   'Детское',
 ];
 
-export default function Menu() {
+export default function Menu({ initialMenuItems, restaurantId }: MenuProps) {
   const router = useRouter();
   const { selectedRestaurant } = useStore();
-  const [menuItems, setMenuItems] = useState<Record<string, MenuItem[]>>({});
-  const [loading, setLoading] = useState(true);
+  const [menuItems] = useState<Record<string, MenuItem[]>>(initialMenuItems);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!selectedRestaurant?.id) {
-      router.push('/');
-      return;
-    }
+  // Используем restaurantId из props или из store
+  const currentRestaurantId = selectedRestaurant?.id || restaurantId;
 
-    const fetchMenu = async () => {
-      try {
-        setLoading(true);
-        const response = await api.get(`/menu/${selectedRestaurant.id}`);
-        setMenuItems(response.data.data || {});
-      } catch (error) {
-        console.error('Failed to fetch menu:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchMenu();
-  }, [selectedRestaurant, router]);
-
-  if (loading) {
-    return (
-      <Layout>
-        <Header title="Меню" />
-        <div className="px-4 py-6">
-          <div className="text-center text-text-primary">Загрузка...</div>
-        </div>
-      </Layout>
-    );
-  }
 
   // Фильтруем категории, которые есть в меню
   const availableCategories = CATEGORIES.filter(
@@ -209,3 +185,71 @@ export default function Menu() {
     </Layout>
   );
 }
+
+export const getServerSideProps: GetServerSideProps = async (context) => {
+  try {
+    const { restaurantId } = context.query;
+
+    if (!restaurantId || typeof restaurantId !== 'string') {
+      return {
+        redirect: {
+          destination: '/',
+          permanent: false,
+        },
+      };
+    }
+
+    // Получаем токен из cookies, если он есть
+    const token = context.req.cookies.token || context.req.headers.authorization?.replace('Bearer ', '');
+    
+    // Создаем экземпляр axios для серверного запроса
+    const getBaseURL = () => {
+      const url = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+      return url.endsWith('/api') ? url : `${url.replace(/\/$/, '')}/api`;
+    };
+
+    // Используем динамический импорт для axios на сервере
+    const axios = (await import('axios')).default;
+    const serverApi = axios.create({
+      baseURL: getBaseURL(),
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token && { Authorization: `Bearer ${token}` }),
+      },
+      timeout: 10000,
+    });
+
+    // Используем новый эндпоинт для получения полных данных страницы меню с кэшированием
+    const pageResponse = await serverApi.get(`/pages/menu/${restaurantId}`);
+
+    const pageData = pageResponse.data.data || {};
+    const menuItems = pageData.menuItems || {};
+
+    return {
+      props: {
+        initialMenuItems: menuItems,
+        restaurantId,
+      },
+    };
+  } catch (error) {
+    console.error('Error fetching menu page data on server:', error);
+    
+    // Если ресторан не найден, редиректим на главную
+    if ((error as any)?.response?.status === 404) {
+      return {
+        redirect: {
+          destination: '/',
+          permanent: false,
+        },
+      };
+    }
+
+    // В случае другой ошибки возвращаем пустое меню
+    return {
+      props: {
+        initialMenuItems: {},
+        restaurantId: context.query.restaurantId as string || '',
+      },
+    };
+  }
+};

@@ -84,7 +84,12 @@ export default function MenuBlock({ restaurantId }: MenuBlockProps) {
   const menuItems = allMenuItems.slice(0, displayCount);
 
   const handleMenuClick = () => {
-    router.push('/menu');
+    const currentRestaurantId = restaurantId || selectedRestaurant?.id;
+    if (currentRestaurantId) {
+      router.push(`/menu?restaurantId=${currentRestaurantId}`);
+    } else {
+      router.push('/menu');
+    }
   };
 
   if (isLoading || allMenuItems.length === 0) {

@@ -12,7 +12,10 @@ import {
   invalidateRestaurantsCache, 
   invalidateRestaurantCache,
   invalidateMenuCache,
-  invalidateAllMenuCache 
+  invalidateAllMenuCache,
+  invalidateHomePageCache,
+  invalidateMenuPageCache,
+  invalidateAllMenuPageCache
 } from '../services/cacheService';
 
 const router = Router();
@@ -169,8 +172,9 @@ router.post('/restaurants', requireRole('admin'), async (req: AuthRequest, res: 
       // Администратор может создать лист вручную позже
     }
     
-    // Инвалидируем кэш ресторанов
+    // Инвалидируем кэш ресторанов и главной страницы
     await invalidateRestaurantsCache();
+    await invalidateHomePageCache();
     
     res.json({ success: true, data: savedRestaurant });
   } catch (error) {
@@ -231,8 +235,10 @@ router.put('/restaurants/:id', requireRole('admin'), async (req: AuthRequest, re
     
     const updatedRestaurant = await restaurantRepository.save(restaurant);
     
-    // Инвалидируем кэш ресторанов
+    // Инвалидируем кэш ресторанов, главной страницы и страницы меню для этого ресторана
     await invalidateRestaurantCache(req.params.id);
+    await invalidateHomePageCache();
+    await invalidateMenuPageCache(req.params.id);
     
     res.json({ success: true, data: updatedRestaurant });
   } catch (error) {
@@ -257,8 +263,10 @@ router.delete('/restaurants/:id', requireRole('admin'), async (req: AuthRequest,
     restaurant.isActive = false;
     await restaurantRepository.save(restaurant);
     
-    // Инвалидируем кэш ресторанов
+    // Инвалидируем кэш ресторанов, главной страницы и страницы меню для этого ресторана
     await invalidateRestaurantCache(req.params.id);
+    await invalidateHomePageCache();
+    await invalidateMenuPageCache(req.params.id);
     
     res.json({ success: true, message: 'Restaurant deactivated' });
   } catch (error) {
@@ -291,8 +299,9 @@ router.post('/restaurants/:id/sync', requireRole('admin', 'manager'), async (req
     const sheetsService = createGoogleSheetsService();
     const result = await sheetsService.syncMenuFromSheet(restaurant);
     
-    // Инвалидируем кэш меню для этого ресторана
+    // Инвалидируем кэш меню и страницы меню для этого ресторана
     await invalidateMenuCache(req.params.id);
+    await invalidateMenuPageCache(req.params.id);
     
     res.json({ 
       success: true, 
@@ -313,8 +322,9 @@ router.post('/restaurants/sync-all', requireRole('admin'), async (req: AuthReque
   try {
     await syncAllRestaurantsMenu();
     
-    // Инвалидируем весь кэш меню
+    // Инвалидируем весь кэш меню и страниц меню
     await invalidateAllMenuCache();
+    await invalidateAllMenuPageCache();
     
     res.json({ 
       success: true, 

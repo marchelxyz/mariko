@@ -73,7 +73,7 @@ export default function MenuPreview({ restaurantId }: MenuPreviewProps) {
         <h2 className="text-xl font-bold text-text-primary">Меню</h2>
         {selectedRestaurant && (
           <button
-            onClick={() => router.push('/menu')}
+            onClick={() => router.push(`/menu?restaurantId=${selectedRestaurant.id}`)}
             className="text-primary text-sm font-medium"
           >
             Смотреть все
