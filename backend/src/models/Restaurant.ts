@@ -62,6 +62,10 @@ export class Restaurant {
     url: string;
   }>;
 
+  // ReMarked API: ID заведения в системе ReMarked для бронирования столиков
+  @Column({ nullable: true })
+  remarkedPointId?: number;
+
   @CreateDateColumn()
   createdAt!: Date;
 

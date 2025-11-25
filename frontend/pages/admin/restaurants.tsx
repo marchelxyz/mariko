@@ -27,6 +27,7 @@ interface Restaurant {
   yandexMapsUrl?: string;
   twoGisUrl?: string;
   socialNetworks?: SocialNetwork[];
+  remarkedPointId?: number;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -48,6 +49,7 @@ export default function AdminRestaurants() {
     yandexMapsUrl: '',
     twoGisUrl: '',
     socialNetworks: [] as SocialNetwork[],
+    remarkedPointId: '',
   });
 
   const fetchRestaurants = useCallback(async () => {
@@ -94,6 +96,7 @@ export default function AdminRestaurants() {
       yandexMapsUrl: '',
       twoGisUrl: '',
       socialNetworks: [],
+      remarkedPointId: '',
     });
     setIsFormOpen(true);
   };
@@ -110,6 +113,7 @@ export default function AdminRestaurants() {
       yandexMapsUrl: restaurant.yandexMapsUrl || '',
       twoGisUrl: restaurant.twoGisUrl || '',
       socialNetworks: restaurant.socialNetworks || [],
+      remarkedPointId: restaurant.remarkedPointId?.toString() || '',
     });
     setIsFormOpen(true);
   };
@@ -138,6 +142,7 @@ export default function AdminRestaurants() {
         socialNetworks: formData.socialNetworks.length > 0 ? formData.socialNetworks : undefined,
         yandexMapsUrl: formData.yandexMapsUrl || undefined,
         twoGisUrl: formData.twoGisUrl || undefined,
+        remarkedPointId: formData.remarkedPointId || undefined,
       };
       
       if (editingRestaurant) {
@@ -294,6 +299,11 @@ export default function AdminRestaurants() {
                       <p>
                         <span className="font-medium">Телефон:</span> {restaurant.phoneNumber}
                       </p>
+                      {restaurant.remarkedPointId && (
+                        <p>
+                          <span className="font-medium">ReMarked Point ID:</span> {restaurant.remarkedPointId}
+                        </p>
+                      )}
                     </div>
                   </div>
 
@@ -505,6 +515,23 @@ export default function AdminRestaurants() {
                         />
                       </div>
                     </div>
+                  </div>
+
+                  {/* ReMarked API */}
+                  <div className="border-t pt-4">
+                    <label className="block text-sm font-medium text-text-primary mb-1">
+                      ReMarked Point ID (для бронирования столиков)
+                    </label>
+                    <input
+                      type="number"
+                      value={formData.remarkedPointId}
+                      onChange={(e) => setFormData({ ...formData, remarkedPointId: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-sm"
+                      placeholder="Например: 7999999"
+                    />
+                    <p className="text-xs text-text-secondary mt-1">
+                      ID заведения в системе ReMarked. Необходим для работы бронирования столиков.
+                    </p>
                   </div>
 
                   {/* Социальные сети */}
