@@ -16,10 +16,21 @@ const api = axios.create({
 });
 
 // Добавляем токен к каждому запросу
-api.interceptors.request.use((config) => {
-  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
+api.interceptors.request.use(async (config) => {
+  if (typeof window !== 'undefined') {
+    try {
+      const { secureStorage, STORAGE_KEYS } = await import('./storage');
+      const token = await secureStorage.getItem(STORAGE_KEYS.TOKEN);
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
+    } catch (error) {
+      // Fallback на localStorage для обратной совместимости
+      const token = localStorage.getItem('token');
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
+    }
   }
   return config;
 });
