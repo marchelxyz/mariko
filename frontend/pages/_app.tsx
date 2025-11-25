@@ -21,10 +21,66 @@ function MyApp({ Component, pageProps }: AppProps) {
     if (typeof window !== 'undefined') {
       import('@twa-dev/sdk').then(({ default: WebApp }) => {
         WebApp.ready();
+        
+        // Функция для разворачивания приложения
+        const expandApp = () => {
+          try {
+            // Пробуем через SDK или через window.Telegram
+            const webApp = WebApp || (window as any).Telegram?.WebApp;
+            
+            if (webApp && typeof webApp.expand === 'function') {
+              // Проверяем, не развернуто ли уже приложение
+              if (!webApp.isExpanded) {
+                webApp.expand();
+              }
+              // Устанавливаем viewportHeight для корректного отображения
+              if (webApp.viewportHeight) {
+                document.documentElement.style.setProperty('--tg-viewport-height', `${webApp.viewportHeight}px`);
+              }
+            }
+          } catch (error) {
+            console.warn('Error expanding WebApp:', error);
+            // Пробуем альтернативный способ
+            try {
+              if ((window as any).Telegram?.WebApp?.expand && !(window as any).Telegram.WebApp.isExpanded) {
+                (window as any).Telegram.WebApp.expand();
+              }
+            } catch (e) {
+              // Игнорируем ошибку
+            }
+          }
+        };
+
         // Разворачиваем приложение на полный экран
-        WebApp.expand();
+        // Используем несколько попыток для гарантии, что WebApp полностью готов
+        expandApp();
+        setTimeout(expandApp, 100);
+        setTimeout(expandApp, 500);
+
+        // Слушаем изменения viewport
+        if (WebApp.onEvent) {
+          WebApp.onEvent('viewportChanged', () => {
+            const webApp = WebApp || (window as any).Telegram?.WebApp;
+            if (webApp?.viewportHeight) {
+              document.documentElement.style.setProperty('--tg-viewport-height', `${webApp.viewportHeight}px`);
+            }
+          });
+        }
       }).catch((error) => {
         console.warn('Telegram WebApp SDK not available:', error);
+        // Пробуем альтернативный способ через window.Telegram
+        try {
+          if ((window as any).Telegram?.WebApp) {
+            (window as any).Telegram.WebApp.ready();
+            setTimeout(() => {
+              if ((window as any).Telegram?.WebApp?.expand && !(window as any).Telegram.WebApp.isExpanded) {
+                (window as any).Telegram.WebApp.expand();
+              }
+            }, 100);
+          }
+        } catch (e) {
+          // Игнорируем ошибку
+        }
       });
     }
   }, []);
