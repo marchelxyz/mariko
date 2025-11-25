@@ -96,6 +96,12 @@ export default function MenuBlock({ restaurantId }: MenuBlockProps) {
       {/* Заголовок "Рекомендуем попробовать" с стрелкой */}
       <button
         onClick={handleMenuClick}
+        onMouseEnter={() => {
+          // Предзагружаем страницу меню при наведении
+          router.prefetch('/menu').catch((error) => {
+            console.debug('Failed to prefetch /menu:', error);
+          });
+        }}
         className="flex items-center justify-between w-full mb-4 group px-4 md:px-0"
       >
         <span className="text-[#000000] font-normal text-base">Рекомендуем попробовать</span>

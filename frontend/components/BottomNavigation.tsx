@@ -162,6 +162,12 @@ export default function BottomNavigation() {
                 ref={(el) => { buttonRefs.current[index] = el; }}
                 onClick={() => router.push(item.path)}
                 onMouseEnter={() => {
+                  // Предзагружаем страницу при наведении для быстрого переключения
+                  if (!isActive) {
+                    router.prefetch(item.path).catch((error) => {
+                      console.debug(`Failed to prefetch ${item.path}:`, error);
+                    });
+                  }
                   // Предзагружаем баннеры при наведении на главную страницу
                   if (isHomePage) {
                     const restaurantId = selectedRestaurant?.id;
