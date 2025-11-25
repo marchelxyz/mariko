@@ -110,7 +110,8 @@ router.post('/restaurants', requireRole('admin'), async (req: AuthRequest, res: 
       deliveryAggregators,
       yandexMapsUrl,
       twoGisUrl,
-      socialNetworks
+      socialNetworks,
+      remarkedPointId
     } = req.body;
     
     if (!name || !city || !address || !phoneNumber) {
@@ -155,6 +156,7 @@ router.post('/restaurants', requireRole('admin'), async (req: AuthRequest, res: 
       yandexMapsUrl: yandexMapsUrl || null,
       twoGisUrl: twoGisUrl || null,
       socialNetworks: socialNetworks || null,
+      remarkedPointId: remarkedPointId ? Number(remarkedPointId) : null,
     });
     
     const savedRestaurant = await restaurantRepository.save(restaurant);
@@ -194,7 +196,8 @@ router.put('/restaurants/:id', requireRole('admin'), async (req: AuthRequest, re
       deliveryAggregators,
       yandexMapsUrl,
       twoGisUrl,
-      socialNetworks
+      socialNetworks,
+      remarkedPointId
     } = req.body;
     
     // Валидация доставки (до 5 агрегаторов)
@@ -232,6 +235,7 @@ router.put('/restaurants/:id', requireRole('admin'), async (req: AuthRequest, re
     if (yandexMapsUrl !== undefined) restaurant.yandexMapsUrl = yandexMapsUrl || null;
     if (twoGisUrl !== undefined) restaurant.twoGisUrl = twoGisUrl || null;
     if (socialNetworks !== undefined) restaurant.socialNetworks = socialNetworks.length > 0 ? socialNetworks : null;
+    if (remarkedPointId !== undefined) restaurant.remarkedPointId = remarkedPointId ? Number(remarkedPointId) : null;
     
     const updatedRestaurant = await restaurantRepository.save(restaurant);
     
