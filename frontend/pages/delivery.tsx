@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
+import Image from 'next/image';
 import Layout from '@/components/Layout';
 import Header from '@/components/Header';
 import VerticalBanners from '@/components/VerticalBanners';
@@ -92,12 +93,16 @@ export default function Delivery() {
                         }}
                       >
                         {aggregator.imageUrl ? (
-                          <img
-                            src={aggregator.imageUrl}
-                            alt={aggregator.name}
-                            className="w-full h-full object-cover"
-                            style={{ display: 'block' }}
-                          />
+                          <div className="w-full h-full relative">
+                            <Image
+                              src={aggregator.imageUrl}
+                              alt={aggregator.name}
+                              fill
+                              className="object-cover"
+                              sizes="160px"
+                              unoptimized
+                            />
+                          </div>
                         ) : (
                           <div 
                             className="w-full h-full bg-gray-200 flex items-center justify-center"
@@ -133,12 +138,16 @@ export default function Delivery() {
                     }}
                   >
                     {aggregator.imageUrl ? (
-                      <img
-                        src={aggregator.imageUrl}
-                        alt={aggregator.name}
-                        className="w-full h-full object-cover"
-                        style={{ display: 'block' }}
-                      />
+                      <div className="w-full h-full relative">
+                        <Image
+                          src={aggregator.imageUrl}
+                          alt={aggregator.name}
+                          fill
+                          className="object-cover"
+                          sizes="160px"
+                          unoptimized
+                        />
+                      </div>
                     ) : (
                       <div 
                         className="w-full h-full bg-gray-200 flex items-center justify-center"
@@ -173,55 +182,63 @@ export default function Delivery() {
                       }}
                     >
                       {aggregator.imageUrl ? (
-                        <img
-                          src={aggregator.imageUrl}
-                          alt={aggregator.name}
-                          className="w-full h-full object-cover"
-                          style={{ display: 'block' }}
-                        />
-                      ) : (
-                        <div 
-                          className="w-full h-full bg-gray-200 flex items-center justify-center"
-                        >
-                          <span className="text-4xl">📦</span>
+                        <div className="w-full h-full relative">
+                          <Image
+                            src={aggregator.imageUrl}
+                            alt={aggregator.name}
+                            fill
+                            className="object-cover"
+                            sizes="160px"
+                            unoptimized
+                          />
                         </div>
-                      )}
-                    </a>
-                  ))}
-                </div>
-              )}
-
-              {/* Баннер */}
-              <div className="flex-shrink-0" style={{ width: '160px', minWidth: '160px', maxWidth: '160px' }}>
-                <VerticalBanners restaurantId={selectedRestaurant?.id} />
+                    ) : (
+                      <div 
+                        className="w-full h-full bg-gray-200 flex items-center justify-center"
+                      >
+                        <span className="text-4xl">📦</span>
+                      </div>
+                    )}
+                  </a>
+                ))}
               </div>
+            )}
 
-              {/* Остальные агрегаторы */}
-              {remainingAggregators.length > 0 && (
-                <>
-                  {remainingAggregators.map((aggregator, index) => (
-                    <a
-                      key={index + 2}
-                      href={aggregator.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow overflow-hidden block flex-shrink-0"
-                      style={{ 
-                        width: '160px', 
-                        height: '120px',
-                        minWidth: '160px',
-                        maxWidth: '160px',
-                        minHeight: '120px',
-                        maxHeight: '120px'
-                      }}
-                    >
-                      {aggregator.imageUrl ? (
-                        <img
-                          src={aggregator.imageUrl}
-                          alt={aggregator.name}
-                          className="w-full h-full object-cover"
-                          style={{ display: 'block' }}
-                        />
+            {/* Баннер */}
+            <div className="flex-shrink-0" style={{ width: '160px', minWidth: '160px', maxWidth: '160px' }}>
+              <VerticalBanners restaurantId={selectedRestaurant?.id} />
+            </div>
+
+            {/* Остальные агрегаторы */}
+            {remainingAggregators.length > 0 && (
+              <>
+                {remainingAggregators.map((aggregator, index) => (
+                  <a
+                    key={index + 2}
+                    href={aggregator.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow overflow-hidden block flex-shrink-0"
+                    style={{ 
+                      width: '160px', 
+                      height: '120px',
+                      minWidth: '160px',
+                      maxWidth: '160px',
+                      minHeight: '120px',
+                      maxHeight: '120px'
+                    }}
+                  >
+                    {aggregator.imageUrl ? (
+                        <div className="w-full h-full relative">
+                          <Image
+                            src={aggregator.imageUrl}
+                            alt={aggregator.name}
+                            fill
+                            className="object-cover"
+                            sizes="160px"
+                            unoptimized
+                          />
+                        </div>
                       ) : (
                         <div 
                           className="w-full h-full bg-gray-200 flex items-center justify-center"

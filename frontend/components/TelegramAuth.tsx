@@ -12,9 +12,15 @@ export default function TelegramAuth() {
       if (typeof window === 'undefined') return;
 
       try {
-        // Проверяем, есть ли токен в localStorage
-        const existingToken = localStorage.getItem('token');
-        const { user } = useStore.getState();
+        // Проверяем, есть ли токен в SecureStorage
+        const { secureStorage, STORAGE_KEYS } = await import('@/lib/storage');
+        const existingToken = await secureStorage.getItem(STORAGE_KEYS.TOKEN);
+        const { user, token: storeToken } = useStore.getState();
+        
+        // Если токен есть в SecureStorage, но не в store, обновляем store
+        if (existingToken && !storeToken) {
+          await setToken(existingToken);
+        }
         
         // Если токен есть, но пользователь не загружен, загружаем профиль
         if (existingToken && !user) {
@@ -28,8 +34,8 @@ export default function TelegramAuth() {
             if (error && typeof error === 'object' && 'response' in error) {
               const axiosError = error as any;
               if (axiosError.response?.status === 401) {
-                localStorage.removeItem('token');
-                setToken(null);
+                await secureStorage.removeItem(STORAGE_KEYS.TOKEN);
+                await setToken(null);
               }
             }
           }

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import Image from 'next/image';
 import { useStore } from '@/store/useStore';
 import api from '@/lib/api';
 
@@ -114,12 +115,21 @@ export default function Banners({ restaurantId, initialBanners }: BannersProps) 
                 }}
               >
                 {banner.imageUrl ? (
-                  <img
-                    src={banner.imageUrl}
-                    alt={banner.title || 'Banner'}
-                    className="w-full object-cover rounded-[15px]"
-                    style={{ aspectRatio: '16/9', display: 'block' }}
-                  />
+                  <div
+                    className="w-full rounded-[15px] overflow-hidden"
+                    style={{
+                      aspectRatio: '16/9',
+                      position: 'relative',
+                    }}
+                  >
+                    <Image
+                      src={banner.imageUrl}
+                      alt={banner.title || 'Banner'}
+                      fill
+                      className="object-cover"
+                      sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                    />
+                  </div>
                 ) : (
                   <div className="w-full bg-secondary flex items-center justify-center rounded-[15px]" style={{ aspectRatio: '16/9' }}>
                     <span className="text-4xl">🖼️</span>

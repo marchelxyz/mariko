@@ -1,5 +1,5 @@
 import { useRouter } from 'next/router';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useMemo } from 'react';
 import { useStore } from '@/store/useStore';
 
 const baseNavItems = [
@@ -57,11 +57,11 @@ export default function BottomNavigation() {
   const currentLeftRef = useRef<number>(0);
 
   // Формируем список пунктов меню в зависимости от роли пользователя
-  const navItems = [
+  const navItems = useMemo(() => [
     ...baseNavItems,
     // Добавляем админский пункт меню, если пользователь админ
     ...(user && ['admin', 'ADMIN'].includes(user.role) ? [adminNavItem] : [])
-  ];
+  ], [user]);
 
   useEffect(() => {
     const updateIndicator = (attempt = 0) => {

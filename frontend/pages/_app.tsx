@@ -22,28 +22,51 @@ function MyApp({ Component, pageProps }: AppProps) {
       import('@twa-dev/sdk').then(({ default: WebApp }) => {
         WebApp.ready();
         
-        // Функция для разворачивания приложения
-        const expandApp = () => {
+        // Функция для запроса полноэкранного режима
+        const requestFullscreenMode = () => {
           try {
-            // Пробуем через SDK или через window.Telegram
             const webApp = WebApp || (window as any).Telegram?.WebApp;
             
-            if (webApp && typeof webApp.expand === 'function') {
-              // Проверяем, не развернуто ли уже приложение
-              if (!webApp.isExpanded) {
+            if (!webApp) return;
+            
+            // Проверяем версию API (Bot API 8.0+ для полноэкранного режима)
+            const isVersionSupported = webApp.isVersionAtLeast 
+              ? webApp.isVersionAtLeast('8.0')
+              : false;
+            
+            if (isVersionSupported && typeof webApp.requestFullscreen === 'function') {
+              // Запрашиваем полноэкранный режим
+              if (!webApp.isFullscreen) {
+                webApp.requestFullscreen();
+              }
+              
+              // Устанавливаем цвет заголовка для контраста (рекомендация Telegram)
+              if (typeof webApp.setHeaderColor === 'function') {
+                webApp.setHeaderColor('#FFFFFF'); // Белый цвет для контраста
+              }
+            } else {
+              // Fallback на expand() для старых версий
+              if (typeof webApp.expand === 'function' && !webApp.isExpanded) {
                 webApp.expand();
               }
-              // Устанавливаем viewportHeight для корректного отображения
-              if (webApp.viewportHeight) {
-                document.documentElement.style.setProperty('--tg-viewport-height', `${webApp.viewportHeight}px`);
-              }
+            }
+            
+            // Устанавливаем viewportHeight для корректного отображения
+            if (webApp.viewportHeight) {
+              document.documentElement.style.setProperty('--tg-viewport-height', `${webApp.viewportHeight}px`);
+            }
+            
+            // Устанавливаем viewportStableHeight если доступен
+            if (webApp.viewportStableHeight) {
+              document.documentElement.style.setProperty('--tg-viewport-stable-height', `${webApp.viewportStableHeight}px`);
             }
           } catch (error) {
-            console.warn('Error expanding WebApp:', error);
-            // Пробуем альтернативный способ
+            console.warn('Error requesting fullscreen:', error);
+            // Fallback на expand()
             try {
-              if ((window as any).Telegram?.WebApp?.expand && !(window as any).Telegram.WebApp.isExpanded) {
-                (window as any).Telegram.WebApp.expand();
+              const webApp = WebApp || (window as any).Telegram?.WebApp;
+              if (webApp && typeof webApp.expand === 'function' && !webApp.isExpanded) {
+                webApp.expand();
               }
             } catch (e) {
               // Игнорируем ошибку
@@ -51,18 +74,36 @@ function MyApp({ Component, pageProps }: AppProps) {
           }
         };
 
-        // Разворачиваем приложение на полный экран
+        // Запрашиваем полноэкранный режим при старте
         // Используем несколько попыток для гарантии, что WebApp полностью готов
-        expandApp();
-        setTimeout(expandApp, 100);
-        setTimeout(expandApp, 500);
+        requestFullscreenMode();
+        setTimeout(requestFullscreenMode, 100);
+        setTimeout(requestFullscreenMode, 500);
 
-        // Слушаем изменения viewport
+        // Слушаем изменения viewport и полноэкранного режима
         if (WebApp.onEvent) {
           WebApp.onEvent('viewportChanged', () => {
             const webApp = WebApp || (window as any).Telegram?.WebApp;
             if (webApp?.viewportHeight) {
               document.documentElement.style.setProperty('--tg-viewport-height', `${webApp.viewportHeight}px`);
+            }
+            if (webApp?.viewportStableHeight) {
+              document.documentElement.style.setProperty('--tg-viewport-stable-height', `${webApp.viewportStableHeight}px`);
+            }
+          });
+          
+          // Слушаем изменения полноэкранного режима
+          WebApp.onEvent('fullscreenChanged', () => {
+            const webApp = WebApp || (window as any).Telegram?.WebApp;
+            console.log('Fullscreen changed:', webApp?.isFullscreen);
+          });
+          
+          // Обрабатываем ошибки полноэкранного режима
+          WebApp.onEvent('fullscreenFailed', () => {
+            console.warn('Fullscreen request failed, falling back to expand');
+            const webApp = WebApp || (window as any).Telegram?.WebApp;
+            if (webApp && typeof webApp.expand === 'function' && !webApp.isExpanded) {
+              webApp.expand();
             }
           });
         }
@@ -72,11 +113,16 @@ function MyApp({ Component, pageProps }: AppProps) {
         try {
           if ((window as any).Telegram?.WebApp) {
             (window as any).Telegram.WebApp.ready();
-            setTimeout(() => {
-              if ((window as any).Telegram?.WebApp?.expand && !(window as any).Telegram.WebApp.isExpanded) {
-                (window as any).Telegram.WebApp.expand();
+            const webApp = (window as any).Telegram.WebApp;
+            
+            // Проверяем версию и запрашиваем полноэкранный режим
+            if (webApp.isVersionAtLeast && webApp.isVersionAtLeast('8.0') && typeof webApp.requestFullscreen === 'function') {
+              if (!webApp.isFullscreen) {
+                webApp.requestFullscreen();
               }
-            }, 100);
+            } else if (typeof webApp.expand === 'function' && !webApp.isExpanded) {
+              webApp.expand();
+            }
           }
         } catch (e) {
           // Игнорируем ошибку
@@ -84,6 +130,41 @@ function MyApp({ Component, pageProps }: AppProps) {
       });
     }
   }, []);
+
+  // Инициализация данных из кэша при загрузке
+  useEffect(() => {
+    if (!mounted || typeof window === 'undefined') return;
+
+    const initializeFromCache = async () => {
+      try {
+        const { deviceStorage, secureStorage, STORAGE_KEYS, storageHelpers } = await import('@/lib/storage');
+        const { useStore } = await import('@/store/useStore');
+        
+        // Инициализация токена из SecureStorage
+        const token = await secureStorage.getItem(STORAGE_KEYS.TOKEN);
+        const { token: storeToken } = useStore.getState();
+        
+        if (token && !storeToken) {
+          await useStore.getState().setToken(token);
+        }
+        
+        // Восстановление выбранного ресторана из кэша
+        const selectedRestaurantId = await deviceStorage.getItem(STORAGE_KEYS.SELECTED_RESTAURANT_ID);
+        const { selectedRestaurant, restaurants } = useStore.getState();
+        
+        if (selectedRestaurantId && !selectedRestaurant && restaurants.length > 0) {
+          const restaurant = restaurants.find(r => r.id === selectedRestaurantId);
+          if (restaurant) {
+            useStore.getState().setSelectedRestaurant(restaurant);
+          }
+        }
+      } catch (error) {
+        console.debug('Failed to initialize from cache:', error);
+      }
+    };
+
+    initializeFromCache();
+  }, [mounted]);
 
   // Предзагрузка баннеров при инициализации приложения
   useEffect(() => {

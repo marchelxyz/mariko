@@ -27,7 +27,15 @@ export default function ActionButtons() {
             // Слушаем изменения состояния полноэкранного режима
             if (WebApp?.onEvent) {
               WebApp.onEvent('viewportChanged', () => {
-                setIsFullscreen(WebApp.isExpanded || false);
+                const isExpanded = WebApp?.isExpanded || (window as any).Telegram?.WebApp?.isExpanded || false;
+                const isFullscreen = WebApp?.isFullscreen || (window as any).Telegram?.WebApp?.isFullscreen || false;
+                setIsFullscreen(isExpanded || isFullscreen);
+              });
+              
+              // Слушаем изменения полноэкранного режима
+              WebApp.onEvent('fullscreenChanged', () => {
+                const isFullscreen = WebApp?.isFullscreen || (window as any).Telegram?.WebApp?.isFullscreen || false;
+                setIsFullscreen(isFullscreen);
               });
             }
           }
@@ -64,23 +72,70 @@ export default function ActionButtons() {
       // Пробуем через SDK или через window.Telegram
       const webApp = WebApp || (window as any).Telegram?.WebApp;
       
-      if (webApp && typeof webApp.expand === 'function') {
+      if (!webApp) {
+        alert('Telegram WebApp недоступен');
+        return;
+      }
+      
+      // Проверяем версию API (Bot API 8.0+ для полноэкранного режима)
+      const isVersionSupported = webApp.isVersionAtLeast 
+        ? webApp.isVersionAtLeast('8.0')
+        : false;
+      
+      if (isVersionSupported && typeof webApp.requestFullscreen === 'function') {
+        // Используем полноэкранный режим
+        if (webApp.isFullscreen) {
+          // Если уже в полноэкранном режиме, выходим из него
+          if (typeof webApp.exitFullscreen === 'function') {
+            webApp.exitFullscreen();
+            setIsFullscreen(false);
+          }
+        } else {
+          // Запрашиваем полноэкранный режим
+          webApp.requestFullscreen();
+          setIsFullscreen(true);
+          
+          // Устанавливаем цвет заголовка для контраста
+          if (typeof webApp.setHeaderColor === 'function') {
+            webApp.setHeaderColor('#FFFFFF');
+          }
+        }
+      } else if (typeof webApp.expand === 'function') {
+        // Fallback на expand() для старых версий
         webApp.expand();
         setIsFullscreen(true);
-        // Также устанавливаем viewportHeight для корректного отображения
-        if (webApp.viewportHeight) {
-          document.documentElement.style.setProperty('--tg-viewport-height', `${webApp.viewportHeight}px`);
-        }
       } else {
-        alert('Полноэкранный режим недоступен');
+        alert('Полноэкранный режим недоступен в вашей версии Telegram');
+      }
+      
+      // Устанавливаем viewportHeight для корректного отображения
+      if (webApp.viewportHeight) {
+        document.documentElement.style.setProperty('--tg-viewport-height', `${webApp.viewportHeight}px`);
+      }
+      
+      if (webApp.viewportStableHeight) {
+        document.documentElement.style.setProperty('--tg-viewport-stable-height', `${webApp.viewportStableHeight}px`);
       }
     } catch (error) {
-      console.warn('Error expanding WebApp:', error);
+      console.warn('Error toggling fullscreen:', error);
       // Пробуем альтернативный способ
       try {
-        if ((window as any).Telegram?.WebApp?.expand) {
-          (window as any).Telegram.WebApp.expand();
-          setIsFullscreen(true);
+        const webApp = (window as any).Telegram?.WebApp;
+        if (webApp) {
+          if (webApp.isVersionAtLeast && webApp.isVersionAtLeast('8.0') && typeof webApp.requestFullscreen === 'function') {
+            if (webApp.isFullscreen) {
+              webApp.exitFullscreen();
+              setIsFullscreen(false);
+            } else {
+              webApp.requestFullscreen();
+              setIsFullscreen(true);
+            }
+          } else if (typeof webApp.expand === 'function') {
+            webApp.expand();
+            setIsFullscreen(true);
+          } else {
+            alert('Не удалось переключить в полноэкранный режим');
+          }
         } else {
           alert('Не удалось переключить в полноэкранный режим');
         }
@@ -110,8 +165,17 @@ export default function ActionButtons() {
   ];
 
   // Добавляем кнопку полноэкранного режима только в Telegram WebApp
-  const allActions = isTelegramWebApp && !isFullscreen
-    ? [...actions, { label: 'Полноэкранный режим', icon: <FullscreenIcon />, action: handleFullscreenClick }]
+  // Показываем кнопку, если не в полноэкранном режиме, или если в полноэкранном режиме - показываем для выхода
+  const fullscreenAction = isTelegramWebApp
+    ? { 
+        label: isFullscreen ? 'Выйти из полноэкранного режима' : 'Полноэкранный режим', 
+        icon: <FullscreenIcon />, 
+        action: handleFullscreenClick 
+      }
+    : null;
+  
+  const allActions = fullscreenAction 
+    ? [...actions, fullscreenAction]
     : actions;
 
   return (

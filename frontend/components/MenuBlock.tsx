@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
+import Image from 'next/image';
 import { useStore } from '@/store/useStore';
 import api from '@/lib/api';
 
@@ -130,12 +131,15 @@ export default function MenuBlock({ restaurantId }: MenuBlockProps) {
                   className="w-full rounded-lg overflow-hidden mb-3"
                   style={{
                     aspectRatio: '4/3',
+                    position: 'relative',
                   }}
                 >
-                  <img
+                  <Image
                     src={item.imageUrl}
                     alt={item.name}
-                    className="w-full h-full object-cover"
+                    fill
+                    className="object-cover"
+                    sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                   />
                 </div>
               ) : (
