@@ -92,10 +92,25 @@ function MyApp({ Component, pageProps }: AppProps) {
             }
           });
           
-          // Слушаем изменения полноэкранного режима
+          // Слушаем изменения полноэкранного режима и автоматически возвращаем в полноэкранный режим
           WebApp.onEvent('fullscreenChanged', () => {
             const webApp = WebApp || (window as any).Telegram?.WebApp;
             console.log('Fullscreen changed:', webApp?.isFullscreen);
+            // Если вышли из полноэкранного режима, автоматически возвращаемся
+            if (!webApp?.isFullscreen) {
+              const isVersionSupported = webApp?.isVersionAtLeast 
+                ? webApp.isVersionAtLeast('8.0')
+                : false;
+              if (isVersionSupported && typeof webApp?.requestFullscreen === 'function') {
+                setTimeout(() => {
+                  webApp.requestFullscreen();
+                }, 100);
+              } else if (typeof webApp?.expand === 'function' && !webApp.isExpanded) {
+                setTimeout(() => {
+                  webApp.expand();
+                }, 100);
+              }
+            }
           });
           
           // Обрабатываем ошибки полноэкранного режима

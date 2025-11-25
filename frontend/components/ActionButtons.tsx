@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/router';
 import Image from 'next/image';
 import { useStore } from '@/store/useStore';
@@ -7,51 +7,6 @@ export default function ActionButtons() {
   const router = useRouter();
   const { selectedRestaurant } = useStore();
   const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
-  const [isFullscreen, setIsFullscreen] = useState(false);
-  const [isTelegramWebApp, setIsTelegramWebApp] = useState(false);
-
-  // Проверяем, запущено ли приложение в Telegram WebApp
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const checkTelegramWebApp = async () => {
-        try {
-          const { default: WebApp } = await import('@twa-dev/sdk');
-          // Проверяем через SDK или через window.Telegram
-          const isTelegram = (WebApp && WebApp.initData) || (window as any).Telegram?.WebApp;
-          
-          if (isTelegram) {
-            setIsTelegramWebApp(true);
-            const expanded = WebApp?.isExpanded || (window as any).Telegram?.WebApp?.isExpanded || false;
-            setIsFullscreen(expanded);
-
-            // Слушаем изменения состояния полноэкранного режима
-            if (WebApp?.onEvent) {
-              WebApp.onEvent('viewportChanged', () => {
-                const isExpanded = WebApp?.isExpanded || (window as any).Telegram?.WebApp?.isExpanded || false;
-                const isFullscreen = WebApp?.isFullscreen || (window as any).Telegram?.WebApp?.isFullscreen || false;
-                setIsFullscreen(isExpanded || isFullscreen);
-              });
-              
-              // Слушаем изменения полноэкранного режима
-              WebApp.onEvent('fullscreenChanged', () => {
-                const isFullscreen = WebApp?.isFullscreen || (window as any).Telegram?.WebApp?.isFullscreen || false;
-                setIsFullscreen(isFullscreen);
-              });
-            }
-          }
-        } catch (error) {
-          // Проверяем альтернативный способ через window.Telegram
-          if ((window as any).Telegram?.WebApp) {
-            setIsTelegramWebApp(true);
-            setIsFullscreen((window as any).Telegram.WebApp.isExpanded || false);
-          } else {
-            setIsTelegramWebApp(false);
-          }
-        }
-      };
-      checkTelegramWebApp();
-    }
-  }, []);
 
   const MapPinIcon = () => (
     <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -60,90 +15,6 @@ export default function ActionButtons() {
     </svg>
   );
 
-  const FullscreenIcon = () => (
-    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <path d="M8 3H5C3.89543 3 3 3.89543 3 5V8M21 8V5C21 3.89543 20.1046 3 19 3H16M16 21H19C20.1046 21 21 20.1046 21 19V16M3 16V19C3 20.1046 3.89543 21 5 21H8" stroke="#8E1A1A" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-    </svg>
-  );
-
-  const handleFullscreenClick = async () => {
-    try {
-      const { default: WebApp } = await import('@twa-dev/sdk');
-      // Пробуем через SDK или через window.Telegram
-      const webApp = WebApp || (window as any).Telegram?.WebApp;
-      
-      if (!webApp) {
-        alert('Telegram WebApp недоступен');
-        return;
-      }
-      
-      // Проверяем версию API (Bot API 8.0+ для полноэкранного режима)
-      const isVersionSupported = webApp.isVersionAtLeast 
-        ? webApp.isVersionAtLeast('8.0')
-        : false;
-      
-      if (isVersionSupported && typeof webApp.requestFullscreen === 'function') {
-        // Используем полноэкранный режим
-        if (webApp.isFullscreen) {
-          // Если уже в полноэкранном режиме, выходим из него
-          if (typeof webApp.exitFullscreen === 'function') {
-            webApp.exitFullscreen();
-            setIsFullscreen(false);
-          }
-        } else {
-          // Запрашиваем полноэкранный режим
-          webApp.requestFullscreen();
-          setIsFullscreen(true);
-          
-          // Устанавливаем цвет заголовка для контраста
-          if (typeof webApp.setHeaderColor === 'function') {
-            webApp.setHeaderColor('#FFFFFF');
-          }
-        }
-      } else if (typeof webApp.expand === 'function') {
-        // Fallback на expand() для старых версий
-        webApp.expand();
-        setIsFullscreen(true);
-      } else {
-        alert('Полноэкранный режим недоступен в вашей версии Telegram');
-      }
-      
-      // Устанавливаем viewportHeight для корректного отображения
-      if (webApp.viewportHeight) {
-        document.documentElement.style.setProperty('--tg-viewport-height', `${webApp.viewportHeight}px`);
-      }
-      
-      if (webApp.viewportStableHeight) {
-        document.documentElement.style.setProperty('--tg-viewport-stable-height', `${webApp.viewportStableHeight}px`);
-      }
-    } catch (error) {
-      console.warn('Error toggling fullscreen:', error);
-      // Пробуем альтернативный способ
-      try {
-        const webApp = (window as any).Telegram?.WebApp;
-        if (webApp) {
-          if (webApp.isVersionAtLeast && webApp.isVersionAtLeast('8.0') && typeof webApp.requestFullscreen === 'function') {
-            if (webApp.isFullscreen) {
-              webApp.exitFullscreen();
-              setIsFullscreen(false);
-            } else {
-              webApp.requestFullscreen();
-              setIsFullscreen(true);
-            }
-          } else if (typeof webApp.expand === 'function') {
-            webApp.expand();
-            setIsFullscreen(true);
-          } else {
-            alert('Не удалось переключить в полноэкранный режим');
-          }
-        } else {
-          alert('Не удалось переключить в полноэкранный режим');
-        }
-      } catch (e) {
-        alert('Не удалось переключить в полноэкранный режим');
-      }
-    }
-  };
 
   const handleDeliveryClick = () => {
     router.push('/delivery');
@@ -164,26 +35,12 @@ export default function ActionButtons() {
     { label: 'Как нас найти', icon: <MapPinIcon />, action: handleLocationClick },
   ];
 
-  // Добавляем кнопку полноэкранного режима только в Telegram WebApp
-  // Показываем кнопку, если не в полноэкранном режиме, или если в полноэкранном режиме - показываем для выхода
-  const fullscreenAction = isTelegramWebApp
-    ? { 
-        label: isFullscreen ? 'Выйти из полноэкранного режима' : 'Полноэкранный режим', 
-        icon: <FullscreenIcon />, 
-        action: handleFullscreenClick 
-      }
-    : null;
-  
-  const allActions = fullscreenAction 
-    ? [...actions, fullscreenAction]
-    : actions;
-
   return (
     <>
       <div className="bg-white px-4 py-4 md:px-0 md:py-0 md:bg-transparent">
         {/* Мобильная версия - адаптивная сетка */}
-        <div className={`grid gap-2 md:hidden ${allActions.length === 5 ? 'grid-cols-5' : 'grid-cols-4'}`}>
-          {allActions.map((action, index) => (
+        <div className={`grid gap-2 md:hidden grid-cols-4`}>
+          {actions.map((action, index) => (
             <div key={index} className="flex flex-col items-center">
               <button
                 onClick={action.action}
@@ -201,8 +58,8 @@ export default function ActionButtons() {
         </div>
 
         {/* Десктопная версия - адаптивная сетка */}
-        <div className={`hidden md:grid md:gap-3 md:mb-6 md:max-w-xs ${allActions.length === 5 ? 'md:grid-cols-3' : 'md:grid-cols-2'}`}>
-          {allActions.map((action, index) => (
+        <div className={`hidden md:grid md:gap-3 md:mb-6 md:max-w-xs md:grid-cols-2`}>
+          {actions.map((action, index) => (
             <div key={index} className="flex flex-col items-center">
               <button
                 onClick={action.action}
