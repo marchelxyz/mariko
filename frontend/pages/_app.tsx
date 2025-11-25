@@ -21,6 +21,8 @@ function MyApp({ Component, pageProps }: AppProps) {
     if (typeof window !== 'undefined') {
       import('@twa-dev/sdk').then(({ default: WebApp }) => {
         WebApp.ready();
+        // Разворачиваем приложение на полный экран
+        WebApp.expand();
       }).catch((error) => {
         console.warn('Telegram WebApp SDK not available:', error);
       });
