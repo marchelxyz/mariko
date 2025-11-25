@@ -6,6 +6,8 @@ const CACHE_PREFIXES = {
   RESTAURANT: 'restaurant',
   MENU: 'menu',
   BANNERS: 'banners',
+  PAGE_HOME: 'page:home',
+  PAGE_MENU: 'page:menu',
 } as const;
 
 // Время жизни кэша (в секундах)
@@ -14,6 +16,8 @@ const CACHE_TTL = {
   RESTAURANT: 3600, // 1 час
   MENU: 1800, // 30 минут
   BANNERS: 1800, // 30 минут
+  PAGE_HOME: 1800, // 30 минут
+  PAGE_MENU: 1800, // 30 минут
 } as const;
 
 /**
@@ -165,4 +169,60 @@ export const setBannersToCache = async (restaurantId: string | undefined, type: 
 
 export const invalidateBannersCache = async () => {
   await deleteByPattern(`${CACHE_PREFIXES.BANNERS}:*`);
+};
+
+// ========== Специфичные функции для кэширования полных страниц ==========
+
+/**
+ * Получить кэшированные данные главной страницы
+ */
+export const getHomePageFromCache = async (restaurantId?: string) => {
+  const key = getCacheKey(CACHE_PREFIXES.PAGE_HOME, restaurantId || 'default');
+  return getFromCache(key);
+};
+
+/**
+ * Сохранить данные главной страницы в кэш
+ */
+export const setHomePageToCache = async (restaurantId: string | undefined, data: any) => {
+  const key = getCacheKey(CACHE_PREFIXES.PAGE_HOME, restaurantId || 'default');
+  await setToCache(key, data, CACHE_TTL.PAGE_HOME);
+};
+
+/**
+ * Инвалидировать кэш главной страницы
+ */
+export const invalidateHomePageCache = async () => {
+  await deleteByPattern(`${CACHE_PREFIXES.PAGE_HOME}:*`);
+};
+
+/**
+ * Получить кэшированные данные страницы меню
+ */
+export const getMenuPageFromCache = async (restaurantId: string) => {
+  const key = getCacheKey(CACHE_PREFIXES.PAGE_MENU, restaurantId);
+  return getFromCache(key);
+};
+
+/**
+ * Сохранить данные страницы меню в кэш
+ */
+export const setMenuPageToCache = async (restaurantId: string, data: any) => {
+  const key = getCacheKey(CACHE_PREFIXES.PAGE_MENU, restaurantId);
+  await setToCache(key, data, CACHE_TTL.PAGE_MENU);
+};
+
+/**
+ * Инвалидировать кэш страницы меню для конкретного ресторана
+ */
+export const invalidateMenuPageCache = async (restaurantId: string) => {
+  const key = getCacheKey(CACHE_PREFIXES.PAGE_MENU, restaurantId);
+  await deleteFromCache(key);
+};
+
+/**
+ * Инвалидировать кэш всех страниц меню
+ */
+export const invalidateAllMenuPageCache = async () => {
+  await deleteByPattern(`${CACHE_PREFIXES.PAGE_MENU}:*`);
 };

@@ -103,25 +103,23 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
       timeout: 10000,
     });
 
-    // Загружаем горизонтальные баннеры для дефолтного ресторана (без restaurantId)
-    // Это баннеры, которые показываются всем пользователям
-    const bannersResponse = await serverApi.get('/banners', {
-      params: {
-        type: 'horizontal', // Загружаем только горизонтальные баннеры
-        // Без restaurantId - получаем общие баннеры для всех ресторанов
-      },
+    // Используем новый эндпоинт для получения полных данных главной страницы с кэшированием
+    const { restaurantId } = context.query;
+    const pageResponse = await serverApi.get('/pages/home', {
+      params: restaurantId ? { restaurantId } : {},
     });
 
-    const banners = bannersResponse.data.data || [];
+    const pageData = pageResponse.data.data || {};
+    const banners = pageData.banners || [];
 
     return {
       props: {
         initialBanners: banners,
-        restaurantId: null,
+        restaurantId: restaurantId as string || null,
       },
     };
   } catch (error) {
-    console.error('Error fetching banners on server:', error);
+    console.error('Error fetching home page data on server:', error);
     // В случае ошибки возвращаем пустой массив баннеров
     return {
       props: {

@@ -2,7 +2,12 @@ import { Router, Request, Response } from 'express';
 import { AppDataSource } from '../config/database';
 import { Banner } from '../models/Banner';
 import { authenticate, AuthRequest, requireRole } from '../middleware/auth';
-import { getBannersFromCache, setBannersToCache, invalidateBannersCache } from '../services/cacheService';
+import { 
+  getBannersFromCache, 
+  setBannersToCache, 
+  invalidateBannersCache,
+  invalidateHomePageCache 
+} from '../services/cacheService';
 
 const router = Router();
 
@@ -69,8 +74,9 @@ router.post('/', authenticate, requireRole('admin'), async (req: AuthRequest, re
     const banner = bannerRepository.create(req.body);
     await bannerRepository.save(banner);
     
-    // Инвалидируем кэш баннеров
+    // Инвалидируем кэш баннеров и главной страницы
     await invalidateBannersCache();
+    await invalidateHomePageCache();
     
     res.status(201).json({ success: true, data: banner });
   } catch (error) {
@@ -94,8 +100,9 @@ router.put('/:id', authenticate, requireRole('admin'), async (req: AuthRequest, 
     Object.assign(banner, req.body);
     await bannerRepository.save(banner);
     
-    // Инвалидируем кэш баннеров
+    // Инвалидируем кэш баннеров и главной страницы
     await invalidateBannersCache();
+    await invalidateHomePageCache();
     
     res.json({ success: true, data: banner });
   } catch (error) {
@@ -109,8 +116,9 @@ router.delete('/:id', authenticate, requireRole('admin'), async (req: AuthReques
     const bannerRepository = AppDataSource.getRepository(Banner);
     await bannerRepository.delete(req.params.id);
     
-    // Инвалидируем кэш баннеров
+    // Инвалидируем кэш баннеров и главной страницы
     await invalidateBannersCache();
+    await invalidateHomePageCache();
     
     res.json({ success: true, message: 'Banner deleted' });
   } catch (error) {

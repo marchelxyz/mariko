@@ -19,6 +19,7 @@ import profileRoutes from './routes/profile';
 import adminRoutes from './routes/admin';
 import bookingRoutes from './routes/booking';
 import dishImageRoutes from './routes/dishImages';
+import pagesRoutes from './routes/pages';
 import * as cron from 'node-cron';
 import { syncAllRestaurantsMenu } from './services/syncService';
 import { initializeBot, stopBot } from './services/telegramBot';
@@ -129,6 +130,7 @@ app.use('/api/restaurants', restaurantRoutes);
 app.use('/api/menu', menuRoutes);
 app.use('/api/banners', bannerRoutes);
 app.use('/api/profile', profileRoutes);
+app.use('/api/pages', pagesRoutes);
 // ✅ Лимит для админских операций и бронирований (20 запросов в минуту)
 app.use('/api/admin', writeLimiter, adminRoutes);
 app.use('/api/booking', writeLimiter, bookingRoutes);
