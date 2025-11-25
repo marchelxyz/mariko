@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
+import Image from 'next/image';
 import { useStore } from '@/store/useStore';
 import api from '@/lib/api';
 
@@ -134,16 +135,23 @@ export default function VerticalBanners({ restaurantId, initialBanners }: Vertic
                 }}
               >
                 {banner.imageUrl ? (
-                  <img
-                    src={banner.imageUrl}
-                    alt={banner.title || 'Banner'}
-                    className="w-full h-full object-cover rounded-[15px]"
-                    style={{ 
-                      display: 'block', 
-                      objectPosition: 'center',
-                      objectFit: 'cover'
+                  <div
+                    className="w-full h-full rounded-[15px] overflow-hidden"
+                    style={{
+                      position: 'relative',
                     }}
-                  />
+                  >
+                    <Image
+                      src={banner.imageUrl}
+                      alt={banner.title || 'Banner'}
+                      fill
+                      className="object-cover"
+                      sizes="(max-width: 768px) 100vw, 33vw"
+                      style={{
+                        objectPosition: 'center',
+                      }}
+                    />
+                  </div>
                 ) : (
                   <div className="w-full h-full bg-secondary flex items-center justify-center rounded-[15px]">
                     <span className="text-4xl">🖼️</span>
