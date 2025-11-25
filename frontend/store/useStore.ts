@@ -111,14 +111,14 @@ export const useStore = create<Store>((set, get) => {
     isLoading: false,
     error: null,
 
-  setToken: async (token) => {
-    if (token) {
-      await secureStorage.setItem(STORAGE_KEYS.TOKEN, token);
-    } else {
-      await secureStorage.removeItem(STORAGE_KEYS.TOKEN);
-    }
-    set({ token });
-  },
+    setToken: async (token) => {
+      if (token) {
+        await secureStorage.setItem(STORAGE_KEYS.TOKEN, token);
+      } else {
+        await secureStorage.removeItem(STORAGE_KEYS.TOKEN);
+      }
+      set({ token });
+    },
 
   setUser: (user) => set({ user }),
 
