@@ -159,7 +159,7 @@ router.post('/restaurants', requireRole('admin'), async (req: AuthRequest, res: 
       remarkedPointId: remarkedPointId ? Number(remarkedPointId) : undefined,
     });
     
-    const savedRestaurant = await restaurantRepository.save(restaurant);
+    const savedRestaurant = await restaurantRepository.save(restaurant) as Restaurant;
 
     // Создаем лист в Google Sheets для нового ресторана
     try {
@@ -235,7 +235,7 @@ router.put('/restaurants/:id', requireRole('admin'), async (req: AuthRequest, re
     if (yandexMapsUrl !== undefined) restaurant.yandexMapsUrl = yandexMapsUrl || undefined;
     if (twoGisUrl !== undefined) restaurant.twoGisUrl = twoGisUrl || undefined;
     if (socialNetworks !== undefined) restaurant.socialNetworks = socialNetworks.length > 0 ? socialNetworks : undefined;
-    if (remarkedPointId !== undefined) restaurant.remarkedPointId = remarkedPointId ? Number(remarkedPointId) : undefined;
+    if (remarkedPointId !== undefined) restaurant.remarkedPointId = remarkedPointId !== null && remarkedPointId !== '' ? Number(remarkedPointId) : undefined;
     
     const updatedRestaurant = await restaurantRepository.save(restaurant);
     
