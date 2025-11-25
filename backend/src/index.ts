@@ -21,6 +21,7 @@ import bookingRoutes from './routes/booking';
 import dishImageRoutes from './routes/dishImages';
 import * as cron from 'node-cron';
 import { syncAllRestaurantsMenu } from './services/syncService';
+import { initializeBot, stopBot } from './services/telegramBot';
 
 const app = express();
 const PORT: number = Number(process.env.PORT) || 5000;
@@ -162,6 +163,9 @@ const startServer = async () => {
       console.log('⚠️  Redis не настроен (REDIS_URL не указан). Кэширование отключено.');
     }
     
+    // Инициализируем Telegram бота
+    initializeBot();
+    
     server = app.listen(PORT, '0.0.0.0', () => {
       console.log(`🚀 Server running on port ${PORT}`);
       console.log(`📡 Health check available at http://localhost:${PORT}/health`);
@@ -202,6 +206,13 @@ const gracefulShutdown = async (signal: string) => {
     server.close(() => {
       console.log('✅ HTTP server closed');
     });
+  }
+  
+  // Останавливаем Telegram бота
+  try {
+    await stopBot();
+  } catch (error) {
+    console.error('Error stopping Telegram bot:', error);
   }
   
   // Закрываем подключение к Redis
