@@ -28,8 +28,12 @@ export default function ActionButtons() {
     }
   };
 
+  const handleBookingClick = () => {
+    router.push('/booking');
+  };
+
   const actions = [
-    { label: 'Бронь столика', icon: <Image src="/image/iconBittom/Frame-2.svg" alt="Бронь столика" width={28} height={28} />, action: () => alert('Бронь столика') },
+    { label: 'Бронь столика', icon: <Image src="/image/iconBittom/Frame-2.svg" alt="Бронь столика" width={28} height={28} />, action: handleBookingClick },
     { label: 'Заказать доставку', icon: <Image src="/image/iconBittom/Frame-1.svg" alt="Заказать доставку" width={28} height={28} />, action: handleDeliveryClick },
     { label: 'Оставить отзыв', icon: <Image src="/image/iconBittom/Frame.svg" alt="Оставить отзыв" width={28} height={28} />, action: () => alert('Оставить отзыв') },
     { label: 'Как нас найти', icon: <MapPinIcon />, action: handleLocationClick },
@@ -45,10 +49,14 @@ export default function ActionButtons() {
               <button
                 onClick={action.action}
                 onMouseEnter={() => {
-                  // Предзагружаем страницу доставки при наведении
+                  // Предзагружаем страницы при наведении
                   if (action.label === 'Заказать доставку') {
                     router.prefetch('/delivery').catch((error) => {
                       console.debug('Failed to prefetch /delivery:', error);
+                    });
+                  } else if (action.label === 'Бронь столика') {
+                    router.prefetch('/booking').catch((error) => {
+                      console.debug('Failed to prefetch /booking:', error);
                     });
                   }
                 }}
@@ -72,10 +80,14 @@ export default function ActionButtons() {
               <button
                 onClick={action.action}
                 onMouseEnter={() => {
-                  // Предзагружаем страницу доставки при наведении
+                  // Предзагружаем страницы при наведении
                   if (action.label === 'Заказать доставку') {
                     router.prefetch('/delivery').catch((error) => {
                       console.debug('Failed to prefetch /delivery:', error);
+                    });
+                  } else if (action.label === 'Бронь столика') {
+                    router.prefetch('/booking').catch((error) => {
+                      console.debug('Failed to prefetch /booking:', error);
                     });
                   }
                 }}
