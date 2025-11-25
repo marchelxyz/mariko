@@ -13,7 +13,7 @@ const TelegramAuth = dynamic(() => import('@/components/TelegramAuth'), {
 function MyApp({ Component, pageProps }: AppProps) {
   const [mounted, setMounted] = useState(false);
   const router = useRouter();
-  const { selectedRestaurant, prefetchBanners, fetchRestaurants } = useStore();
+  const { selectedRestaurant, prefetchBanners, fetchRestaurants, user } = useStore();
 
   useEffect(() => {
     setMounted(true);
@@ -217,6 +217,90 @@ function MyApp({ Component, pageProps }: AppProps) {
       router.events.off('routeChangeStart', handleRouteChangeStart);
     };
   }, [mounted, router, selectedRestaurant, prefetchBanners]);
+
+  // Предзагрузка всех страниц навигации для бесшовного переключения
+  useEffect(() => {
+    if (!mounted || typeof window === 'undefined') return;
+
+    // Список страниц для предзагрузки
+    const pagesToPrefetch = [
+      '/',
+      '/franchise',
+      '/profile',
+      '/menu',
+      '/delivery',
+    ];
+
+    // Добавляем админскую страницу, если пользователь админ
+    if (user && ['admin', 'ADMIN'].includes(user.role)) {
+      pagesToPrefetch.push('/admin');
+    }
+
+    // Предзагружаем все страницы с небольшой задержкой после монтирования
+    // чтобы не блокировать первоначальную загрузку
+    const prefetchTimer = setTimeout(() => {
+      pagesToPrefetch.forEach((path) => {
+        // Предзагружаем только если это не текущая страница
+        if (router.pathname !== path) {
+          router.prefetch(path).catch((error) => {
+            // Тихая ошибка при предзагрузке
+            console.debug(`Failed to prefetch ${path}:`, error);
+          });
+        }
+      });
+    }, 1000); // Задержка 1 секунда после монтирования
+
+    return () => {
+      clearTimeout(prefetchTimer);
+    };
+  }, [mounted, router, user]);
+
+  // Предзагрузка страниц после загрузки текущей страницы
+  useEffect(() => {
+    if (!mounted || typeof window === 'undefined') return;
+
+    const handleRouteChangeComplete = (url: string) => {
+      // После загрузки страницы предзагружаем остальные страницы навигации
+      const pagesToPrefetch = [
+        '/',
+        '/franchise',
+        '/profile',
+        '/menu',
+        '/delivery',
+      ];
+
+      if (user && ['admin', 'ADMIN'].includes(user.role)) {
+        pagesToPrefetch.push('/admin');
+      }
+
+      // Предзагружаем страницы, которые еще не были предзагружены
+      pagesToPrefetch.forEach((path) => {
+        if (path !== url && path !== router.pathname) {
+          router.prefetch(path).catch((error) => {
+            console.debug(`Failed to prefetch ${path}:`, error);
+          });
+        }
+      });
+    };
+
+    router.events.on('routeChangeComplete', handleRouteChangeComplete);
+
+    return () => {
+      router.events.off('routeChangeComplete', handleRouteChangeComplete);
+    };
+  }, [mounted, router, user]);
+
+  // Предзагрузка админской страницы при изменении пользователя
+  useEffect(() => {
+    if (!mounted || typeof window === 'undefined') return;
+    
+    if (user && ['admin', 'ADMIN'].includes(user.role)) {
+      // Предзагружаем админскую страницу, если пользователь админ
+      router.prefetch('/admin').catch((error) => {
+        console.debug('Failed to prefetch /admin:', error);
+      });
+    }
+  }, [mounted, router, user]);
 
   return (
     <>

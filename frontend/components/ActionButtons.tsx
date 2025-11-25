@@ -44,6 +44,14 @@ export default function ActionButtons() {
             <div key={index} className="flex flex-col items-center">
               <button
                 onClick={action.action}
+                onMouseEnter={() => {
+                  // Предзагружаем страницу доставки при наведении
+                  if (action.label === 'Заказать доставку') {
+                    router.prefetch('/delivery').catch((error) => {
+                      console.debug('Failed to prefetch /delivery:', error);
+                    });
+                  }
+                }}
                 className="bg-[#F7F7F7] rounded-[10px] p-3 flex items-center justify-center hover:opacity-90 transition-opacity aspect-square w-full"
               >
                 <div className="flex items-center justify-center">
@@ -63,6 +71,14 @@ export default function ActionButtons() {
             <div key={index} className="flex flex-col items-center">
               <button
                 onClick={action.action}
+                onMouseEnter={() => {
+                  // Предзагружаем страницу доставки при наведении
+                  if (action.label === 'Заказать доставку') {
+                    router.prefetch('/delivery').catch((error) => {
+                      console.debug('Failed to prefetch /delivery:', error);
+                    });
+                  }
+                }}
                 className="bg-[#F7F7F7] rounded-[10px] p-3 flex items-center justify-center hover:opacity-90 transition-opacity aspect-square w-full"
               >
                 <div className="flex items-center justify-center">
