@@ -158,7 +158,13 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
     // Создаем экземпляр axios для серверного запроса
     const getBaseURL = () => {
       const url = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
-      return url.endsWith('/api') ? url : `${url.replace(/\/$/, '')}/api`;
+      const baseURL = url.endsWith('/api') ? url : `${url.replace(/\/$/, '')}/api`;
+      
+      // Логируем URL для диагностики
+      console.log('[getServerSideProps] API Base URL:', baseURL);
+      console.log('[getServerSideProps] NEXT_PUBLIC_API_URL:', process.env.NEXT_PUBLIC_API_URL || 'не установлена');
+      
+      return baseURL;
     };
 
     // Используем динамический импорт для axios на сервере
@@ -174,9 +180,14 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
 
     // Используем эндпоинт для получения полных данных главной страницы
     const { restaurantId } = context.query;
+    console.log('[getServerSideProps] Fetching home page data, restaurantId:', restaurantId);
+    
     const pageResponse = await serverApi.get('/pages/home', {
       params: restaurantId ? { restaurantId } : {},
     });
+
+    console.log('[getServerSideProps] Response status:', pageResponse.status);
+    console.log('[getServerSideProps] Response data keys:', Object.keys(pageResponse.data || {}));
 
     const pageData = pageResponse.data.data || {};
     const banners = pageData.banners || [];
@@ -184,6 +195,14 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
     const menuItems = pageData.menuItems || [];
     const selectedRestaurantId = pageData.selectedRestaurantId || null;
     const favoriteRestaurant = pageData.favoriteRestaurant || null;
+
+    console.log('[getServerSideProps] Loaded data:', {
+      bannersCount: banners.length,
+      restaurantsCount: restaurants.length,
+      menuItemsCount: menuItems.length,
+      selectedRestaurantId,
+      hasFavoriteRestaurant: !!favoriteRestaurant,
+    });
 
     return {
       props: {
@@ -195,8 +214,33 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
         restaurantId: restaurantId as string || null,
       },
     };
-  } catch (error) {
-    console.error('Error fetching home page data on server:', error);
+  } catch (error: any) {
+    console.error('❌ Error fetching home page data on server:', {
+      message: error.message,
+      code: error.code,
+      response: error.response ? {
+        status: error.response.status,
+        statusText: error.response.statusText,
+        data: error.response.data,
+      } : null,
+      request: error.request ? {
+        url: error.config?.url,
+        baseURL: error.config?.baseURL,
+        method: error.config?.method,
+      } : null,
+      stack: error.stack,
+    });
+    
+    // Дополнительная диагностика
+    if (error.code === 'ECONNREFUSED') {
+      console.error('🔍 Диагностика: Соединение отклонено на сервере');
+      console.error('   Проверьте NEXT_PUBLIC_API_URL:', process.env.NEXT_PUBLIC_API_URL);
+    } else if (error.code === 'ETIMEDOUT') {
+      console.error('🔍 Диагностика: Таймаут запроса на сервере');
+    } else if (error.response) {
+      console.error('🔍 Диагностика: Сервер вернул ошибку:', error.response.status);
+    }
+    
     // В случае ошибки возвращаем пустые данные
     return {
       props: {

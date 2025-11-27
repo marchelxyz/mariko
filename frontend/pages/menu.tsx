@@ -220,7 +220,13 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
     // Создаем экземпляр axios для серверного запроса
     const getBaseURL = () => {
       const url = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
-      return url.endsWith('/api') ? url : `${url.replace(/\/$/, '')}/api`;
+      const baseURL = url.endsWith('/api') ? url : `${url.replace(/\/$/, '')}/api`;
+      
+      // Логируем URL для диагностики
+      console.log('[menu.tsx getServerSideProps] API Base URL:', baseURL);
+      console.log('[menu.tsx getServerSideProps] NEXT_PUBLIC_API_URL:', process.env.NEXT_PUBLIC_API_URL || 'не установлена');
+      
+      return baseURL;
     };
 
     // Используем динамический импорт для axios на сервере
@@ -235,7 +241,9 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
     });
 
     // Используем новый эндпоинт для получения полных данных страницы меню с кэшированием
+    console.log('[menu.tsx getServerSideProps] Fetching menu data for restaurantId:', restaurantId);
     const pageResponse = await serverApi.get(`/pages/menu/${restaurantId}`);
+    console.log('[menu.tsx getServerSideProps] Response status:', pageResponse.status);
 
     const pageData = pageResponse.data.data || {};
     const menuItems = pageData.menuItems || {};
@@ -258,11 +266,35 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
         restaurantId,
       },
     };
-  } catch (error) {
-    console.error('Error fetching menu page data on server:', error);
+  } catch (error: any) {
+    console.error('❌ Error fetching menu page data on server:', {
+      message: error.message,
+      code: error.code,
+      response: error.response ? {
+        status: error.response.status,
+        statusText: error.response.statusText,
+        data: error.response.data,
+      } : null,
+      request: error.request ? {
+        url: error.config?.url,
+        baseURL: error.config?.baseURL,
+        method: error.config?.method,
+      } : null,
+      stack: error.stack,
+    });
+    
+    // Дополнительная диагностика
+    if (error.code === 'ECONNREFUSED') {
+      console.error('🔍 Диагностика: Соединение отклонено на сервере');
+      console.error('   Проверьте NEXT_PUBLIC_API_URL:', process.env.NEXT_PUBLIC_API_URL);
+    } else if (error.code === 'ETIMEDOUT') {
+      console.error('🔍 Диагностика: Таймаут запроса на сервере');
+    } else if (error.response) {
+      console.error('🔍 Диагностика: Сервер вернул ошибку:', error.response.status);
+    }
     
     // Если ресторан не найден, редиректим на главную
-    if ((error as any)?.response?.status === 404) {
+    if (error.response?.status === 404) {
       return {
         redirect: {
           destination: '/',
