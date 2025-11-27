@@ -98,14 +98,15 @@ export default function Home({
       if (favoriteInList) {
         setSelectedRestaurant(favoriteInList);
       } else if (initialSelectedRestaurantId) {
+        // Если избранный ресторан не найден в списке, но есть явно выбранный, используем его
         const restaurant = initialRestaurants.find((r) => r.id === initialSelectedRestaurantId);
         if (restaurant) {
           setSelectedRestaurant(restaurant);
         }
-      } else if (initialRestaurants.length > 0) {
-        setSelectedRestaurant(initialRestaurants[0]);
       }
+      // Не выбираем первый ресторан автоматически, если нет избранного и явно выбранного
     } else if (initialSelectedRestaurantId && initialRestaurants) {
+      // Если есть явно выбранный ресторан (из URL или сервера), используем его
       const restaurant = initialRestaurants.find((r) => r.id === initialSelectedRestaurantId);
       if (restaurant) {
         setSelectedRestaurant(restaurant);
@@ -133,26 +134,34 @@ export default function Home({
       });
       
       if (restaurantsWithCoords.length > 0) {
-        // Небольшая задержка, чтобы дать время для инициализации store
+        // Небольшая задержка, чтобы дать время для инициализации store и Telegram WebApp SDK
         setTimeout(async () => {
           try {
-            console.log('[Home] Пытаемся выбрать ближайший ресторан из', restaurantsWithCoords.length, 'ресторанов с координатами');
-            const success = await selectNearestRestaurantByLocation();
+            console.log('[Home] 🎯 Начинаем процесс выбора ближайшего ресторана');
+            console.log('[Home] Найдено ресторанов с координатами:', restaurantsWithCoords.length);
+            console.log('[Home] Условия: нет избранного ресторана, нет явно выбранного ресторана');
+            
+            // Принудительно запрашиваем местоположение при первой загрузке страницы
+            // чтобы пользователь явно видел запрос на доступ к геолокации
+            console.log('[Home] ⚠️ Запрашиваем местоположение у пользователя (forceRequest=true)...');
+            const success = await selectNearestRestaurantByLocation(true);
             
             // Если ближайший ресторан не был выбран (пользователь отказал или ошибка),
             // выбираем первый ресторан как fallback
             if (!success && initialRestaurants.length > 0) {
               console.log('[Home] Ближайший ресторан не выбран, используем первый ресторан как fallback');
               setSelectedRestaurant(initialRestaurants[0]);
+            } else if (success) {
+              console.log('[Home] ✅ Ближайший ресторан успешно выбран');
             }
           } catch (error) {
-            console.log('[Home] Не удалось выбрать ближайший ресторан:', error);
+            console.error('[Home] ❌ Не удалось выбрать ближайший ресторан:', error);
             // В случае ошибки выбираем первый ресторан
             if (initialRestaurants.length > 0) {
               setSelectedRestaurant(initialRestaurants[0]);
             }
           }
-        }, 500);
+        }, 1000); // Увеличиваем задержку до 1 секунды для гарантии готовности Telegram WebApp SDK
       } else {
         console.log('[Home] Нет ресторанов с координатами, выбираем первый ресторан');
         // Если нет ресторанов с координатами, выбираем первый

@@ -13,16 +13,30 @@ interface Location {
  */
 export async function requestLocation(): Promise<Location | null> {
   if (typeof window === 'undefined') {
+    console.warn('[Location] Выполняется на сервере, пропускаем запрос местоположения');
     return null;
   }
 
   try {
-    // Пробуем использовать Telegram WebApp SDK
-    const WebApp = (window as any).Telegram?.WebApp;
+    // Ждем, пока Telegram WebApp SDK будет готов
+    // Иногда SDK загружается асинхронно
+    let WebApp = (window as any).Telegram?.WebApp;
+    
+    // Если SDK еще не готов, ждем немного
+    if (!WebApp) {
+      console.log('[Location] Telegram WebApp SDK еще не готов, ждем...');
+      await new Promise(resolve => setTimeout(resolve, 100));
+      WebApp = (window as any).Telegram?.WebApp;
+    }
     
     if (!WebApp) {
-      console.warn('[Location] Telegram WebApp SDK не доступен');
+      console.warn('[Location] Telegram WebApp SDK не доступен после ожидания');
       return null;
+    }
+
+    // Убеждаемся, что WebApp готов
+    if (typeof WebApp.ready === 'function') {
+      WebApp.ready();
     }
 
     // Проверяем версию SDK (requestLocation доступен с версии 6.0+)
@@ -41,7 +55,7 @@ export async function requestLocation(): Promise<Location | null> {
       return null;
     }
 
-    console.log('[Location] Запрашиваем местоположение пользователя...');
+    console.log('[Location] ✅ Запрашиваем местоположение пользователя через Telegram WebApp...');
 
     // Telegram WebApp.requestLocation принимает callback
     return new Promise<Location | null>((resolve) => {
