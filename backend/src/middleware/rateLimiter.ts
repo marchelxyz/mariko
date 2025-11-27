@@ -22,8 +22,8 @@ export const apiLimiter = rateLimit({
   },
   standardHeaders: true, // Возвращает информацию о лимитах в заголовках (X-RateLimit-*)
   legacyHeaders: false, // Отключает заголовки Retry-After
-  // Пропускаем успешные health check запросы
-  skip: (req) => req.path === '/health',
+  // Пропускаем успешные health check запросы и preflight (OPTIONS) запросы
+  skip: (req) => req.path === '/health' || req.method === 'OPTIONS',
   // ✅ Безопасная настройка для работы с trust proxy
   // Используем кастомный keyGenerator для дополнительной защиты
   keyGenerator: (req) => {

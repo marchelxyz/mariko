@@ -64,6 +64,7 @@ app.use(cors({
   origin: (origin, callback) => {
     // Разрешаем запросы без origin (например, мобильные приложения, Postman, curl)
     if (!origin) {
+      console.log('✅ CORS: Allowed request without origin');
       callback(null, true);
       return;
     }
@@ -71,8 +72,15 @@ app.use(cors({
     // Извлекаем базовый origin (без query параметров и хэша)
     const baseOrigin = getBaseOrigin(origin);
 
-    // Проверяем точное совпадение с разрешенными origins
-    if (allowedOrigins.includes(origin) || allowedOrigins.includes(baseOrigin)) {
+    // Проверяем точное совпадение с разрешенными origins (сначала по базовому origin)
+    if (allowedOrigins.includes(baseOrigin)) {
+      console.log(`✅ CORS: Allowed origin (exact match): ${origin} -> ${baseOrigin}`);
+      callback(null, true);
+      return;
+    }
+    
+    // Проверяем точное совпадение с полным origin (на случай если он уже в списке)
+    if (allowedOrigins.includes(origin)) {
       console.log(`✅ CORS: Allowed origin (exact match): ${origin}`);
       callback(null, true);
       return;
@@ -80,10 +88,10 @@ app.use(cors({
 
     // Проверяем паттерны (например, для Vercel доменов)
     const matchesPattern = allowedOriginPatterns.some(pattern => 
-      pattern.test(origin) || pattern.test(baseOrigin)
+      pattern.test(baseOrigin)
     );
     if (matchesPattern) {
-      console.log(`✅ CORS: Allowed origin (pattern match): ${origin}`);
+      console.log(`✅ CORS: Allowed origin (pattern match): ${origin} -> ${baseOrigin}`);
       callback(null, true);
       return;
     }
@@ -91,6 +99,7 @@ app.use(cors({
     // Если не прошло проверку - блокируем
     console.warn(`❌ CORS: Blocked origin ${origin} (base: ${baseOrigin})`);
     console.warn(`   Allowed origins: ${allowedOrigins.join(', ')}`);
+    console.warn(`   Patterns: ${allowedOriginPatterns.map(p => p.toString()).join(', ')}`);
     callback(new Error('Not allowed by CORS'));
   },
   credentials: true,
