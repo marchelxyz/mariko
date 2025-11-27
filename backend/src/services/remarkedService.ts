@@ -146,7 +146,6 @@ export class RemarkedService {
       const cachedToken = await getRemarkedTokenFromCache(pointId);
       if (cachedToken) {
         return {
-          status: 'success',
           token: cachedToken,
         } as GetTokenResponse;
       }
@@ -162,7 +161,7 @@ export class RemarkedService {
     const response = await this.request<GetTokenResponse>('/ApiReservesWidget', request);
 
     // Кешируем токен, если он успешно получен и не требуется дополнительная информация
-    if (response.status === 'success' && response.token && !additionalInfo && useCache) {
+    if (response.token && !additionalInfo && useCache) {
       await setRemarkedTokenToCache(pointId, response.token);
     }
 

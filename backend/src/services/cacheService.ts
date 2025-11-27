@@ -1,4 +1,6 @@
 import { getRedisClient } from '../config/redis';
+import { User } from '../models/User';
+import { Restaurant } from '../models/Restaurant';
 
 // Префиксы для разных типов данных
 const CACHE_PREFIXES = {
@@ -119,7 +121,7 @@ export const setRestaurantsToCache = async (data: any) => {
 
 export const getRestaurantFromCache = async (id: string) => {
   const key = getCacheKey(CACHE_PREFIXES.RESTAURANT, id);
-  return getFromCache(key);
+  return getFromCache<Restaurant>(key);
 };
 
 export const setRestaurantToCache = async (id: string, data: any) => {
@@ -264,7 +266,7 @@ export const invalidateRemarkedTokenCache = async (pointId: number): Promise<voi
  */
 export const getUserFromCache = async (userId: string) => {
   const key = getCacheKey(CACHE_PREFIXES.USER, userId);
-  return getFromCache(key);
+  return getFromCache<User>(key);
 };
 
 /**
