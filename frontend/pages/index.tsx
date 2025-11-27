@@ -78,8 +78,21 @@ export default function Home({
     }
 
     // Инициализируем выбранный ресторан
-    if (initialSelectedRestaurantId) {
-      const restaurant = initialRestaurants?.find((r) => r.id === initialSelectedRestaurantId);
+    // Приоритет всегда у избранного ресторана
+    if (initialFavoriteRestaurant && initialRestaurants) {
+      const favoriteInList = initialRestaurants.find((r) => r.id === initialFavoriteRestaurant.id);
+      if (favoriteInList) {
+        setSelectedRestaurant(favoriteInList);
+      } else if (initialSelectedRestaurantId) {
+        const restaurant = initialRestaurants.find((r) => r.id === initialSelectedRestaurantId);
+        if (restaurant) {
+          setSelectedRestaurant(restaurant);
+        }
+      } else if (initialRestaurants.length > 0) {
+        setSelectedRestaurant(initialRestaurants[0]);
+      }
+    } else if (initialSelectedRestaurantId && initialRestaurants) {
+      const restaurant = initialRestaurants.find((r) => r.id === initialSelectedRestaurantId);
       if (restaurant) {
         setSelectedRestaurant(restaurant);
       }

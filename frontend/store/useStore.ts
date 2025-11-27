@@ -141,21 +141,27 @@ export const useStore = create<Store>((set, get) => {
 
     setRestaurants: (restaurants) => {
       set({ restaurants });
-      // Автоматически выбираем ресторан, если еще не выбран
+      // Автоматически выбираем ресторан
+      // Приоритет всегда у избранного ресторана
       const currentSelected = get().selectedRestaurant;
       const favoriteRestaurant = get().favoriteRestaurant;
       
-      if (!currentSelected && restaurants.length > 0) {
+      if (restaurants.length > 0) {
+        // Если есть избранный ресторан, всегда выбираем его (даже если уже есть выбранный)
         if (favoriteRestaurant) {
           const favoriteInList = restaurants.find(r => r.id === favoriteRestaurant.id);
           if (favoriteInList) {
-            set({ selectedRestaurant: favoriteInList });
-            deviceStorage.setItem(STORAGE_KEYS.SELECTED_RESTAURANT_ID, favoriteInList.id).catch(console.error);
-          } else {
-            set({ selectedRestaurant: restaurants[0] });
-            deviceStorage.setItem(STORAGE_KEYS.SELECTED_RESTAURANT_ID, restaurants[0].id).catch(console.error);
+            // Выбираем избранный, если его еще нет или если текущий выбранный не избранный
+            if (!currentSelected || currentSelected.id !== favoriteInList.id) {
+              set({ selectedRestaurant: favoriteInList });
+              deviceStorage.setItem(STORAGE_KEYS.SELECTED_RESTAURANT_ID, favoriteInList.id).catch(console.error);
+            }
+            return;
           }
-        } else {
+        }
+        
+        // Если нет избранного ресторана, выбираем первый или сохраняем текущий
+        if (!currentSelected) {
           set({ selectedRestaurant: restaurants[0] });
           deviceStorage.setItem(STORAGE_KEYS.SELECTED_RESTAURANT_ID, restaurants[0].id).catch(console.error);
         }
@@ -195,22 +201,28 @@ export const useStore = create<Store>((set, get) => {
         
         set({ restaurants, isLoading: false });
         
-        // Автоматически выбираем любимый ресторан или первый ресторан, если не выбран
+        // Автоматически выбираем ресторан
+        // Приоритет всегда у избранного ресторана
         const currentSelected = get().selectedRestaurant;
         const favoriteRestaurant = get().favoriteRestaurant;
         
-        if (!currentSelected && restaurants.length > 0) {
+        if (restaurants.length > 0) {
+          // Если есть избранный ресторан, всегда выбираем его (даже если уже есть выбранный)
           if (favoriteRestaurant) {
             // Проверяем, что любимый ресторан все еще существует в списке
             const favoriteInList = restaurants.find(r => r.id === favoriteRestaurant.id);
             if (favoriteInList) {
-              set({ selectedRestaurant: favoriteInList });
-              await deviceStorage.setItem(STORAGE_KEYS.SELECTED_RESTAURANT_ID, favoriteInList.id);
-            } else {
-              set({ selectedRestaurant: restaurants[0] });
-              await deviceStorage.setItem(STORAGE_KEYS.SELECTED_RESTAURANT_ID, restaurants[0].id);
+              // Выбираем избранный, если его еще нет или если текущий выбранный не избранный
+              if (!currentSelected || currentSelected.id !== favoriteInList.id) {
+                set({ selectedRestaurant: favoriteInList });
+                await deviceStorage.setItem(STORAGE_KEYS.SELECTED_RESTAURANT_ID, favoriteInList.id);
+              }
+              return;
             }
-          } else {
+          }
+          
+          // Если нет избранного ресторана, выбираем первый или сохраняем текущий
+          if (!currentSelected) {
             set({ selectedRestaurant: restaurants[0] });
             await deviceStorage.setItem(STORAGE_KEYS.SELECTED_RESTAURANT_ID, restaurants[0].id);
           }
@@ -273,16 +285,15 @@ export const useStore = create<Store>((set, get) => {
         
         set({ favoriteRestaurant: restaurant });
         
-        // Если есть любимый ресторан, выбираем его (если он есть в списке ресторанов)
+        // Если есть любимый ресторан, всегда выбираем его (приоритет избранному)
         if (restaurant) {
           const restaurants = get().restaurants;
           const currentSelected = get().selectedRestaurant;
           
           if (restaurants.length > 0) {
             const favoriteInList = restaurants.find(r => r.id === restaurant.id);
-            // Выбираем любимый ресторан только если еще ничего не выбрано
-            // Это происходит при первой загрузке приложения или после авторизации
-            if (favoriteInList && !currentSelected) {
+            // Выбираем любимый ресторан всегда, если он отличается от текущего выбранного
+            if (favoriteInList && (!currentSelected || currentSelected.id !== favoriteInList.id)) {
               set({ selectedRestaurant: favoriteInList });
               await deviceStorage.setItem(STORAGE_KEYS.SELECTED_RESTAURANT_ID, favoriteInList.id);
             }
