@@ -14,37 +14,85 @@ interface Banner {
   linkUrl?: string;
 }
 
+interface Restaurant {
+  id: string;
+  _id?: string;
+  name: string;
+  city: string;
+  address: string;
+  phoneNumber: string;
+}
+
+interface MenuItem {
+  id: string;
+  name: string;
+  description: string;
+  price: number;
+  category: string;
+  imageUrl?: string;
+  calories?: number;
+}
+
 interface HomeProps {
   initialBanners: Banner[];
+  initialRestaurants: Restaurant[];
+  initialMenuItems: MenuItem[];
+  initialSelectedRestaurantId: string | null;
+  initialFavoriteRestaurant: Restaurant | null;
   restaurantId?: string;
 }
 
-export default function Home({ initialBanners, restaurantId }: HomeProps) {
-  const { selectedRestaurant, fetchRestaurants, setBannersForRestaurant, fetchFavoriteRestaurant, token } = useStore();
+export default function Home({
+  initialBanners,
+  initialRestaurants,
+  initialMenuItems,
+  initialSelectedRestaurantId,
+  initialFavoriteRestaurant,
+  restaurantId,
+}: HomeProps) {
+  const {
+    selectedRestaurant,
+    setBannersForRestaurant,
+    setRestaurants,
+    setSelectedRestaurant,
+    setFavoriteRestaurant,
+    setMenuItems,
+  } = useStore();
 
-  // Инициализируем store с предзагруженными баннерами при первом рендере
+  // Инициализируем store с предзагруженными данными при первом рендере
   useEffect(() => {
+    // Инициализируем баннеры
     if (initialBanners && initialBanners.length > 0) {
-      // Используем ключ с префиксом для горизонтальных баннеров
       const key = restaurantId ? `horizontal_${restaurantId}` : 'horizontal_default';
       setBannersForRestaurant(key, initialBanners);
     }
-  }, [initialBanners, restaurantId, setBannersForRestaurant]);
 
-  useEffect(() => {
-    const initializeApp = async () => {
-      // Если пользователь авторизован, сначала загружаем его любимый ресторан
-      // Это нужно сделать до загрузки ресторанов, чтобы при загрузке ресторанов
-      // автоматически выбрался любимый ресторан
-      if (token) {
-        await fetchFavoriteRestaurant();
+    // Инициализируем рестораны
+    if (initialRestaurants && initialRestaurants.length > 0) {
+      setRestaurants(initialRestaurants);
+    }
+
+    // Инициализируем любимый ресторан
+    if (initialFavoriteRestaurant) {
+      setFavoriteRestaurant(initialFavoriteRestaurant);
+    }
+
+    // Инициализируем выбранный ресторан
+    if (initialSelectedRestaurantId) {
+      const restaurant = initialRestaurants?.find((r) => r.id === initialSelectedRestaurantId);
+      if (restaurant) {
+        setSelectedRestaurant(restaurant);
       }
-      
-      // Затем загружаем рестораны (они автоматически выберут любимый ресторан, если он есть)
-      await fetchRestaurants();
-    };
-    
-    initializeApp();
+    } else if (initialRestaurants && initialRestaurants.length > 0) {
+      // Если нет выбранного ресторана, выбираем первый
+      setSelectedRestaurant(initialRestaurants[0]);
+    }
+
+    // Инициализируем меню
+    if (initialMenuItems && initialMenuItems.length > 0) {
+      const targetRestaurantId = initialSelectedRestaurantId || restaurantId || initialRestaurants?.[0]?.id;
+      setMenuItems(initialMenuItems, targetRestaurantId || undefined);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -103,7 +151,7 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
       timeout: 10000,
     });
 
-    // Используем новый эндпоинт для получения полных данных главной страницы с кэшированием
+    // Используем эндпоинт для получения полных данных главной страницы
     const { restaurantId } = context.query;
     const pageResponse = await serverApi.get('/pages/home', {
       params: restaurantId ? { restaurantId } : {},
@@ -111,19 +159,31 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
 
     const pageData = pageResponse.data.data || {};
     const banners = pageData.banners || [];
+    const restaurants = pageData.restaurants || [];
+    const menuItems = pageData.menuItems || [];
+    const selectedRestaurantId = pageData.selectedRestaurantId || null;
+    const favoriteRestaurant = pageData.favoriteRestaurant || null;
 
     return {
       props: {
         initialBanners: banners,
+        initialRestaurants: restaurants,
+        initialMenuItems: menuItems,
+        initialSelectedRestaurantId: selectedRestaurantId,
+        initialFavoriteRestaurant: favoriteRestaurant,
         restaurantId: restaurantId as string || null,
       },
     };
   } catch (error) {
     console.error('Error fetching home page data on server:', error);
-    // В случае ошибки возвращаем пустой массив баннеров
+    // В случае ошибки возвращаем пустые данные
     return {
       props: {
         initialBanners: [],
+        initialRestaurants: [],
+        initialMenuItems: [],
+        initialSelectedRestaurantId: null,
+        initialFavoriteRestaurant: null,
         restaurantId: null,
       },
     };
