@@ -38,8 +38,13 @@ const getCacheKey = (prefix: string, ...parts: (string | number | undefined)[]):
 
 /**
  * Получить данные из кэша
+ * ВРЕМЕННО ОТКЛЮЧЕНО: всегда возвращает null
  */
 export const getFromCache = async <T>(key: string): Promise<T | null> => {
+  // ВРЕМЕННО ОТКЛЮЧЕНО: кеширование отключено
+  return null;
+  
+  /* ОРИГИНАЛЬНЫЙ КОД (закомментирован):
   const redis = getRedisClient();
   if (!redis) {
     return null;
@@ -55,12 +60,18 @@ export const getFromCache = async <T>(key: string): Promise<T | null> => {
     console.error(`❌ Ошибка при чтении из кэша (ключ: ${key}):`, error);
     return null;
   }
+  */
 };
 
 /**
  * Сохранить данные в кэш
+ * ВРЕМЕННО ОТКЛЮЧЕНО: ничего не делает
  */
 export const setToCache = async (key: string, value: any, ttl: number): Promise<void> => {
+  // ВРЕМЕННО ОТКЛЮЧЕНО: кеширование отключено
+  return;
+  
+  /* ОРИГИНАЛЬНЫЙ КОД (закомментирован):
   const redis = getRedisClient();
   if (!redis) {
     return;
@@ -71,12 +82,18 @@ export const setToCache = async (key: string, value: any, ttl: number): Promise<
   } catch (error) {
     console.error(`❌ Ошибка при записи в кэш (ключ: ${key}):`, error);
   }
+  */
 };
 
 /**
  * Удалить данные из кэша
+ * ВРЕМЕННО ОТКЛЮЧЕНО: ничего не делает
  */
 export const deleteFromCache = async (key: string): Promise<void> => {
+  // ВРЕМЕННО ОТКЛЮЧЕНО: кеширование отключено
+  return;
+  
+  /* ОРИГИНАЛЬНЫЙ КОД (закомментирован):
   const redis = getRedisClient();
   if (!redis) {
     return;
@@ -87,12 +104,18 @@ export const deleteFromCache = async (key: string): Promise<void> => {
   } catch (error) {
     console.error(`❌ Ошибка при удалении из кэша (ключ: ${key}):`, error);
   }
+  */
 };
 
 /**
  * Удалить все ключи по паттерну
+ * ВРЕМЕННО ОТКЛЮЧЕНО: ничего не делает
  */
 export const deleteByPattern = async (pattern: string): Promise<void> => {
+  // ВРЕМЕННО ОТКЛЮЧЕНО: кеширование отключено
+  return;
+  
+  /* ОРИГИНАЛЬНЫЙ КОД (закомментирован):
   const redis = getRedisClient();
   if (!redis) {
     return;
@@ -107,6 +130,7 @@ export const deleteByPattern = async (pattern: string): Promise<void> => {
   } catch (error) {
     console.error(`❌ Ошибка при удалении по паттерну (${pattern}):`, error);
   }
+  */
 };
 
 // ========== Специфичные функции для ресторанов ==========
