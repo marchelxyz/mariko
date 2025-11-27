@@ -33,6 +33,8 @@ interface Restaurant {
   city: string;
   address: string;
   phoneNumber: string;
+  latitude?: number;
+  longitude?: number;
   deliveryAggregators?: DeliveryAggregator[];
   yandexMapsUrl?: string;
   twoGisUrl?: string;
@@ -82,6 +84,8 @@ interface Store {
   prefetchBanners: (restaurantId?: string) => Promise<void>;
   setBannersForRestaurant: (restaurantId: string | null, banners: Banner[]) => void;
   setMenuItems: (menuItems: MenuItem[], restaurantId?: string) => void;
+  findNearestRestaurant: (latitude: number, longitude: number) => Promise<Restaurant | null>;
+  selectNearestRestaurantByLocation: () => Promise<void>;
 }
 
 // Инициализация токена из SecureStorage
@@ -202,7 +206,7 @@ export const useStore = create<Store>((set, get) => {
         set({ restaurants, isLoading: false });
         
         // Автоматически выбираем ресторан
-        // Приоритет всегда у избранного ресторана
+        // Приоритет: избранный ресторан > ближайший по местоположению > первый в списке
         const currentSelected = get().selectedRestaurant;
         const favoriteRestaurant = get().favoriteRestaurant;
         
@@ -221,8 +225,20 @@ export const useStore = create<Store>((set, get) => {
             }
           }
           
-          // Если нет избранного ресторана, выбираем первый или сохраняем текущий
+          // Если нет избранного ресторана и нет текущего выбранного, пробуем выбрать ближайший
           if (!currentSelected) {
+            // Пробуем выбрать ближайший ресторан по местоположению
+            try {
+              await get().selectNearestRestaurantByLocation();
+              // Если ближайший ресторан был выбран, выходим
+              if (get().selectedRestaurant) {
+                return;
+              }
+            } catch (error) {
+              console.log('[Store] Не удалось выбрать ближайший ресторан, используем первый');
+            }
+            
+            // Если не удалось выбрать ближайший, выбираем первый
             set({ selectedRestaurant: restaurants[0] });
             await deviceStorage.setItem(STORAGE_KEYS.SELECTED_RESTAURANT_ID, restaurants[0].id);
           }
@@ -418,6 +434,65 @@ export const useStore = create<Store>((set, get) => {
         // Если это баннеры для текущего ресторана, обновляем и текущие баннеры
         banners: banners,
       }));
+    },
+
+    findNearestRestaurant: async (latitude, longitude) => {
+      if (typeof window === 'undefined') return null;
+      
+      try {
+        const response = await api.get('/restaurants/nearest', {
+          params: { latitude, longitude },
+        });
+        
+        if (response.data.success && response.data.data?.restaurant) {
+          return response.data.data.restaurant;
+        }
+        
+        return null;
+      } catch (error: any) {
+        console.error('Failed to find nearest restaurant:', error);
+        return null;
+      }
+    },
+
+    selectNearestRestaurantByLocation: async () => {
+      if (typeof window === 'undefined') return;
+      
+      try {
+        const { requestLocation, getStoredLocation, storeLocation } = await import('@/lib/location');
+        
+        // Пробуем получить сохраненное местоположение
+        let location = getStoredLocation();
+        
+        // Если нет сохраненного, запрашиваем у пользователя
+        if (!location) {
+          location = await requestLocation();
+          
+          if (location) {
+            storeLocation(location);
+          } else {
+            console.log('[Store] Пользователь не предоставил местоположение');
+            return;
+          }
+        }
+
+        // Ищем ближайший ресторан
+        const nearestRestaurant = await get().findNearestRestaurant(location.latitude, location.longitude);
+        
+        if (nearestRestaurant) {
+          const favoriteRestaurant = get().favoriteRestaurant;
+          
+          // Если нет избранного ресторана, выбираем ближайший
+          if (!favoriteRestaurant) {
+            await get().setSelectedRestaurant(nearestRestaurant);
+            console.log(`[Store] Выбран ближайший ресторан: ${nearestRestaurant.name}`);
+          } else {
+            console.log(`[Store] Избранный ресторан имеет приоритет над ближайшим`);
+          }
+        }
+      } catch (error) {
+        console.error('[Store] Ошибка при выборе ближайшего ресторана:', error);
+      }
     },
   };
 });
