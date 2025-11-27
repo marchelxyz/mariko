@@ -52,22 +52,45 @@ const optionalAuthenticate = async (
  * Теперь также возвращает меню и любимый ресторан пользователя
  */
 router.get('/home', optionalAuthenticate, async (req: Request | AuthRequest, res: Response) => {
+  const requestStartTime = Date.now();
+  console.log(`[pages/home] 📥 Начало обработки запроса /home`);
+  console.log(`   Query params:`, req.query);
+  console.log(`   User ID:`, (req as AuthRequest).userId || 'не авторизован');
+  
   try {
+    // Проверяем подключение к БД перед началом обработки
+    if (!AppDataSource.isInitialized) {
+      console.error('[pages/home] ❌ База данных не инициализирована');
+      return res.status(503).json({ 
+        success: false, 
+        message: 'Database not initialized',
+        code: 'DATABASE_NOT_INITIALIZED'
+      });
+    }
+
     const { restaurantId } = req.query;
     const restaurantIdStr = restaurantId as string | undefined;
     const authReq = req as AuthRequest;
     const userId = authReq.userId;
 
+    console.log(`[pages/home] 🔄 Попытка получить данные из кэша...`);
     // Пытаемся получить из кэша (но только если нет авторизации, т.к. любимый ресторан может отличаться)
     const cacheKey = userId ? `${restaurantIdStr || 'default'}_${userId}` : restaurantIdStr;
     if (!userId) {
-      const cached = await getHomePageFromCache(restaurantIdStr);
-      if (cached) {
-        console.log('✅ Данные главной страницы получены из кэша');
-        return res.json({ success: true, data: cached, cached: true });
+      try {
+        const cached = await getHomePageFromCache(restaurantIdStr);
+        if (cached) {
+          const cacheTime = Date.now() - requestStartTime;
+          console.log(`[pages/home] ✅ Данные главной страницы получены из кэша за ${cacheTime}ms`);
+          return res.json({ success: true, data: cached, cached: true });
+        }
+      } catch (cacheError) {
+        console.warn('[pages/home] ⚠️ Ошибка при получении из кэша (продолжаем):', cacheError);
+        // Продолжаем выполнение, если кэш недоступен
       }
     }
 
+    console.log(`[pages/home] 🔄 Загрузка данных из БД...`);
     const bannerRepository = AppDataSource.getRepository(Banner);
     const restaurantRepository = AppDataSource.getRepository(Restaurant);
     const menuItemRepository = AppDataSource.getRepository(MenuItem);
@@ -189,15 +212,68 @@ router.get('/home', optionalAuthenticate, async (req: Request | AuthRequest, res
       selectedRestaurantId, // Теперь null, если нет явного выбора или избранного ресторана
     };
 
+    const dbLoadTime = Date.now() - requestStartTime;
+    console.log(`[pages/home] ✅ Данные загружены из БД за ${dbLoadTime}ms:`, {
+      bannersCount: banners.length,
+      restaurantsCount: restaurants.length,
+      menuItemsCount: menuItems?.length || 0,
+      hasFavoriteRestaurant: !!favoriteRestaurant,
+    });
+
     // Сохраняем в кэш только для неавторизованных пользователей
     if (!userId) {
-      await setHomePageToCache(restaurantIdStr, pageData);
+      try {
+        await setHomePageToCache(restaurantIdStr, pageData);
+        console.log(`[pages/home] ✅ Данные сохранены в кэш`);
+      } catch (cacheError) {
+        console.warn('[pages/home] ⚠️ Ошибка при сохранении в кэш (не критично):', cacheError);
+        // Продолжаем выполнение, если кэш недоступен
+      }
     }
 
+    const totalTime = Date.now() - requestStartTime;
+    console.log(`[pages/home] ✅ Запрос успешно обработан за ${totalTime}ms`);
     res.json({ success: true, data: pageData, cached: false });
   } catch (error) {
-    console.error('Error fetching home page data:', error);
-    res.status(500).json({ success: false, message: 'Failed to fetch home page data' });
+    const totalTime = Date.now() - requestStartTime;
+    console.error(`[pages/home] ❌ Ошибка при обработке запроса (время до ошибки: ${totalTime}ms):`, error);
+    
+    // Детальное логирование ошибки
+    if (error instanceof Error) {
+      console.error(`[pages/home] Тип ошибки: ${error.constructor.name}`);
+      console.error(`[pages/home] Сообщение: ${error.message}`);
+      if (error.stack) {
+        console.error(`[pages/home] Stack trace:`, error.stack);
+      }
+    }
+
+    // Проверяем тип ошибки для более информативного ответа
+    let statusCode = 500;
+    let errorMessage = 'Failed to fetch home page data';
+    let errorCode = 'UNKNOWN_ERROR';
+
+    if (error instanceof Error) {
+      if (error.message.includes('timeout') || error.message.includes('TIMEOUT')) {
+        statusCode = 504;
+        errorMessage = 'Request timeout - database query took too long';
+        errorCode = 'TIMEOUT';
+      } else if (error.message.includes('ECONNREFUSED') || error.message.includes('connection')) {
+        statusCode = 503;
+        errorMessage = 'Database connection failed';
+        errorCode = 'DATABASE_CONNECTION_ERROR';
+      } else if (error.message.includes('not initialized')) {
+        statusCode = 503;
+        errorMessage = 'Database not initialized';
+        errorCode = 'DATABASE_NOT_INITIALIZED';
+      }
+    }
+
+    res.status(statusCode).json({ 
+      success: false, 
+      message: errorMessage,
+      code: errorCode,
+      timestamp: new Date().toISOString()
+    });
   }
 });
 
