@@ -267,7 +267,7 @@ const startServer = async () => {
     console.log('\n🤖 ШАГ 3: Инициализация Telegram бота...');
     const botStartTime = Date.now();
     try {
-      initializeBot();
+      await initializeBot();
       const botTime = Date.now() - botStartTime;
       console.log(`✅ Telegram бот инициализирован за ${botTime}ms`);
     } catch (botError) {
