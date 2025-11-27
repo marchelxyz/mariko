@@ -254,6 +254,35 @@ app.get('/health', async (req, res) => {
   }
 });
 
+// Middleware для обработки таймаутов запросов
+app.use((req, res, next) => {
+  // Устанавливаем таймаут для запросов (Railway имеет таймаут ~30 секунд)
+  const REQUEST_TIMEOUT = 25000; // 25 секунд (меньше чем Railway таймаут)
+  
+  const timeout = setTimeout(() => {
+    if (!res.headersSent) {
+      console.error(`[TIMEOUT] Запрос превысил таймаут: ${req.method} ${req.path}`);
+      res.status(504).json({
+        success: false,
+        message: 'Request timeout',
+        code: 'REQUEST_TIMEOUT',
+        timestamp: new Date().toISOString()
+      });
+    }
+  }, REQUEST_TIMEOUT);
+
+  // Очищаем таймаут при завершении запроса
+  res.on('finish', () => {
+    clearTimeout(timeout);
+  });
+
+  res.on('close', () => {
+    clearTimeout(timeout);
+  });
+
+  next();
+});
+
 // Routes
 // ✅ Строгий лимит для аутентификации (5 попыток за 15 минут)
 app.use('/api/auth', authLimiter, authRoutes);
