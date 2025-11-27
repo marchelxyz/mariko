@@ -41,6 +41,11 @@ import {
   SlotOptions,
   RemarkedError,
 } from '../types/remarked';
+import {
+  getRemarkedTokenFromCache,
+  setRemarkedTokenToCache,
+  invalidateRemarkedTokenCache,
+} from './cacheService';
 
 export class RemarkedService {
   private readonly baseUrl: string;
@@ -122,17 +127,31 @@ export class RemarkedService {
 
   /**
    * Получает токен для работы с API конкретного заведения
+   * Использует кеширование для оптимизации производительности
    * 
    * @param pointId - ID заведения в системе ReMarked
    * @param additionalInfo - Флаг для получения информации о вместимости
    * @param requestId - IDEMPOTENCY KEY (опционально)
+   * @param useCache - Использовать кеш (по умолчанию true)
    * @returns Токен и опционально информацию о вместимости
    */
   async getToken(
     pointId: number,
     additionalInfo: boolean = false,
-    requestId?: string
+    requestId?: string,
+    useCache: boolean = true
   ): Promise<GetTokenResponse> {
+    // Если не требуется дополнительная информация и кеш включен, пытаемся получить токен из кеша
+    if (!additionalInfo && useCache) {
+      const cachedToken = await getRemarkedTokenFromCache(pointId);
+      if (cachedToken) {
+        return {
+          status: 'success',
+          token: cachedToken,
+        } as GetTokenResponse;
+      }
+    }
+
     const request: GetTokenRequest = {
       method: 'GetToken',
       point: pointId,
@@ -140,7 +159,14 @@ export class RemarkedService {
       ...(requestId && { request_id: requestId }),
     };
 
-    return this.request<GetTokenResponse>('/ApiReservesWidget', request);
+    const response = await this.request<GetTokenResponse>('/ApiReservesWidget', request);
+
+    // Кешируем токен, если он успешно получен и не требуется дополнительная информация
+    if (response.status === 'success' && response.token && !additionalInfo && useCache) {
+      await setRemarkedTokenToCache(pointId, response.token);
+    }
+
+    return response;
   }
 
   /**
