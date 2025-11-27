@@ -13,7 +13,7 @@ const TelegramAuth = dynamic(() => import('@/components/TelegramAuth'), {
 function MyApp({ Component, pageProps }: AppProps) {
   const [mounted, setMounted] = useState(false);
   const router = useRouter();
-  const { selectedRestaurant, prefetchBanners, fetchRestaurants, user } = useStore();
+  const { selectedRestaurant, prefetchBanners, fetchRestaurants, user, favoriteRestaurant, restaurants } = useStore();
 
   useEffect(() => {
     setMounted(true);
@@ -164,13 +164,34 @@ function MyApp({ Component, pageProps }: AppProps) {
         }
         
         // Восстановление выбранного ресторана из настроек (не кеширование данных)
-        const selectedRestaurantId = await deviceStorage.getItem(STORAGE_KEYS.SELECTED_RESTAURANT_ID);
-        const { selectedRestaurant, restaurants } = useStore.getState();
+        // Приоритет всегда у избранного ресторана
+        const { selectedRestaurant, restaurants, favoriteRestaurant } = useStore.getState();
         
-        if (selectedRestaurantId && !selectedRestaurant && restaurants.length > 0) {
-          const restaurant = restaurants.find(r => r.id === selectedRestaurantId);
-          if (restaurant) {
-            useStore.getState().setSelectedRestaurant(restaurant);
+        if (!selectedRestaurant && restaurants.length > 0) {
+          // Если есть избранный ресторан, выбираем его
+          if (favoriteRestaurant) {
+            const favoriteInList = restaurants.find(r => r.id === favoriteRestaurant.id);
+            if (favoriteInList) {
+              useStore.getState().setSelectedRestaurant(favoriteInList);
+              return;
+            }
+          }
+          
+          // Если нет избранного, восстанавливаем из хранилища
+          const selectedRestaurantId = await deviceStorage.getItem(STORAGE_KEYS.SELECTED_RESTAURANT_ID);
+          if (selectedRestaurantId) {
+            const restaurant = restaurants.find(r => r.id === selectedRestaurantId);
+            if (restaurant) {
+              useStore.getState().setSelectedRestaurant(restaurant);
+            }
+          }
+        } else if (selectedRestaurant && favoriteRestaurant) {
+          // Если уже есть выбранный ресторан, но он не избранный, заменяем на избранный
+          if (selectedRestaurant.id !== favoriteRestaurant.id) {
+            const favoriteInList = restaurants.find(r => r.id === favoriteRestaurant.id);
+            if (favoriteInList) {
+              useStore.getState().setSelectedRestaurant(favoriteInList);
+            }
           }
         }
       } catch (error) {
@@ -180,6 +201,19 @@ function MyApp({ Component, pageProps }: AppProps) {
 
     restoreSelectedRestaurant();
   }, [mounted]);
+
+  // Следим за изменениями избранного ресторана и выбираем его при необходимости
+  useEffect(() => {
+    if (!mounted || typeof window === 'undefined') return;
+    
+    // Если есть избранный ресторан и он отличается от текущего выбранного, выбираем его
+    if (favoriteRestaurant && restaurants.length > 0) {
+      const favoriteInList = restaurants.find(r => r.id === favoriteRestaurant.id);
+      if (favoriteInList && (!selectedRestaurant || selectedRestaurant.id !== favoriteInList.id)) {
+        useStore.getState().setSelectedRestaurant(favoriteInList);
+      }
+    }
+  }, [mounted, favoriteRestaurant, restaurants, selectedRestaurant]);
 
   // Предзагрузка баннеров при инициализации приложения
   useEffect(() => {
