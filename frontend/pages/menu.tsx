@@ -34,18 +34,25 @@ export default function Menu({ initialMenuItems, restaurantId }: MenuProps) {
   // Используем restaurantId из props или из store
   const currentRestaurantId = selectedRestaurant?.id || restaurantId;
 
-
-  // Фильтруем категории, которые есть в меню
-  const availableCategories = CATEGORIES.filter(
-    (cat) => menuItems[cat] && menuItems[cat].length > 0
+  // Получаем все категории из данных меню (приоритет) и дополняем стандартными категориями
+  const allCategoriesFromData = Object.keys(menuItems).filter(
+    (cat) => menuItems[cat] && Array.isArray(menuItems[cat]) && menuItems[cat].length > 0
   );
+
+  // Объединяем категории из данных с стандартными категориями (уникальные)
+  const allAvailableCategories = Array.from(
+    new Set([...allCategoriesFromData, ...CATEGORIES])
+  ).filter((cat) => menuItems[cat] && Array.isArray(menuItems[cat]) && menuItems[cat].length > 0);
+
+  // Фильтруем категории, которые есть в меню (используем все доступные, не только из CATEGORIES)
+  const availableCategories = allAvailableCategories;
 
   // Если выбрана категория, показываем только её, иначе показываем все
   const categoriesToShow = selectedCategory
     ? [selectedCategory]
     : availableCategories.length > 0
     ? availableCategories
-    : Object.keys(menuItems).filter((cat) => menuItems[cat] && menuItems[cat].length > 0);
+    : allCategoriesFromData;
 
   // Получаем все блюда для отображения в сетке
   const allItemsToShow: MenuItem[] = [];
@@ -117,7 +124,14 @@ export default function Menu({ initialMenuItems, restaurantId }: MenuProps) {
         {/* Меню в виде сетки карточек */}
         {allItemsToShow.length === 0 ? (
           <div className="bg-white rounded-lg shadow-sm p-6 text-center">
-            <p className="text-text-primary">Меню пока пусто</p>
+            <p className="text-text-primary mb-2">Меню пока пусто</p>
+            {process.env.NODE_ENV === 'development' && (
+              <div className="text-xs text-gray-500 mt-2">
+                <p>Категории в данных: {Object.keys(menuItems).join(', ') || 'нет'}</p>
+                <p>Доступные категории: {availableCategories.join(', ') || 'нет'}</p>
+                <p>Всего блюд в данных: {Object.values(menuItems).reduce((sum: number, items: any) => sum + (Array.isArray(items) ? items.length : 0), 0)}</p>
+              </div>
+            )}
           </div>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
@@ -225,6 +239,18 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
 
     const pageData = pageResponse.data.data || {};
     const menuItems = pageData.menuItems || {};
+
+    // Логирование для диагностики
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[menu.tsx] Server-side props:', {
+        restaurantId,
+        menuItemsKeys: Object.keys(menuItems),
+        menuItemsCount: Object.values(menuItems).reduce((sum: number, items: any) => sum + (Array.isArray(items) ? items.length : 0), 0),
+        categories: Object.keys(menuItems),
+        sampleCategory: Object.keys(menuItems)[0],
+        sampleItemsCount: Array.isArray(menuItems[Object.keys(menuItems)[0]]) ? menuItems[Object.keys(menuItems)[0]].length : 0,
+      });
+    }
 
     return {
       props: {
