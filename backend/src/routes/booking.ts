@@ -15,7 +15,6 @@ const router = Router();
  * - restaurantId: string (UUID ресторана)
  * - name: string (Имя клиента)
  * - phone: string (Телефон в формате +79999999999)
- * - email?: string (Email клиента)
  * - date: string (Дата в формате YYYY-MM-DD)
  * - time: string (Время в формате HH:mm)
  * - guests_count: number (Количество гостей)
@@ -34,7 +33,6 @@ router.post('/', authenticate, async (req: AuthRequest, res: Response) => {
       restaurantId,
       name,
       phone,
-      email,
       date,
       time,
       guests_count,
@@ -117,7 +115,6 @@ router.post('/', authenticate, async (req: AuthRequest, res: Response) => {
       date,
       time,
       guests_count: Number(guests_count),
-      ...(email && { email }),
       ...(duration && { duration: Number(duration) }),
       ...(comment && { comment }),
       ...(table_ids && Array.isArray(table_ids) && { table_ids: table_ids.map(Number) }),
