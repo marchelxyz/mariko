@@ -23,11 +23,15 @@ export default function TelegramAuth() {
         }
         
         // Если токен есть, но пользователь не загружен, загружаем профиль
-        if (existingToken && !user) {
+        // Проверяем, что запросы еще не выполняются
+        const { isLoadingProfile, isLoadingFavoriteRestaurant } = useStore.getState();
+        if (existingToken && !user && !isLoadingProfile) {
           try {
             await fetchProfile();
-            // Загружаем любимый ресторан после загрузки профиля
-            await fetchFavoriteRestaurant();
+            // Загружаем любимый ресторан после загрузки профиля (только если не загружается)
+            if (!isLoadingFavoriteRestaurant) {
+              await fetchFavoriteRestaurant();
+            }
           } catch (error) {
             console.error('Failed to fetch profile with existing token:', error);
             // Если токен невалидный, удаляем его
@@ -76,12 +80,22 @@ export default function TelegramAuth() {
             setToken(response.data.token);
             setUser(response.data.user);
             // Загружаем актуальные данные профиля, чтобы убедиться, что роль обновлена
+            // Проверяем, что запросы еще не выполняются
+            const { isLoadingProfile, isLoadingFavoriteRestaurant, isLoadingRestaurants } = useStore.getState();
             try {
-              await fetchProfile();
-              // Загружаем любимый ресторан после авторизации
-              await fetchFavoriteRestaurant();
+              // Загружаем профиль только если он еще не загружается
+              if (!isLoadingProfile) {
+                await fetchProfile();
+              }
+              // Загружаем любимый ресторан после авторизации (только если не загружается)
+              if (!isLoadingFavoriteRestaurant) {
+                await fetchFavoriteRestaurant();
+              }
               // Загружаем рестораны (внутри fetchRestaurants будет попытка выбрать ближайший)
-              await fetchRestaurants();
+              // Только если они еще не загружаются и не загружены
+              if (!isLoadingRestaurants) {
+                await fetchRestaurants();
+              }
             } catch (error) {
               console.error('Failed to fetch profile after auth:', error);
             }

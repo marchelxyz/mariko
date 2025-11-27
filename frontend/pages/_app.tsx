@@ -216,12 +216,22 @@ function MyApp({ Component, pageProps }: AppProps) {
     if (!mounted || typeof window === 'undefined') return;
 
     // Загружаем рестораны, если они еще не загружены
+    // Используем useRef для отслеживания, чтобы избежать повторных вызовов
+    let cancelled = false;
+    
     fetchRestaurants().then(() => {
-      // После загрузки ресторанов предзагружаем баннеры для выбранного ресторана
-      const restaurantId = selectedRestaurant?.id;
-      prefetchBanners(restaurantId);
+      if (!cancelled) {
+        // После загрузки ресторанов предзагружаем баннеры для выбранного ресторана
+        const restaurantId = selectedRestaurant?.id;
+        prefetchBanners(restaurantId);
+      }
     });
-  }, [mounted, fetchRestaurants, selectedRestaurant, prefetchBanners]);
+    
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mounted]); // Функции из Zustand стабильны, зависимости не нужны
 
   // Предзагрузка баннеров при переключении на главную страницу
   useEffect(() => {
@@ -235,18 +245,23 @@ function MyApp({ Component, pageProps }: AppProps) {
       }
     };
 
-    // Предзагружаем баннеры при изменении выбранного ресторана
-    const restaurantId = selectedRestaurant?.id;
-    if (restaurantId) {
-      prefetchBanners(restaurantId);
-    }
-
     router.events.on('routeChangeStart', handleRouteChangeStart);
 
     return () => {
       router.events.off('routeChangeStart', handleRouteChangeStart);
     };
-  }, [mounted, router, selectedRestaurant, prefetchBanners]);
+  }, [mounted, router, selectedRestaurant?.id]); // Используем только id вместо всего объекта
+
+  // Отдельный эффект для предзагрузки баннеров при изменении выбранного ресторана
+  useEffect(() => {
+    if (!mounted || typeof window === 'undefined') return;
+    
+    const restaurantId = selectedRestaurant?.id;
+    if (restaurantId) {
+      prefetchBanners(restaurantId);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mounted, selectedRestaurant?.id]); // prefetchBanners из Zustand стабильна
 
   // Предзагрузка всех страниц навигации для бесшовного переключения
   useEffect(() => {

@@ -64,6 +64,11 @@ interface Store {
   token: string | null;
   isLoading: boolean;
   error: string | null;
+  // Флаги для предотвращения повторных запросов
+  isLoadingRestaurants: boolean;
+  isLoadingProfile: boolean;
+  isLoadingFavoriteRestaurant: boolean;
+  loadingBanners: Set<string>;
   setToken: (token: string | null) => void;
   setUser: (user: User | null) => void;
   setRestaurants: (restaurants: Restaurant[]) => void;
@@ -123,6 +128,10 @@ export const useStore = create<Store>((set, get) => {
     token: initialToken,
     isLoading: false,
     error: null,
+    isLoadingRestaurants: false,
+    isLoadingProfile: false,
+    isLoadingFavoriteRestaurant: false,
+    loadingBanners: new Set<string>(),
 
     setToken: async (token) => {
       if (token) {
@@ -165,7 +174,13 @@ export const useStore = create<Store>((set, get) => {
       // Пропускаем запрос на сервере
       if (typeof window === 'undefined') return;
       
-      set({ isLoading: true, error: null });
+      // Предотвращаем повторные запросы
+      const state = get();
+      if (state.isLoadingRestaurants || (state.restaurants.length > 0 && !state.error)) {
+        return;
+      }
+      
+      set({ isLoading: true, isLoadingRestaurants: true, error: null });
       
       try {
         const response = await api.get('/restaurants');
@@ -192,7 +207,7 @@ export const useStore = create<Store>((set, get) => {
         
         console.log('Processed restaurants:', restaurants);
         
-        set({ restaurants, isLoading: false });
+        set({ restaurants, isLoading: false, isLoadingRestaurants: false });
         
         // Автоматически выбираем ресторан
         // Приоритет: избранный ресторан > первый в списке
@@ -222,7 +237,8 @@ export const useStore = create<Store>((set, get) => {
         set({ 
           restaurants: [],
           error: error?.response?.data?.message || 'Не удалось загрузить рестораны',
-          isLoading: false 
+          isLoading: false,
+          isLoadingRestaurants: false
         });
       }
     },
@@ -239,14 +255,25 @@ export const useStore = create<Store>((set, get) => {
     fetchProfile: async () => {
       if (typeof window === 'undefined') return;
       
+      // Предотвращаем повторные запросы
+      const state = get();
+      if (state.isLoadingProfile) {
+        return;
+      }
+      
+      set({ isLoadingProfile: true });
+      
       try {
         const response = await api.get('/profile');
         const userData = response.data.data;
         
-        set({ user: userData });
+        set({ user: userData, isLoadingProfile: false });
       } catch (error: any) {
         console.error('Failed to fetch profile:', error);
-        set({ error: error?.response?.data?.message || 'Не удалось загрузить профиль' });
+        set({ 
+          error: error?.response?.data?.message || 'Не удалось загрузить профиль',
+          isLoadingProfile: false
+        });
       }
     },
 
@@ -275,11 +302,19 @@ export const useStore = create<Store>((set, get) => {
     fetchFavoriteRestaurant: async () => {
       if (typeof window === 'undefined') return;
       
+      // Предотвращаем повторные запросы
+      const state = get();
+      if (state.isLoadingFavoriteRestaurant) {
+        return;
+      }
+      
+      set({ isLoadingFavoriteRestaurant: true });
+      
       try {
         const response = await api.get('/profile/favorite-restaurant');
         const restaurant = response.data.data;
         
-        set({ favoriteRestaurant: restaurant });
+        set({ favoriteRestaurant: restaurant, isLoadingFavoriteRestaurant: false });
         
         // Обновляем локальное хранилище: сохраняем или удаляем в зависимости от значения
         if (restaurant) {
@@ -305,6 +340,7 @@ export const useStore = create<Store>((set, get) => {
         }
       } catch (error: any) {
         console.error('Failed to fetch favorite restaurant:', error);
+        set({ isLoadingFavoriteRestaurant: false });
       }
     },
 
@@ -403,13 +439,25 @@ export const useStore = create<Store>((set, get) => {
       // Пропускаем запрос на сервере
       if (typeof window === 'undefined') return;
       
-      const key = restaurantId || 'default';
-      const memoryBanners = get().bannersByRestaurant[key];
+      // Используем тот же формат ключа, что и компонент Banners
+      const key = restaurantId ? `horizontal_${restaurantId}` : 'horizontal_default';
+      const state = get();
+      const memoryBanners = state.bannersByRestaurant[key];
       
       // Если баннеры уже загружены в памяти, не делаем повторный запрос
       if (memoryBanners && memoryBanners.length > 0) {
         return;
       }
+      
+      // Если запрос уже выполняется для этого ключа, не делаем повторный запрос
+      if (state.loadingBanners.has(key)) {
+        return;
+      }
+
+      // Добавляем ключ в набор загружаемых баннеров
+      set((state) => ({
+        loadingBanners: new Set(state.loadingBanners).add(key),
+      }));
 
       try {
         const response = await api.get('/banners', {
@@ -418,15 +466,26 @@ export const useStore = create<Store>((set, get) => {
         const banners = response.data.data || [];
         
         // Сохраняем в память без обновления текущих баннеров
-        set((state) => ({
-          bannersByRestaurant: {
-            ...state.bannersByRestaurant,
-            [key]: banners,
-          },
-        }));
+        set((state) => {
+          const newLoadingBanners = new Set(state.loadingBanners);
+          newLoadingBanners.delete(key);
+          return {
+            bannersByRestaurant: {
+              ...state.bannersByRestaurant,
+              [key]: banners,
+            },
+            loadingBanners: newLoadingBanners,
+          };
+        });
       } catch (error: any) {
         // Тихая ошибка при предзагрузке
         console.debug('Failed to prefetch banners:', error);
+        // Удаляем ключ из набора загружаемых баннеров при ошибке
+        set((state) => {
+          const newLoadingBanners = new Set(state.loadingBanners);
+          newLoadingBanners.delete(key);
+          return { loadingBanners: newLoadingBanners };
+        });
       }
     },
 
