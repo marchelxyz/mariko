@@ -29,6 +29,10 @@ import { autoGeocodeRestaurants } from './services/autoGeocodeService';
 const app = express();
 const PORT: number = Number(process.env.PORT) || 5000;
 
+// ✅ Настройка trust proxy для работы за прокси-сервером (Railway, nginx и т.д.)
+// Это необходимо для правильного определения IP-адреса клиента через X-Forwarded-For
+app.set('trust proxy', true);
+
 // Middleware
 app.use(helmet());
 
