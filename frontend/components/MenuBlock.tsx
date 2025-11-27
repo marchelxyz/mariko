@@ -3,6 +3,7 @@ import { useRouter } from 'next/router';
 import Image from 'next/image';
 import { useStore } from '@/store/useStore';
 import api from '@/lib/api';
+import DishCard from './DishCard';
 
 interface MenuItem {
   id: string;
@@ -12,6 +13,7 @@ interface MenuItem {
   category: string;
   imageUrl?: string;
   calories?: number;
+  ingredients?: string;
 }
 
 interface MenuBlockProps {
@@ -24,6 +26,7 @@ export default function MenuBlock({ restaurantId, initialMenuItems }: MenuBlockP
   const router = useRouter();
   const [displayCount, setDisplayCount] = useState(2);
   const [isLoading, setIsLoading] = useState(false);
+  const [selectedDish, setSelectedDish] = useState<MenuItem | null>(null);
 
   // Определяем количество блюд в зависимости от размера экрана
   useEffect(() => {
@@ -161,9 +164,10 @@ export default function MenuBlock({ restaurantId, initialMenuItems }: MenuBlockP
       <div className="px-4 w-full overflow-x-hidden md:px-0">
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 gap-4 md:justify-items-start">
           {menuItemsToDisplay.map((item) => (
-            <div
+            <button
               key={item.id}
-              className="bg-[#F7F7F7] rounded-xl p-3 flex flex-col w-full min-w-0"
+              onClick={() => setSelectedDish(item)}
+              className="bg-[#F7F7F7] rounded-xl p-3 flex flex-col w-full min-w-0 text-left hover:opacity-90 transition-opacity cursor-pointer"
             >
               {/* Фото блюда */}
               {item.imageUrl ? (
@@ -211,10 +215,17 @@ export default function MenuBlock({ restaurantId, initialMenuItems }: MenuBlockP
                   {item.calories} ккал
                 </div>
               )}
-            </div>
+            </button>
           ))}
         </div>
       </div>
+
+      {/* Карточка блюда */}
+      <DishCard
+        item={selectedDish}
+        isOpen={!!selectedDish}
+        onClose={() => setSelectedDish(null)}
+      />
     </div>
   );
 }

@@ -4,6 +4,7 @@ import { GetServerSideProps } from 'next';
 import Image from 'next/image';
 import Layout from '@/components/Layout';
 import Header from '@/components/Header';
+import DishCard from '@/components/DishCard';
 import { useStore } from '@/store/useStore';
 
 interface MenuItem {
@@ -14,6 +15,7 @@ interface MenuItem {
   category: string;
   imageUrl?: string;
   calories?: number;
+  ingredients?: string;
 }
 
 interface MenuProps {
@@ -37,6 +39,7 @@ export default function Menu({ initialMenuItems, restaurantId }: MenuProps) {
   const { selectedRestaurant } = useStore();
   const [menuItems] = useState<Record<string, MenuItem[]>>(initialMenuItems);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [selectedDish, setSelectedDish] = useState<MenuItem | null>(null);
 
   // Используем restaurantId из props или из store
   const currentRestaurantId = selectedRestaurant?.id || restaurantId;
@@ -129,9 +132,10 @@ export default function Menu({ initialMenuItems, restaurantId }: MenuProps) {
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
             {allItemsToShow.map((item) => (
-              <div
+              <button
                 key={item.id}
-                className="bg-[#F7F7F7] rounded-xl p-3 flex flex-col"
+                onClick={() => setSelectedDish(item)}
+                className="bg-[#F7F7F7] rounded-xl p-3 flex flex-col text-left hover:opacity-90 transition-opacity cursor-pointer"
               >
                 {/* Фото блюда */}
                 {item.imageUrl ? (
@@ -177,10 +181,17 @@ export default function Menu({ initialMenuItems, restaurantId }: MenuProps) {
                     {item.calories} ккал
                   </div>
                 )}
-              </div>
+              </button>
             ))}
           </div>
         )}
+
+        {/* Карточка блюда */}
+        <DishCard
+          item={selectedDish}
+          isOpen={!!selectedDish}
+          onClose={() => setSelectedDish(null)}
+        />
       </div>
     </Layout>
   );
