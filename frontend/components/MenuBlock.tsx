@@ -15,8 +15,18 @@ export default function MenuBlock({ restaurantId, initialMenuItems }: MenuBlockP
   const { selectedRestaurant, menuItems, menuItemsByRestaurant, setMenuItems } = useStore();
   const router = useRouter();
   const [displayCount, setDisplayCount] = useState(2);
-  const [isLoading, setIsLoading] = useState(false);
   const [selectedDish, setSelectedDish] = useState<MenuItem | null>(null);
+  
+  // Определяем текущий ID ресторана для проверки кэша
+  const currentRestaurantIdForInit = restaurantId || selectedRestaurant?.id;
+  
+  // Инициализируем isLoading на основе наличия данных в кэше или initialMenuItems
+  // чтобы избежать мигания индикатора загрузки
+  const hasCachedData = currentRestaurantIdForInit
+    ? (menuItemsByRestaurant[currentRestaurantIdForInit]?.length > 0)
+    : (menuItems.length > 0);
+  const hasInitialData = initialMenuItems && initialMenuItems.length > 0;
+  const [isLoading, setIsLoading] = useState(!hasCachedData && !hasInitialData);
 
   // Определяем количество блюд в зависимости от размера экрана
   useEffect(() => {
@@ -83,8 +93,10 @@ export default function MenuBlock({ restaurantId, initialMenuItems }: MenuBlockP
       return;
     }
 
-    // Если меню уже есть в кэше для этого ресторана, не загружаем
+    // Проверяем кэш синхронно, чтобы избежать мигания индикатора загрузки
     const cachedItems = menuItemsByRestaurant[currentRestaurantId];
+    
+    // Если меню уже есть в кэше для этого ресторана, не загружаем и не показываем загрузку
     if (cachedItems && cachedItems.length > 0) {
       setIsLoading(false);
       return;
@@ -100,6 +112,7 @@ export default function MenuBlock({ restaurantId, initialMenuItems }: MenuBlockP
       return;
     }
 
+    // Только если данных нет ни в кэше, ни в initialMenuItems, делаем запрос
     const fetchMenu = async () => {
       setIsLoading(true);
       try {
