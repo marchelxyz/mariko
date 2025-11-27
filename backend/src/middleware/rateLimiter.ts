@@ -1,4 +1,4 @@
-import rateLimit from 'express-rate-limit';
+import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 
 // ✅ Общий rate limiter для всех API запросов
 // Настройки можно переопределить через переменные окружения
@@ -24,15 +24,9 @@ export const apiLimiter = rateLimit({
   legacyHeaders: false, // Отключает заголовки Retry-After
   // Пропускаем успешные health check запросы и preflight (OPTIONS) запросы
   skip: (req) => req.path === '/health' || req.method === 'OPTIONS',
-  // ✅ Безопасная настройка для работы с trust proxy
-  // Используем кастомный keyGenerator для дополнительной защиты
-  keyGenerator: (req) => {
-    // Используем IP из req.ip (уже обработанный trust proxy)
-    // Дополнительно проверяем, что это валидный IP
-    const ip = req.ip || req.socket.remoteAddress || 'unknown';
-    // Если IP содержит несколько адресов (через запятую), берем первый
-    return ip.split(',')[0].trim();
-  },
+  // ✅ Безопасная настройка для работы с trust proxy и IPv6
+  // Используем ipKeyGenerator для правильной обработки IPv6 адресов
+  keyGenerator: ipKeyGenerator,
 });
 
 // ✅ Строгий rate limiter для аутентификации
@@ -48,11 +42,8 @@ export const authLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   skipSuccessfulRequests: true, // Не считать успешные запросы (если вход успешен, не блокируем)
-  // ✅ Безопасная настройка для работы с trust proxy
-  keyGenerator: (req) => {
-    const ip = req.ip || req.socket.remoteAddress || 'unknown';
-    return ip.split(',')[0].trim();
-  },
+  // ✅ Безопасная настройка для работы с trust proxy и IPv6
+  keyGenerator: ipKeyGenerator,
 });
 
 // ✅ Rate limiter для тяжелых операций (создание/обновление)
@@ -67,9 +58,6 @@ export const writeLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
-  // ✅ Безопасная настройка для работы с trust proxy
-  keyGenerator: (req) => {
-    const ip = req.ip || req.socket.remoteAddress || 'unknown';
-    return ip.split(',')[0].trim();
-  },
+  // ✅ Безопасная настройка для работы с trust proxy и IPv6
+  keyGenerator: ipKeyGenerator,
 });
