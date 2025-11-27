@@ -6,7 +6,7 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
-import { connectDatabase } from './config/database';
+import { connectDatabase, closeDatabase } from './config/database';
 import { getRedisClient } from './config/redis';
 import { errorHandler } from './middleware/errorHandler';
 import { apiLimiter, authLimiter, writeLimiter } from './middleware/rateLimiter';
@@ -254,6 +254,19 @@ app.get('/health', async (req, res) => {
   }
 });
 
+// Middleware для блокировки новых запросов во время shutdown
+app.use((req, res, next) => {
+  if (isShuttingDown) {
+    return res.status(503).json({
+      success: false,
+      message: 'Server is shutting down',
+      code: 'SHUTTING_DOWN',
+      timestamp: new Date().toISOString()
+    });
+  }
+  next();
+});
+
 // Middleware для обработки таймаутов запросов
 app.use((req, res, next) => {
   // Устанавливаем таймаут для запросов (Railway имеет таймаут ~30 секунд)
@@ -313,6 +326,7 @@ app.use(errorHandler);
 
 // Start server
 let server: any = null;
+let isShuttingDown = false;
 
 const startServer = async () => {
   const startTime = Date.now();
@@ -479,6 +493,13 @@ const startServer = async () => {
 
 // Graceful shutdown - обработка сигналов завершения
 const gracefulShutdown = async (signal: string) => {
+  // Предотвращаем множественные вызовы shutdown
+  if (isShuttingDown) {
+    console.log('⚠️  Shutdown уже выполняется, игнорируем повторный сигнал');
+    return;
+  }
+  
+  isShuttingDown = true;
   const shutdownStart = Date.now();
   console.log('\n' + '='.repeat(60));
   console.log(`🛑 ${signal} получен. Начало graceful shutdown...`);
@@ -494,17 +515,23 @@ const gracefulShutdown = async (signal: string) => {
       name: 'HTTP Server',
       fn: () => new Promise<void>((resolve) => {
         console.log('🔄 Закрытие HTTP сервера...');
+        
+        // Закрываем все активные соединения
         server.close(() => {
           const time = Date.now() - shutdownStart;
           console.log(`✅ HTTP сервер закрыт за ${time}ms`);
           resolve();
         });
         
-        // Таймаут для закрытия сервера (5 секунд)
+        // Закрываем все активные соединения принудительно
+        server.closeAllConnections?.();
+        
+        // Таймаут для закрытия сервера (10 секунд)
         setTimeout(() => {
-          console.log('⚠️  Таймаут закрытия HTTP сервера');
+          console.log('⚠️  Таймаут закрытия HTTP сервера, принудительное закрытие');
+          server.closeAllConnections?.();
           resolve();
-        }, 5000);
+        }, 10000);
       })
     });
   }
@@ -544,13 +571,7 @@ const gracefulShutdown = async (signal: string) => {
     fn: async () => {
       try {
         console.log('🔄 Закрытие подключения к базе данных...');
-        const { AppDataSource } = await import('./config/database');
-        if (AppDataSource.isInitialized) {
-          await AppDataSource.destroy();
-          console.log('✅ Подключение к базе данных закрыто');
-        } else {
-          console.log('ℹ️  База данных не была инициализирована');
-        }
+        await closeDatabase();
       } catch (error) {
         console.error('⚠️  Ошибка при закрытии базы данных:', error);
       }
@@ -574,13 +595,11 @@ const gracefulShutdown = async (signal: string) => {
   console.log(`✅ Graceful shutdown завершен за ${totalShutdownTime}ms`);
   console.log('='.repeat(60) + '\n');
   
-  // Даем время на завершение операций (максимум 10 секунд)
+  // Завершаем процесс после успешного shutdown
+  // Используем небольшую задержку, чтобы убедиться, что все логи записаны
   setTimeout(() => {
-    console.log('⚠️  Принудительное завершение после таймаута');
     process.exit(0);
-  }, 10000);
-  
-  process.exit(0);
+  }, 100);
 };
 
 // Обработка сигналов завершения
