@@ -94,33 +94,75 @@ app.use('/api', apiLimiter);
 
 // Health check с проверкой подключения к БД и Redis
 app.get('/health', async (req, res) => {
+  const healthCheckStart = Date.now();
+  
   try {
     const { AppDataSource } = await import('./config/database');
     const { isRedisAvailable } = await import('./config/redis');
     
     const isDbConnected = AppDataSource.isInitialized;
+    let dbDetails: any = {};
+    
+    // Дополнительная проверка БД
+    if (isDbConnected) {
+      try {
+        // Пробуем выполнить простой запрос для проверки работоспособности
+        const queryRunner = AppDataSource.createQueryRunner();
+        await queryRunner.query('SELECT 1');
+        await queryRunner.release();
+        dbDetails.status = 'connected';
+        dbDetails.activeConnections = AppDataSource.driver.pool?.totalCount || 0;
+        dbDetails.idleConnections = AppDataSource.driver.pool?.idleCount || 0;
+      } catch (dbError) {
+        dbDetails.status = 'error';
+        dbDetails.error = dbError instanceof Error ? dbError.message : String(dbError);
+      }
+    } else {
+      dbDetails.status = 'disconnected';
+    }
+    
     const isRedisConnected = isRedisAvailable();
+    const healthCheckTime = Date.now() - healthCheckStart;
     
     const health = {
-      status: 'ok',
+      status: isDbConnected ? 'ok' : 'unhealthy',
       timestamp: new Date().toISOString(),
-      database: isDbConnected ? 'connected' : 'disconnected',
-      redis: process.env.REDIS_URL ? (isRedisConnected ? 'connected' : 'disconnected') : 'not configured'
+      uptime: process.uptime(),
+      responseTime: `${healthCheckTime}ms`,
+      database: {
+        status: dbDetails.status,
+        ...(dbDetails.activeConnections !== undefined && {
+          activeConnections: dbDetails.activeConnections,
+          idleConnections: dbDetails.idleConnections
+        }),
+        ...(dbDetails.error && { error: dbDetails.error })
+      },
+      redis: process.env.REDIS_URL ? {
+        status: isRedisConnected ? 'connected' : 'disconnected'
+      } : {
+        status: 'not configured'
+      },
+      memory: {
+        used: Math.round(process.memoryUsage().heapUsed / 1024 / 1024) + 'MB',
+        total: Math.round(process.memoryUsage().heapTotal / 1024 / 1024) + 'MB',
+        rss: Math.round(process.memoryUsage().rss / 1024 / 1024) + 'MB'
+      },
+      environment: process.env.NODE_ENV || 'development'
     };
     
     if (!isDbConnected) {
-      return res.status(503).json({ 
-        ...health,
-        status: 'unhealthy'
-      });
+      return res.status(503).json(health);
     }
     
     res.json(health);
   } catch (error) {
+    const healthCheckTime = Date.now() - healthCheckStart;
     res.status(503).json({ 
       status: 'error', 
       timestamp: new Date().toISOString(),
-      error: error instanceof Error ? error.message : 'Unknown error'
+      responseTime: `${healthCheckTime}ms`,
+      error: error instanceof Error ? error.message : 'Unknown error',
+      stack: process.env.NODE_ENV === 'development' && error instanceof Error ? error.stack : undefined
     });
   }
 });
@@ -157,38 +199,103 @@ app.use(errorHandler);
 let server: any = null;
 
 const startServer = async () => {
+  const startTime = Date.now();
+  console.log('\n' + '='.repeat(60));
+  console.log('🚀 ЗАПУСК СЕРВЕРА');
+  console.log('='.repeat(60));
+  console.log(`⏰ Время запуска: ${new Date().toISOString()}`);
+  console.log(`📋 Node.js версия: ${process.version}`);
+  console.log(`🌍 Окружение: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`🔌 Порт: ${PORT}`);
+  
+  // Логируем важные переменные окружения (без секретов)
+  console.log('\n📝 Конфигурация:');
+  console.log(`   - DATABASE_URL: ${process.env.DATABASE_URL ? '✅ установлен' : '❌ не установлен'}`);
+  console.log(`   - REDIS_URL: ${process.env.REDIS_URL ? '✅ установлен' : '❌ не установлен'}`);
+  console.log(`   - JWT_SECRET: ${process.env.JWT_SECRET ? '✅ установлен' : '❌ не установлен'}`);
+  console.log(`   - FRONTEND_URL: ${process.env.FRONTEND_URL || 'не установлен'}`);
+  console.log(`   - TELEGRAM_BOT_TOKEN: ${process.env.TELEGRAM_BOT_TOKEN ? '✅ установлен' : '❌ не установлен'}`);
+  
   try {
-    await connectDatabase();
-    
-    // Автоматическое геокодирование ресторанов без координат (запускается в фоне)
-    // Не блокирует запуск сервера
-    autoGeocodeRestaurants().catch((error) => {
-      console.error('[Startup] Ошибка при автоматическом геокодировании:', error);
-      // Не прерываем запуск приложения при ошибке геокодирования
-    });
-    
-    // Инициализируем Redis (если настроен)
-    const redis = getRedisClient();
-    if (redis) {
-      console.log('🔄 Инициализация Redis...');
-    } else {
-      console.log('⚠️  Redis не настроен (REDIS_URL не указан). Кэширование отключено.');
+    // Шаг 1: Подключение к БД
+    console.log('\n📊 ШАГ 1: Подключение к базе данных...');
+    const dbStartTime = Date.now();
+    try {
+      await connectDatabase();
+      const dbTime = Date.now() - dbStartTime;
+      console.log(`✅ База данных подключена за ${dbTime}ms`);
+    } catch (dbError) {
+      const dbTime = Date.now() - dbStartTime;
+      console.error(`❌ ОШИБКА подключения к БД после ${dbTime}ms:`);
+      console.error('   Детали ошибки:', dbError instanceof Error ? dbError.message : String(dbError));
+      if (dbError instanceof Error && dbError.stack) {
+        console.error('   Stack trace:', dbError.stack);
+      }
+      throw dbError; // Прерываем запуск, если БД не подключена
     }
     
-    // Инициализируем Telegram бота
-    initializeBot();
+    // Шаг 2: Инициализация Redis
+    console.log('\n🔄 ШАГ 2: Инициализация Redis...');
+    const redisStartTime = Date.now();
+    try {
+      const redis = getRedisClient();
+      const redisTime = Date.now() - redisStartTime;
+      if (redis) {
+        console.log(`✅ Redis инициализирован за ${redisTime}ms`);
+      } else {
+        console.log(`⚠️  Redis не настроен (REDIS_URL не указан). Кэширование отключено.`);
+      }
+    } catch (redisError) {
+      console.error('⚠️  Ошибка при инициализации Redis (не критично):', redisError);
+      // Не прерываем запуск, если Redis недоступен
+    }
+    
+    // Шаг 3: Инициализация Telegram бота
+    console.log('\n🤖 ШАГ 3: Инициализация Telegram бота...');
+    const botStartTime = Date.now();
+    try {
+      initializeBot();
+      const botTime = Date.now() - botStartTime;
+      console.log(`✅ Telegram бот инициализирован за ${botTime}ms`);
+    } catch (botError) {
+      console.error('⚠️  Ошибка при инициализации Telegram бота (не критично):', botError);
+      // Не прерываем запуск, если бот не инициализирован
+    }
+    
+    // Шаг 4: Запуск HTTP сервера
+    console.log('\n🌐 ШАГ 4: Запуск HTTP сервера...');
+    const serverStartTime = Date.now();
     
     server = app.listen(PORT, '0.0.0.0', () => {
+      const serverTime = Date.now() - serverStartTime;
+      const totalTime = Date.now() - startTime;
+      
+      console.log('\n' + '='.repeat(60));
+      console.log('✅ СЕРВЕР УСПЕШНО ЗАПУЩЕН');
+      console.log('='.repeat(60));
+      console.log(`⏱️  Время запуска HTTP сервера: ${serverTime}ms`);
+      console.log(`⏱️  Общее время запуска: ${totalTime}ms`);
       console.log(`🚀 Server running on port ${PORT}`);
-      console.log(`📡 Health check available at http://localhost:${PORT}/health`);
-      console.log(`🌐 API endpoints available at http://localhost:${PORT}/api`);
+      console.log(`📡 Health check: http://0.0.0.0:${PORT}/health`);
+      console.log(`🌐 API endpoints: http://0.0.0.0:${PORT}/api`);
       console.log(`📋 Environment: ${process.env.NODE_ENV || 'development'}`);
       console.log(`🔗 Frontend URL: ${process.env.FRONTEND_URL || 'http://localhost:3000'}`);
+      console.log('='.repeat(60) + '\n');
+    });
+    
+    // Обработка ошибок сервера
+    server.on('error', (error: NodeJS.ErrnoException) => {
+      console.error('❌ ОШИБКА HTTP СЕРВЕРА:');
+      console.error('   Тип ошибки:', error.code);
+      console.error('   Сообщение:', error.message);
+      if (error.code === 'EADDRINUSE') {
+        console.error('   ⚠️  Порт уже занят! Проверьте, не запущен ли другой процесс на порту', PORT);
+      }
+      process.exit(1);
     });
 
-    // Настройка ежедневной синхронизации меню из Google Sheets
-    // Запускается каждый день в 3:00 утра по UTC
-    // Можно изменить расписание через переменную окружения SYNC_CRON_SCHEDULE
+    // Шаг 5: Настройка синхронизации меню
+    console.log('\n📅 ШАГ 5: Настройка синхронизации меню...');
     const syncSchedule = process.env.SYNC_CRON_SCHEDULE || '0 3 * * *';
     
     if (process.env.GOOGLE_SHEETS_ID && process.env.GOOGLE_SHEETS_CREDENTIALS) {
@@ -200,55 +307,160 @@ const startServer = async () => {
           console.error('Ошибка при запланированной синхронизации:', error);
         }
       });
-      console.log(`📅 Ежедневная синхронизация меню настроена на расписание: ${syncSchedule}`);
+      console.log(`✅ Ежедневная синхронизация меню настроена на расписание: ${syncSchedule}`);
     } else {
       console.log('⚠️  Google Sheets не настроены. Синхронизация отключена.');
     }
+    
+    // Шаг 6: Автоматическое геокодирование (в фоне)
+    console.log('\n📍 ШАГ 6: Запуск автоматического геокодирования (фоновая задача)...');
+    autoGeocodeRestaurants().catch((error) => {
+      console.error('⚠️  Ошибка при автоматическом геокодировании (не критично):', error);
+      // Не прерываем запуск приложения при ошибке геокодирования
+    });
+    
   } catch (error) {
-    console.error('Failed to start server:', error);
+    const totalTime = Date.now() - startTime;
+    console.error('\n' + '='.repeat(60));
+    console.error('❌ КРИТИЧЕСКАЯ ОШИБКА ПРИ ЗАПУСКЕ СЕРВЕРА');
+    console.error('='.repeat(60));
+    console.error(`⏱️  Время до ошибки: ${totalTime}ms`);
+    console.error('📋 Тип ошибки:', error instanceof Error ? error.constructor.name : typeof error);
+    console.error('💬 Сообщение:', error instanceof Error ? error.message : String(error));
+    
+    if (error instanceof Error && error.stack) {
+      console.error('\n📚 Stack trace:');
+      console.error(error.stack);
+    }
+    
+    // Дополнительная диагностика
+    if (error instanceof Error) {
+      if (error.message.includes('timeout') || error.message.includes('TIMEOUT')) {
+        console.error('\n⚠️  ДИАГНОСТИКА: Похоже на проблему с таймаутом подключения');
+        console.error('   Проверьте:');
+        console.error('   - Доступность базы данных');
+        console.error('   - Правильность DATABASE_URL');
+        console.error('   - Сетевые настройки Railway');
+      }
+      if (error.message.includes('ECONNREFUSED') || error.message.includes('connection refused')) {
+        console.error('\n⚠️  ДИАГНОСТИКА: База данных недоступна');
+        console.error('   Проверьте:');
+        console.error('   - Запущена ли база данных PostgreSQL');
+        console.error('   - Правильность хоста и порта в DATABASE_URL');
+      }
+      if (error.message.includes('password') || error.message.includes('authentication')) {
+        console.error('\n⚠️  ДИАГНОСТИКА: Проблема с аутентификацией');
+        console.error('   Проверьте:');
+        console.error('   - Правильность пароля в DATABASE_URL');
+        console.error('   - Права доступа пользователя БД');
+      }
+    }
+    
+    console.error('='.repeat(60) + '\n');
     process.exit(1);
   }
 };
 
 // Graceful shutdown - обработка сигналов завершения
 const gracefulShutdown = async (signal: string) => {
-  console.log(`\n${signal} received. Starting graceful shutdown...`);
+  const shutdownStart = Date.now();
+  console.log('\n' + '='.repeat(60));
+  console.log(`🛑 ${signal} получен. Начало graceful shutdown...`);
+  console.log('='.repeat(60));
+  console.log(`⏰ Время получения сигнала: ${new Date().toISOString()}`);
+  console.log(`⏱️  Uptime до shutdown: ${Math.round(process.uptime())} секунд`);
   
+  const shutdownSteps: Array<{ name: string; fn: () => Promise<void> }> = [];
+  
+  // Шаг 1: Закрытие HTTP сервера
   if (server) {
-    server.close(() => {
-      console.log('✅ HTTP server closed');
+    shutdownSteps.push({
+      name: 'HTTP Server',
+      fn: () => new Promise<void>((resolve) => {
+        console.log('🔄 Закрытие HTTP сервера...');
+        server.close(() => {
+          const time = Date.now() - shutdownStart;
+          console.log(`✅ HTTP сервер закрыт за ${time}ms`);
+          resolve();
+        });
+        
+        // Таймаут для закрытия сервера (5 секунд)
+        setTimeout(() => {
+          console.log('⚠️  Таймаут закрытия HTTP сервера');
+          resolve();
+        }, 5000);
+      })
     });
   }
   
-  // Останавливаем Telegram бота
-  try {
-    await stopBot();
-  } catch (error) {
-    console.error('Error stopping Telegram bot:', error);
-  }
-  
-  // Закрываем подключение к Redis
-  try {
-    const { closeRedis } = await import('./config/redis');
-    await closeRedis();
-  } catch (error) {
-    console.error('Error closing Redis:', error);
-  }
-  
-  // Закрываем подключение к БД
-  try {
-    const { AppDataSource } = await import('./config/database');
-    if (AppDataSource.isInitialized) {
-      await AppDataSource.destroy();
-      console.log('✅ Database connection closed');
+  // Шаг 2: Остановка Telegram бота
+  shutdownSteps.push({
+    name: 'Telegram Bot',
+    fn: async () => {
+      try {
+        console.log('🔄 Остановка Telegram бота...');
+        await stopBot();
+        console.log('✅ Telegram бот остановлен');
+      } catch (error) {
+        console.error('⚠️  Ошибка при остановке Telegram бота:', error);
+      }
     }
-  } catch (error) {
-    console.error('Error closing database:', error);
+  });
+  
+  // Шаг 3: Закрытие Redis
+  shutdownSteps.push({
+    name: 'Redis',
+    fn: async () => {
+      try {
+        console.log('🔄 Закрытие подключения к Redis...');
+        const { closeRedis } = await import('./config/redis');
+        await closeRedis();
+        console.log('✅ Подключение к Redis закрыто');
+      } catch (error) {
+        console.error('⚠️  Ошибка при закрытии Redis:', error);
+      }
+    }
+  });
+  
+  // Шаг 4: Закрытие БД
+  shutdownSteps.push({
+    name: 'Database',
+    fn: async () => {
+      try {
+        console.log('🔄 Закрытие подключения к базе данных...');
+        const { AppDataSource } = await import('./config/database');
+        if (AppDataSource.isInitialized) {
+          await AppDataSource.destroy();
+          console.log('✅ Подключение к базе данных закрыто');
+        } else {
+          console.log('ℹ️  База данных не была инициализирована');
+        }
+      } catch (error) {
+        console.error('⚠️  Ошибка при закрытии базы данных:', error);
+      }
+    }
+  });
+  
+  // Выполняем все шаги последовательно
+  for (const step of shutdownSteps) {
+    const stepStart = Date.now();
+    try {
+      await step.fn();
+      const stepTime = Date.now() - stepStart;
+      console.log(`   ⏱️  ${step.name}: ${stepTime}ms`);
+    } catch (error) {
+      console.error(`   ❌ Ошибка в шаге ${step.name}:`, error);
+    }
   }
+  
+  const totalShutdownTime = Date.now() - shutdownStart;
+  console.log('\n' + '='.repeat(60));
+  console.log(`✅ Graceful shutdown завершен за ${totalShutdownTime}ms`);
+  console.log('='.repeat(60) + '\n');
   
   // Даем время на завершение операций (максимум 10 секунд)
   setTimeout(() => {
-    console.log('⚠️  Forced shutdown after timeout');
+    console.log('⚠️  Принудительное завершение после таймаута');
     process.exit(0);
   }, 10000);
   
@@ -261,13 +473,41 @@ process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
 // Обработка необработанных ошибок
 process.on('unhandledRejection', (reason, promise) => {
-  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+  console.error('\n' + '='.repeat(60));
+  console.error('❌ UNHANDLED REJECTION');
+  console.error('='.repeat(60));
+  console.error('⏰ Время:', new Date().toISOString());
+  console.error('📋 Promise:', promise);
+  console.error('💬 Причина:', reason);
+  if (reason instanceof Error && reason.stack) {
+    console.error('📚 Stack trace:', reason.stack);
+  }
+  console.error('='.repeat(60) + '\n');
 });
 
 process.on('uncaughtException', (error) => {
-  console.error('Uncaught Exception:', error);
+  console.error('\n' + '='.repeat(60));
+  console.error('❌ UNCAUGHT EXCEPTION');
+  console.error('='.repeat(60));
+  console.error('⏰ Время:', new Date().toISOString());
+  console.error('📋 Тип ошибки:', error.constructor.name);
+  console.error('💬 Сообщение:', error.message);
+  if (error.stack) {
+    console.error('📚 Stack trace:', error.stack);
+  }
+  console.error('='.repeat(60) + '\n');
   gracefulShutdown('uncaughtException');
 });
+
+// Логируем начало запуска приложения
+console.log('\n' + '='.repeat(60));
+console.log('🚀 ИНИЦИАЛИЗАЦИЯ ПРИЛОЖЕНИЯ');
+console.log('='.repeat(60));
+console.log(`⏰ Время: ${new Date().toISOString()}`);
+console.log(`📋 Node.js: ${process.version}`);
+console.log(`🌍 Платформа: ${process.platform} ${process.arch}`);
+console.log(`💾 Память: ${Math.round(process.memoryUsage().rss / 1024 / 1024)}MB RSS`);
+console.log('='.repeat(60) + '\n');
 
 startServer();
 

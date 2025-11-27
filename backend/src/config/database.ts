@@ -65,6 +65,8 @@ export const AppDataSource = new DataSource({
 });
 
 export const connectDatabase = async (): Promise<void> => {
+  const startTime = Date.now();
+  
   try {
     console.log('🔄 Инициализация подключения к базе данных...');
     console.log('📊 Конфигурация БД:', {
@@ -73,29 +75,38 @@ export const connectDatabase = async (): Promise<void> => {
       database: dbConfig.database,
       username: dbConfig.username,
       synchronize: true,
+      ssl: process.env.DB_SSL === 'true' || process.env.DATABASE_URL ? 'enabled' : 'disabled',
+      poolMax: getPoolMax(),
     });
     
     // Добавляем таймаут для подключения (30 секунд)
+    console.log('⏳ Попытка подключения к БД (таймаут: 30 секунд)...');
     const connectionPromise = AppDataSource.initialize();
-    const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error('Database connection timeout after 30 seconds')), 30000);
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => {
+        const elapsed = Date.now() - startTime;
+        reject(new Error(`Database connection timeout after ${elapsed}ms (30 seconds limit)`));
+      }, 30000);
     });
     
     await Promise.race([connectionPromise, timeoutPromise]);
     
-    console.log('✅ PostgreSQL connected');
+    const connectionTime = Date.now() - startTime;
+    console.log(`✅ PostgreSQL connected за ${connectionTime}ms`);
     console.log('📊 Настройки пула соединений:', {
       max: getPoolMax(),
       min: 5,
       idleTimeout: '30s',
       connectionTimeout: '2s',
     });
-    console.log('📋 Доступные таблицы:', AppDataSource.entityMetadatas.map(e => e.tableName).join(', '));
+    console.log('📋 Доступные сущности:', AppDataSource.entityMetadatas.map(e => e.tableName).join(', '));
     
     // Проверяем, что таблицы созданы
+    console.log('🔍 Проверка существующих таблиц в БД...');
     const queryRunner = AppDataSource.createQueryRunner();
     const tables = await queryRunner.getTables();
     const tableNames = tables.map(t => t.name);
+    console.log(`🗄️  Найдено таблиц: ${tableNames.length}`);
     console.log('🗄️  Созданные таблицы в БД:', tableNames.join(', '));
     
     // Проверяем наличие таблицы users
@@ -104,12 +115,16 @@ export const connectDatabase = async (): Promise<void> => {
       // Если synchronize включен, TypeORM должен создать таблицу автоматически
       // Но на всякий случай проверим еще раз после небольшой задержки
       setTimeout(async () => {
-        const checkTables = await queryRunner.getTables();
-        const checkTableNames = checkTables.map(t => t.name);
-        if (checkTableNames.includes('users')) {
-          console.log('✅ Таблица users создана автоматически');
-        } else {
-          console.error('❌ Таблица users все еще не создана! Проверьте настройки synchronize');
+        try {
+          const checkTables = await queryRunner.getTables();
+          const checkTableNames = checkTables.map(t => t.name);
+          if (checkTableNames.includes('users')) {
+            console.log('✅ Таблица users создана автоматически');
+          } else {
+            console.error('❌ Таблица users все еще не создана! Проверьте настройки synchronize');
+          }
+        } catch (checkError) {
+          console.error('❌ Ошибка при проверке таблиц:', checkError);
         }
       }, 1000);
     } else {
@@ -117,12 +132,58 @@ export const connectDatabase = async (): Promise<void> => {
     }
     
     await queryRunner.release();
+    
+    // Финальная проверка работоспособности
+    console.log('🔍 Финальная проверка работоспособности БД...');
+    const testQueryRunner = AppDataSource.createQueryRunner();
+    await testQueryRunner.query('SELECT NOW() as current_time');
+    await testQueryRunner.release();
+    console.log('✅ База данных полностью готова к работе');
+    
   } catch (error) {
-    console.error('❌ PostgreSQL connection error:', error);
+    const connectionTime = Date.now() - startTime;
+    console.error(`❌ PostgreSQL connection error после ${connectionTime}ms`);
+    
     if (error instanceof Error) {
-      console.error('❌ Детали ошибки:', error.message);
-      console.error('❌ Stack trace:', error.stack);
+      console.error('❌ Тип ошибки:', error.constructor.name);
+      console.error('❌ Сообщение:', error.message);
+      
+      // Детальная диагностика по типу ошибки
+      if (error.message.includes('timeout')) {
+        console.error('\n⚠️  ДИАГНОСТИКА ТАЙМАУТА:');
+        console.error('   - Проверьте доступность хоста:', dbConfig.host);
+        console.error('   - Проверьте порт:', dbConfig.port);
+        console.error('   - Проверьте сетевые настройки Railway');
+        console.error('   - Проверьте, что PostgreSQL сервис запущен');
+      } else if (error.message.includes('ECONNREFUSED') || error.message.includes('connection refused')) {
+        console.error('\n⚠️  ДИАГНОСТИКА ОТКЛОНЕНИЯ ПОДКЛЮЧЕНИЯ:');
+        console.error('   - База данных недоступна по адресу:', dbConfig.host + ':' + dbConfig.port);
+        console.error('   - Проверьте, что PostgreSQL сервис запущен в Railway');
+        console.error('   - Проверьте правильность DATABASE_URL');
+      } else if (error.message.includes('password') || error.message.includes('authentication')) {
+        console.error('\n⚠️  ДИАГНОСТИКА АУТЕНТИФИКАЦИИ:');
+        console.error('   - Неверный пароль или имя пользователя');
+        console.error('   - Проверьте DATABASE_URL или отдельные переменные DB_USER/DB_PASSWORD');
+        console.error('   - Проверьте права доступа пользователя БД');
+      } else if (error.message.includes('database') && error.message.includes('does not exist')) {
+        console.error('\n⚠️  ДИАГНОСТИКА БАЗЫ ДАННЫХ:');
+        console.error('   - База данных не существует:', dbConfig.database);
+        console.error('   - Создайте базу данных или проверьте DATABASE_URL');
+      } else if (error.message.includes('SSL')) {
+        console.error('\n⚠️  ДИАГНОСТИКА SSL:');
+        console.error('   - Проблема с SSL соединением');
+        console.error('   - Проверьте настройки SSL в DATABASE_URL');
+        console.error('   - Убедитесь, что DB_SSL=true или DATABASE_URL содержит SSL параметры');
+      }
+      
+      if (error.stack) {
+        console.error('\n📚 Stack trace:');
+        console.error(error.stack);
+      }
+    } else {
+      console.error('❌ Неизвестная ошибка:', error);
     }
+    
     throw error;
   }
 };
