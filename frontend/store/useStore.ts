@@ -77,7 +77,7 @@ interface Store {
   setSelectedRestaurant: (restaurant: Restaurant | null) => void;
   fetchProfile: () => Promise<void>;
   updateProfile: (data: Partial<User>) => Promise<void>;
-  setFavoriteRestaurant: (restaurant: Restaurant | null) => void;
+  setFavoriteRestaurant: (restaurant: Restaurant | null) => Promise<void>;
   fetchFavoriteRestaurant: () => Promise<void>;
   setFavoriteRestaurantById: (restaurantId: string) => Promise<void>;
   fetchBanners: (restaurantId?: string) => Promise<void>;
@@ -288,8 +288,14 @@ export const useStore = create<Store>((set, get) => {
       }
     },
 
-    setFavoriteRestaurant: (restaurant) => {
+    setFavoriteRestaurant: async (restaurant) => {
       set({ favoriteRestaurant: restaurant });
+      // Обновляем локальное хранилище
+      if (restaurant) {
+        await deviceStorage.setItem(STORAGE_KEYS.FAVORITE_RESTAURANT_ID, restaurant.id);
+      } else {
+        await deviceStorage.removeItem(STORAGE_KEYS.FAVORITE_RESTAURANT_ID);
+      }
     },
 
     fetchFavoriteRestaurant: async () => {
@@ -333,6 +339,13 @@ export const useStore = create<Store>((set, get) => {
         const restaurant = response.data.data;
         
         set({ favoriteRestaurant: restaurant });
+        
+        // Обновляем локальное хранилище
+        if (restaurant) {
+          await deviceStorage.setItem(STORAGE_KEYS.FAVORITE_RESTAURANT_ID, restaurant.id);
+        } else {
+          await deviceStorage.removeItem(STORAGE_KEYS.FAVORITE_RESTAURANT_ID);
+        }
         
         // Если устанавливаем новый любимый ресторан, автоматически выбираем его
         if (restaurant) {

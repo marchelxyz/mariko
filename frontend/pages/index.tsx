@@ -74,7 +74,7 @@ export default function Home({
 
     // Инициализируем любимый ресторан
     if (initialFavoriteRestaurant) {
-      setFavoriteRestaurant(initialFavoriteRestaurant);
+      setFavoriteRestaurant(initialFavoriteRestaurant).catch(console.error);
     }
 
     // Инициализируем выбранный ресторан
