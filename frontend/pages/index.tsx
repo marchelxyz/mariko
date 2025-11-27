@@ -1,11 +1,13 @@
 import { useEffect } from 'react';
 import { GetServerSideProps } from 'next';
+import { useRouter } from 'next/router';
 import { useStore } from '@/store/useStore';
 import Layout from '@/components/Layout';
 import Header from '@/components/Header';
 import ActionButtons from '@/components/ActionButtons';
 import Banners from '@/components/Banners';
 import MenuBlock from '@/components/MenuBlock';
+import LocationRequest from '@/components/LocationRequest';
 
 interface Banner {
   id: string;
@@ -41,6 +43,7 @@ interface HomeProps {
   initialMenuItems: MenuItem[];
   initialSelectedRestaurantId: string | null;
   initialFavoriteRestaurant: Restaurant | null;
+  isGeneralMenu?: boolean;
   restaurantId?: string;
 }
 
@@ -50,8 +53,10 @@ export default function Home({
   initialMenuItems,
   initialSelectedRestaurantId,
   initialFavoriteRestaurant,
+  isGeneralMenu,
   restaurantId,
 }: HomeProps) {
+  const router = useRouter();
   const {
     selectedRestaurant,
     setBannersForRestaurant,
@@ -92,7 +97,7 @@ export default function Home({
     setFavoriteRestaurant(initialFavoriteRestaurant).catch(console.error);
 
     // Инициализируем выбранный ресторан
-    // Приоритет всегда у избранного ресторана
+    // Приоритет всегда у избранного ресторана или явно указанного в URL
     if (initialFavoriteRestaurant && initialRestaurants) {
       const favoriteInList = initialRestaurants.find((r) => r.id === initialFavoriteRestaurant.id);
       if (favoriteInList) {
@@ -104,76 +109,41 @@ export default function Home({
           setSelectedRestaurant(restaurant);
         }
       }
-      // Не выбираем первый ресторан автоматически, если нет избранного и явно выбранного
+    } else if (restaurantId && initialRestaurants) {
+      // Если restaurantId указан в URL, это явный выбор - используем его
+      const restaurant = initialRestaurants.find((r) => r.id === restaurantId);
+      if (restaurant) {
+        setSelectedRestaurant(restaurant);
+      }
     } else if (initialSelectedRestaurantId && initialRestaurants) {
-      // Если есть явно выбранный ресторан (из URL или сервера), используем его
+      // Если есть явно выбранный ресторан (из сервера), используем его
       const restaurant = initialRestaurants.find((r) => r.id === initialSelectedRestaurantId);
       if (restaurant) {
         setSelectedRestaurant(restaurant);
       }
     }
-    // Если нет избранного и нет явно выбранного ресторана, 
-    // не выбираем первый сразу - попробуем выбрать ближайший по местоположению
-    // (см. код ниже)
+    // Если нет избранного и нет явно выбранного ресторана,
+    // НЕ выбираем ресторан автоматически - показываем общее меню
+    // и предлагаем пользователю поделиться геолокацией
 
     // Инициализируем меню
     if (initialMenuItems && initialMenuItems.length > 0) {
-      const targetRestaurantId = initialSelectedRestaurantId || restaurantId || initialRestaurants?.[0]?.id;
-      setMenuItems(initialMenuItems, targetRestaurantId || undefined);
+      // Используем restaurantId только если он явно указан (избранный или из URL)
+      const targetRestaurantId = initialSelectedRestaurantId || restaurantId || undefined;
+      setMenuItems(initialMenuItems, targetRestaurantId);
     }
 
-    // Автоматически определяем ближайший ресторан, если нет избранного ресторана
-    // и нет явно выбранного ресторана из URL или сервера
-    if (!initialFavoriteRestaurant && !initialSelectedRestaurantId && initialRestaurants && initialRestaurants.length > 0) {
-      // Проверяем, есть ли рестораны с координатами
-      // Координаты могут приходить как строки из БД (decimal), преобразуем в числа
-      const restaurantsWithCoords = initialRestaurants.filter(r => {
-        const lat = typeof r.latitude === 'string' ? parseFloat(r.latitude) : r.latitude;
-        const lon = typeof r.longitude === 'string' ? parseFloat(r.longitude) : r.longitude;
-        return lat != null && !isNaN(lat) && lon != null && !isNaN(lon);
-      });
-      
-      if (restaurantsWithCoords.length > 0) {
-        // Небольшая задержка, чтобы дать время для инициализации store и Telegram WebApp SDK
-        setTimeout(async () => {
-          try {
-            console.log('[Home] 🎯 Начинаем процесс выбора ближайшего ресторана');
-            console.log('[Home] Найдено ресторанов с координатами:', restaurantsWithCoords.length);
-            console.log('[Home] Условия: нет избранного ресторана, нет явно выбранного ресторана');
-            
-            // Принудительно запрашиваем местоположение при первой загрузке страницы
-            // чтобы пользователь явно видел запрос на доступ к геолокации
-            console.log('[Home] ⚠️ Запрашиваем местоположение у пользователя (forceRequest=true)...');
-            const success = await selectNearestRestaurantByLocation(true);
-            
-            // Если ближайший ресторан не был выбран (пользователь отказал или ошибка),
-            // выбираем первый ресторан как fallback
-            if (!success && initialRestaurants.length > 0) {
-              console.log('[Home] Ближайший ресторан не выбран, используем первый ресторан как fallback');
-              setSelectedRestaurant(initialRestaurants[0]);
-            } else if (success) {
-              console.log('[Home] ✅ Ближайший ресторан успешно выбран');
-            }
-          } catch (error) {
-            console.error('[Home] ❌ Не удалось выбрать ближайший ресторан:', error);
-            // В случае ошибки выбираем первый ресторан
-            if (initialRestaurants.length > 0) {
-              setSelectedRestaurant(initialRestaurants[0]);
-            }
-          }
-        }, 1000); // Увеличиваем задержку до 1 секунды для гарантии готовности Telegram WebApp SDK
-      } else {
-        console.log('[Home] Нет ресторанов с координатами, выбираем первый ресторан');
-        // Если нет ресторанов с координатами, выбираем первый
-        setSelectedRestaurant(initialRestaurants[0]);
-      }
-    }
+    // НЕ выбираем ресторан автоматически, если нет избранного и нет restaurantId в URL
+    // Пользователь увидит общее меню и сможет поделиться геолокацией через компонент LocationRequest
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
     <Layout>
       <Header />
+      {/* Компонент запроса геолокации - показывается только если нет выбранного ресторана и нет restaurantId в URL */}
+      {!restaurantId && !selectedRestaurant && <LocationRequest />}
+      
       {/* Мобильная версия */}
       <div className="md:hidden">
         <ActionButtons />
@@ -181,7 +151,11 @@ export default function Home({
           <div className="px-4">
             <Banners restaurantId={selectedRestaurant?.id || restaurantId} initialBanners={initialBanners} />
           </div>
-          <MenuBlock restaurantId={selectedRestaurant?.id || restaurantId} initialMenuItems={initialMenuItems} />
+          <MenuBlock 
+            restaurantId={selectedRestaurant?.id || restaurantId} 
+            initialMenuItems={initialMenuItems}
+            isGeneralMenu={isGeneralMenu && !selectedRestaurant && !restaurantId}
+          />
         </div>
       </div>
 
@@ -191,7 +165,11 @@ export default function Home({
           {/* Левая колонка - кнопки, заголовок и блюда */}
           <div className="flex-1 flex flex-col">
             <ActionButtons />
-            <MenuBlock restaurantId={selectedRestaurant?.id || restaurantId} initialMenuItems={initialMenuItems} />
+            <MenuBlock 
+              restaurantId={selectedRestaurant?.id || restaurantId} 
+              initialMenuItems={initialMenuItems}
+              isGeneralMenu={isGeneralMenu && !selectedRestaurant && !restaurantId}
+            />
           </div>
 
           {/* Правая колонка - баннер */}
@@ -238,6 +216,7 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
     const menuItems = pageData.menuItems || [];
     const selectedRestaurantId = pageData.selectedRestaurantId || null;
     const favoriteRestaurant = pageData.favoriteRestaurant || null;
+    const isGeneralMenu = pageData.isGeneralMenu || false;
 
     return {
       props: {
@@ -246,6 +225,7 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
         initialMenuItems: menuItems,
         initialSelectedRestaurantId: selectedRestaurantId,
         initialFavoriteRestaurant: favoriteRestaurant,
+        isGeneralMenu,
         restaurantId: restaurantId as string || null,
       },
     };
@@ -259,6 +239,7 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
         initialMenuItems: [],
         initialSelectedRestaurantId: null,
         initialFavoriteRestaurant: null,
+        isGeneralMenu: false,
         restaurantId: null,
       },
     };

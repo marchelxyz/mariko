@@ -2,6 +2,7 @@ import { DataSource } from 'typeorm';
 import { User } from '../models/User';
 import { Restaurant } from '../models/Restaurant';
 import { MenuItem } from '../models/MenuItem';
+import { GeneralMenuItem } from '../models/GeneralMenuItem';
 import { Banner } from '../models/Banner';
 import { DishImage } from '../models/DishImage';
 
@@ -49,7 +50,7 @@ export const AppDataSource = new DataSource({
   username: dbConfig.username,
   password: dbConfig.password,
   database: dbConfig.database,
-  entities: [User, Restaurant, MenuItem, Banner, DishImage],
+  entities: [User, Restaurant, MenuItem, GeneralMenuItem, Banner, DishImage],
   synchronize: true, // Включаем синхронизацию для автоматического создания таблиц
   logging: process.env.NODE_ENV === 'development',
   ssl: process.env.DB_SSL === 'true' || process.env.DATABASE_URL ? { rejectUnauthorized: false } : false,
