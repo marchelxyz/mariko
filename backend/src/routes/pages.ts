@@ -100,6 +100,7 @@ router.get('/home', optionalAuthenticate, async (req: Request | AuthRequest, res
     // Определяем ресторан для загрузки меню
     let targetRestaurantId = restaurantIdStr;
     let favoriteRestaurant = null;
+    let selectedRestaurantId = null; // Явно выбранный ресторан (для возврата клиенту)
 
     // Если пользователь авторизован, загружаем его любимый ресторан
     if (userId) {
@@ -117,14 +118,22 @@ router.get('/home', optionalAuthenticate, async (req: Request | AuthRequest, res
           // Если не указан restaurantId, используем любимый ресторан
           if (!targetRestaurantId) {
             targetRestaurantId = favorite.id;
+            selectedRestaurantId = favorite.id; // Избранный ресторан считается явным выбором
           }
         }
       }
     }
 
-    // Если ресторан не определен, используем первый из списка
+    // Если restaurantId указан в query параметрах, это явный выбор пользователя
+    if (restaurantIdStr) {
+      selectedRestaurantId = restaurantIdStr;
+    }
+
+    // Если ресторан не определен для загрузки меню, используем первый из списка
+    // Но НЕ устанавливаем selectedRestaurantId, чтобы фронтенд мог запросить местоположение
     if (!targetRestaurantId && restaurants.length > 0) {
       targetRestaurantId = restaurants[0].id;
+      // selectedRestaurantId остается null, чтобы фронтенд мог выбрать ближайший по местоположению
     }
 
     // Загружаем меню для выбранного ресторана
@@ -175,7 +184,7 @@ router.get('/home', optionalAuthenticate, async (req: Request | AuthRequest, res
       restaurantId: restaurantIdStr || null,
       menuItems: menuItems || [],
       favoriteRestaurant,
-      selectedRestaurantId: targetRestaurantId || null,
+      selectedRestaurantId, // Теперь null, если нет явного выбора или избранного ресторана
     };
 
     // Сохраняем в кэш только для неавторизованных пользователей

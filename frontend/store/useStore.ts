@@ -85,7 +85,7 @@ interface Store {
   setBannersForRestaurant: (restaurantId: string | null, banners: Banner[]) => void;
   setMenuItems: (menuItems: MenuItem[], restaurantId?: string) => void;
   findNearestRestaurant: (latitude: number, longitude: number) => Promise<Restaurant | null>;
-  selectNearestRestaurantByLocation: () => Promise<boolean>;
+  selectNearestRestaurantByLocation: (forceRequest?: boolean) => Promise<boolean>;
 }
 
 // Инициализация токена из SecureStorage
@@ -516,7 +516,7 @@ export const useStore = create<Store>((set, get) => {
       }
     },
 
-    selectNearestRestaurantByLocation: async () => {
+    selectNearestRestaurantByLocation: async (forceRequest = false) => {
       if (typeof window === 'undefined') return false;
       
       try {
@@ -551,10 +551,11 @@ export const useStore = create<Store>((set, get) => {
         
         console.log(`[Store] Найдено ${restaurantsWithCoords.length} ресторанов с координатами`);
 
-        // Пробуем получить сохраненное местоположение
-        let location = getStoredLocation();
+        // Если forceRequest = true, всегда запрашиваем новое местоположение
+        // Иначе пробуем получить сохраненное местоположение
+        let location = forceRequest ? null : getStoredLocation();
         
-        // Если нет сохраненного, запрашиваем у пользователя
+        // Если нет сохраненного или принудительный запрос, запрашиваем у пользователя
         if (!location) {
           console.log('[Store] Запрашиваем местоположение у пользователя...');
           location = await requestLocation();
