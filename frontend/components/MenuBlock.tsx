@@ -50,12 +50,18 @@ export default function MenuBlock({ restaurantId, initialMenuItems, isGeneralMen
 
   // Получаем меню из store или загружаем, если его нет
   const currentRestaurantId = restaurantId || selectedRestaurant?.id;
+  
+  // Если указан конкретный ресторан, используем только его меню из кеша
+  // НЕ используем fallback на menuItems, чтобы избежать показа меню другого ресторана
   const cachedMenuItems = currentRestaurantId 
-    ? (menuItemsByRestaurant[currentRestaurantId] || menuItems)
+    ? (menuItemsByRestaurant[currentRestaurantId] || [])
     : menuItems;
   
-  // Используем предзагруженные элементы меню, если они есть и кэш пуст
-  const menuItemsToUse = cachedMenuItems.length > 0 ? cachedMenuItems : (initialMenuItems || []);
+  // Используем предзагруженные элементы меню только если они соответствуют текущему ресторану
+  // или если ресторан не указан (общее меню)
+  const shouldUseInitialMenuItems = initialMenuItems && initialMenuItems.length > 0 && 
+    (!currentRestaurantId || cachedMenuItems.length === 0);
+  const menuItemsToUse = cachedMenuItems.length > 0 ? cachedMenuItems : (shouldUseInitialMenuItems ? initialMenuItems : []);
 
   // Загружаем меню только если его нет в store
   useEffect(() => {
@@ -64,14 +70,16 @@ export default function MenuBlock({ restaurantId, initialMenuItems, isGeneralMen
     
     if (!currentRestaurantId) return;
 
-    // Если меню уже есть в кэше, не загружаем
-    if (cachedMenuItems && cachedMenuItems.length > 0) {
+    // Если меню уже есть в кэше для этого ресторана, не загружаем
+    if (menuItemsByRestaurant[currentRestaurantId] && menuItemsByRestaurant[currentRestaurantId].length > 0) {
       setIsLoading(false);
       return;
     }
     
-    // Если есть initialMenuItems, не делаем запрос
-    if (initialMenuItems && initialMenuItems.length > 0) {
+    // Если есть initialMenuItems для текущего ресторана, не делаем запрос
+    // Но только если меню для этого ресторана еще не загружено
+    if (initialMenuItems && initialMenuItems.length > 0 && 
+        !menuItemsByRestaurant[currentRestaurantId]) {
       setIsLoading(false);
       return;
     }
@@ -100,7 +108,7 @@ export default function MenuBlock({ restaurantId, initialMenuItems, isGeneralMen
     };
 
     fetchMenu();
-  }, [restaurantId, selectedRestaurant, currentRestaurantId, cachedMenuItems, initialMenuItems, setMenuItems]);
+  }, [restaurantId, selectedRestaurant?.id, currentRestaurantId, menuItemsByRestaurant, initialMenuItems, setMenuItems]);
 
   // Получаем блюда для отображения
   const menuItemsToDisplay = menuItemsToUse.slice(0, displayCount);
