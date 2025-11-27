@@ -124,11 +124,12 @@ function MyApp({ Component, pageProps }: AppProps) {
 
           // Инициализация LocationManager (Bot API 8.0+)
           if (WebApp.isVersionAtLeast && WebApp.isVersionAtLeast('8.0') && WebApp.LocationManager) {
-            const locationManager = WebApp.LocationManager;
+            const locationManager = WebApp.LocationManager as any;
             
             // Инициализируем LocationManager заранее для лучшей производительности
-            if (!locationManager.isInitialized) {
-              locationManager.init((success) => {
+            // Проверяем через 'in' оператор, так как TypeScript может не знать об этом свойстве
+            if (!('isInitialized' in locationManager) || !locationManager.isInitialized) {
+              locationManager.init((success: boolean) => {
                 if (success) {
                   console.log('[App] LocationManager успешно инициализирован');
                 } else {
@@ -139,10 +140,11 @@ function MyApp({ Component, pageProps }: AppProps) {
 
             // Слушаем изменения состояния LocationManager
             WebApp.onEvent('locationManagerUpdated', () => {
+              const lm = WebApp.LocationManager as any;
               console.log('[App] LocationManager обновлен:', {
-                isLocationAvailable: locationManager.isLocationAvailable,
-                isPermissionRequested: locationManager.isPermissionRequested,
-                isPermissionGranted: locationManager.isPermissionGranted
+                isLocationAvailable: lm?.isLocationAvailable,
+                isPermissionRequested: lm?.isPermissionRequested,
+                isPermissionGranted: lm?.isPermissionGranted
               });
             });
 

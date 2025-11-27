@@ -56,11 +56,12 @@ async function initLocationManager(WebApp: any): Promise<LocationManager | null>
     return null;
   }
 
-  const locationManager = WebApp.LocationManager as LocationManager;
+  const locationManager = WebApp.LocationManager as any;
 
   // Если уже инициализирован, возвращаем сразу
-  if (locationManager.isInitialized) {
-    return locationManager;
+  // Используем безопасную проверку, так как TypeScript может не знать об этом свойстве
+  if ('isInitialized' in locationManager && locationManager.isInitialized) {
+    return locationManager as LocationManager;
   }
 
   // Инициализируем
@@ -70,11 +71,11 @@ async function initLocationManager(WebApp: any): Promise<LocationManager | null>
       resolve(null);
     }, 5000);
 
-    locationManager.init((success) => {
+    locationManager.init((success: boolean) => {
       clearTimeout(timeout);
       if (success) {
         console.log('[Location] LocationManager успешно инициализирован');
-        resolve(locationManager);
+        resolve(locationManager as LocationManager);
       } else {
         console.warn('[Location] Не удалось инициализировать LocationManager');
         resolve(null);
@@ -96,14 +97,16 @@ async function requestLocationViaLocationManager(WebApp: any): Promise<Location 
     return null;
   }
 
+  const lm = locationManager as any;
+
   // Проверяем доступность геолокации
-  if (!locationManager.isLocationAvailable) {
+  if (!lm.isLocationAvailable) {
     console.warn('[Location] Геолокация недоступна на этом устройстве');
     return null;
   }
 
   // Проверяем разрешение
-  if (!locationManager.isPermissionGranted) {
+  if (!lm.isPermissionGranted) {
     console.log('[Location] Разрешение на геолокацию не предоставлено');
     // Примечание: openSettings() можно вызвать только в ответ на действие пользователя
     // Здесь мы просто возвращаем null, вызывающий код может показать кнопку для запроса разрешения
@@ -119,7 +122,7 @@ async function requestLocationViaLocationManager(WebApp: any): Promise<Location 
     }, 10000);
 
     try {
-      locationManager.getLocation((locationData) => {
+      (locationManager as any).getLocation((locationData: any) => {
         clearTimeout(timeout);
 
         if (locationData && typeof locationData.latitude === 'number' && typeof locationData.longitude === 'number') {
@@ -276,7 +279,7 @@ export async function openLocationSettings(): Promise<boolean> {
       const locationManager = await initLocationManager(WebApp);
       if (locationManager) {
         try {
-          locationManager.openSettings();
+          (locationManager as any).openSettings();
           console.log('[Location] Настройки геолокации открыты');
           return true;
         } catch (error) {
@@ -317,10 +320,11 @@ export async function checkLocationPermission(): Promise<{
     if (WebApp.isVersionAtLeast && WebApp.isVersionAtLeast('8.0') && WebApp.LocationManager) {
       const locationManager = await initLocationManager(WebApp);
       if (locationManager) {
+        const lm = locationManager as any;
         return {
-          isLocationAvailable: locationManager.isLocationAvailable,
-          isPermissionRequested: locationManager.isPermissionRequested,
-          isPermissionGranted: locationManager.isPermissionGranted
+          isLocationAvailable: lm.isLocationAvailable ?? false,
+          isPermissionRequested: lm.isPermissionRequested ?? false,
+          isPermissionGranted: lm.isPermissionGranted ?? false
         };
       }
     }
