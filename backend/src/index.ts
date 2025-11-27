@@ -31,7 +31,9 @@ const PORT: number = Number(process.env.PORT) || 5000;
 
 // ✅ Настройка trust proxy для работы за прокси-сервером (Railway, nginx и т.д.)
 // Это необходимо для правильного определения IP-адреса клиента через X-Forwarded-For
-app.set('trust proxy', true);
+// Используем число вместо true для безопасности: доверяем только первому прокси
+// Для Railway/Vercel обычно достаточно 1 прокси
+app.set('trust proxy', 1);
 
 // Middleware
 app.use(helmet());
