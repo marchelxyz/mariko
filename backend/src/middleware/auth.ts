@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { AppDataSource } from '../config/database';
 import { User, UserRole } from '../models/User';
+import { getUserFromCache, setUserToCache, invalidateUserCache } from '../services/cacheService';
 
 export interface AuthRequest extends Request {
   userId?: string;
@@ -55,15 +56,23 @@ export const authenticate = async (
     const jwtSecret = process.env.JWT_SECRET || 'your-secret-key';
     const decoded = jwt.verify(token, jwtSecret) as { userId: string; role: string };
 
-    // Получаем пользователя из БД для проверки Telegram ID
-    const userRepository = AppDataSource.getRepository(User);
-    const user = await userRepository.findOne({
-      where: { id: decoded.userId },
-    });
+    // Пытаемся получить пользователя из кеша
+    let user: User | null = await getUserFromCache(decoded.userId);
 
     if (!user) {
-      res.status(401).json({ success: false, message: 'User not found' });
-      return;
+      // Если пользователя нет в кеше, получаем из БД
+      const userRepository = AppDataSource.getRepository(User);
+      user = await userRepository.findOne({
+        where: { id: decoded.userId },
+      });
+
+      if (!user) {
+        res.status(401).json({ success: false, message: 'User not found' });
+        return;
+      }
+
+      // Сохраняем в кеш для следующих запросов
+      await setUserToCache(decoded.userId, user);
     }
 
     // Проверяем, является ли пользователь админом по Telegram ID
@@ -76,11 +85,14 @@ export const authenticate = async (
     if (isTelegramAdmin(user.telegramId)) {
       console.log('[authenticate] User is admin by Telegram ID, setting role to ADMIN');
       userRole = UserRole.ADMIN;
-      // Обновляем роль в БД, если она изменилась
+      // Обновляем роль в БД и кеше, если она изменилась
       if (user.role !== UserRole.ADMIN) {
         console.log('[authenticate] Updating user role in DB to ADMIN');
         user.role = UserRole.ADMIN;
+        const userRepository = AppDataSource.getRepository(User);
         await userRepository.save(user);
+        // Обновляем кеш
+        await setUserToCache(decoded.userId, user);
       }
     } else {
       console.log('[authenticate] User is not admin by Telegram ID');

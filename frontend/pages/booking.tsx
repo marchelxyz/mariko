@@ -16,7 +16,6 @@ export default function Booking() {
   const [formData, setFormData] = useState({
     name: '',
     phone: '',
-    email: '',
     date: '',
     time: '',
     guests_count: 2,
@@ -30,7 +29,6 @@ export default function Booking() {
         ...prev,
         name: `${user.firstName || ''} ${user.lastName || ''}`.trim() || prev.name,
         phone: user.phoneNumber || prev.phone,
-        email: prev.email, // Email обычно не хранится в профиле
       }));
     }
   }, [user]);
@@ -99,10 +97,6 @@ export default function Booking() {
       setError('Количество гостей должно быть от 1 до 20');
       return false;
     }
-    if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
-      setError('Введите корректный email');
-      return false;
-    }
     return true;
   };
 
@@ -128,7 +122,6 @@ export default function Booking() {
         restaurantId: selectedRestaurant.id,
         name: formData.name.trim(),
         phone: formData.phone.replace(/\s/g, ''),
-        email: formData.email.trim() || undefined,
         date: formData.date,
         time: formData.time,
         guests_count: formData.guests_count,
@@ -145,7 +138,6 @@ export default function Booking() {
           setFormData({
             name: user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() : '',
             phone: user?.phoneNumber || '',
-            email: '',
             date: '',
             time: '',
             guests_count: 2,
@@ -275,19 +267,6 @@ export default function Booking() {
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
                 placeholder="+7 (999) 999-99-99"
                 required
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-text-primary mb-1">
-                Email
-              </label>
-              <input
-                type="email"
-                value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-                placeholder="example@mail.com"
               />
             </div>
 

@@ -4,6 +4,7 @@ import { AppDataSource } from '../config/database';
 import { Restaurant } from '../models/Restaurant';
 import { remarkedService } from '../services/remarkedService';
 import { ReserveData } from '../types/remarked';
+import { getRestaurantFromCache, setRestaurantToCache } from '../services/cacheService';
 
 const router = Router();
 
@@ -14,7 +15,6 @@ const router = Router();
  * - restaurantId: string (UUID ресторана)
  * - name: string (Имя клиента)
  * - phone: string (Телефон в формате +79999999999)
- * - email?: string (Email клиента)
  * - date: string (Дата в формате YYYY-MM-DD)
  * - time: string (Время в формате HH:mm)
  * - guests_count: number (Количество гостей)
@@ -25,12 +25,14 @@ const router = Router();
  * - confirm_code?: number (SMS код подтверждения, если требуется)
  */
 router.post('/', authenticate, async (req: AuthRequest, res: Response) => {
+  const startTime = Date.now();
+  const timings: Record<string, number> = {};
+
   try {
     const {
       restaurantId,
       name,
       phone,
-      email,
       date,
       time,
       guests_count,
@@ -49,11 +51,25 @@ router.post('/', authenticate, async (req: AuthRequest, res: Response) => {
       });
     }
 
-    // Получаем ресторан из базы данных
-    const restaurantRepository = AppDataSource.getRepository(Restaurant);
-    const restaurant = await restaurantRepository.findOne({
-      where: { id: restaurantId },
-    });
+    // Получаем ресторан из кеша или базы данных
+    let restaurant: Restaurant | null = null;
+    const cacheStart = Date.now();
+    restaurant = await getRestaurantFromCache(restaurantId);
+    timings.cache_lookup = Date.now() - cacheStart;
+
+    if (!restaurant) {
+      const dbStart = Date.now();
+      const restaurantRepository = AppDataSource.getRepository(Restaurant);
+      restaurant = await restaurantRepository.findOne({
+        where: { id: restaurantId },
+      });
+      timings.db_restaurant = Date.now() - dbStart;
+
+      // Сохраняем в кеш для следующих запросов
+      if (restaurant) {
+        await setRestaurantToCache(restaurantId, restaurant);
+      }
+    }
 
     if (!restaurant) {
       return res.status(404).json({
@@ -77,10 +93,12 @@ router.post('/', authenticate, async (req: AuthRequest, res: Response) => {
       });
     }
 
-    // Получаем токен от ReMarked API
+    // Получаем токен от ReMarked API (с кешированием)
     let token: string;
     try {
+      const tokenStart = Date.now();
       const tokenResponse = await remarkedService.getToken(restaurant.remarkedPointId);
+      timings.remarked_token = Date.now() - tokenStart;
       token = tokenResponse.token;
     } catch (error: any) {
       console.error('Ошибка получения токена ReMarked:', error);
@@ -97,7 +115,6 @@ router.post('/', authenticate, async (req: AuthRequest, res: Response) => {
       date,
       time,
       guests_count: Number(guests_count),
-      ...(email && { email }),
       ...(duration && { duration: Number(duration) }),
       ...(comment && { comment }),
       ...(table_ids && Array.isArray(table_ids) && { table_ids: table_ids.map(Number) }),
@@ -108,11 +125,13 @@ router.post('/', authenticate, async (req: AuthRequest, res: Response) => {
     // Создаем бронирование через ReMarked API
     let reserveResult;
     try {
+      const reserveStart = Date.now();
       reserveResult = await remarkedService.createReserve(
         token,
         reserveData,
         confirm_code ? Number(confirm_code) : undefined
       );
+      timings.remarked_create = Date.now() - reserveStart;
     } catch (error: any) {
       console.error('Ошибка создания бронирования ReMarked:', error);
       
@@ -137,6 +156,19 @@ router.post('/', authenticate, async (req: AuthRequest, res: Response) => {
       });
     }
 
+    const totalTime = Date.now() - startTime;
+    
+    // Логируем детальную информацию о производительности
+    if (totalTime > 1000) {
+      console.log(`[booking] Детальная статистика производительности (${totalTime}ms):`, {
+        cache_lookup: timings.cache_lookup || 0,
+        db_restaurant: timings.db_restaurant || 0,
+        remarked_token: timings.remarked_token || 0,
+        remarked_create: timings.remarked_create || 0,
+        total: totalTime,
+      });
+    }
+
     // Возвращаем успешный результат
     res.status(201).json({
       success: true,
@@ -149,7 +181,8 @@ router.post('/', authenticate, async (req: AuthRequest, res: Response) => {
       },
     });
   } catch (error: any) {
-    console.error('Ошибка создания бронирования:', error);
+    const totalTime = Date.now() - startTime;
+    console.error(`[booking] Ошибка создания бронирования (${totalTime}ms):`, error);
     res.status(500).json({
       success: false,
       message: error.message || 'Не удалось создать бронирование',

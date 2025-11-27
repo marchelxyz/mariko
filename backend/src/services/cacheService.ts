@@ -8,6 +8,8 @@ const CACHE_PREFIXES = {
   BANNERS: 'banners',
   PAGE_HOME: 'page:home',
   PAGE_MENU: 'page:menu',
+  REMARKED_TOKEN: 'remarked:token',
+  USER: 'user',
 } as const;
 
 // Время жизни кэша (в секундах)
@@ -18,6 +20,8 @@ const CACHE_TTL = {
   BANNERS: 1800, // 30 минут
   PAGE_HOME: 1800, // 30 минут
   PAGE_MENU: 1800, // 30 минут
+  REMARKED_TOKEN: 3300, // 55 минут (токены ReMarked обычно валидны 1 час)
+  USER: 300, // 5 минут (данные пользователя могут изменяться)
 } as const;
 
 /**
@@ -225,4 +229,56 @@ export const invalidateMenuPageCache = async (restaurantId: string) => {
  */
 export const invalidateAllMenuPageCache = async () => {
   await deleteByPattern(`${CACHE_PREFIXES.PAGE_MENU}:*`);
+};
+
+// ========== Специфичные функции для токенов ReMarked ==========
+
+/**
+ * Получить токен ReMarked из кэша
+ */
+export const getRemarkedTokenFromCache = async (pointId: number): Promise<string | null> => {
+  const key = getCacheKey(CACHE_PREFIXES.REMARKED_TOKEN, String(pointId));
+  return getFromCache<string>(key);
+};
+
+/**
+ * Сохранить токен ReMarked в кэш
+ */
+export const setRemarkedTokenToCache = async (pointId: number, token: string): Promise<void> => {
+  const key = getCacheKey(CACHE_PREFIXES.REMARKED_TOKEN, String(pointId));
+  await setToCache(key, token, CACHE_TTL.REMARKED_TOKEN);
+};
+
+/**
+ * Инвалидировать кэш токена ReMarked
+ */
+export const invalidateRemarkedTokenCache = async (pointId: number): Promise<void> => {
+  const key = getCacheKey(CACHE_PREFIXES.REMARKED_TOKEN, String(pointId));
+  await deleteFromCache(key);
+};
+
+// ========== Специфичные функции для пользователей ==========
+
+/**
+ * Получить данные пользователя из кэша
+ */
+export const getUserFromCache = async (userId: string) => {
+  const key = getCacheKey(CACHE_PREFIXES.USER, userId);
+  return getFromCache(key);
+};
+
+/**
+ * Сохранить данные пользователя в кэш
+ */
+export const setUserToCache = async (userId: string, data: any): Promise<void> => {
+  const key = getCacheKey(CACHE_PREFIXES.USER, userId);
+  await setToCache(key, data, CACHE_TTL.USER);
+};
+
+/**
+ * Инвалидировать кэш пользователя
+ */
+export const invalidateUserCache = async (userId: string): Promise<void> => {
+  const key = getCacheKey(CACHE_PREFIXES.USER, userId);
+  await deleteFromCache(key);
 };
