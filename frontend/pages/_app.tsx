@@ -178,14 +178,9 @@ function MyApp({ Component, pageProps }: AppProps) {
             }
           }
           
-          // Если нет избранного, восстанавливаем из хранилища
-          const selectedRestaurantId = await deviceStorage.getItem(STORAGE_KEYS.SELECTED_RESTAURANT_ID);
-          if (selectedRestaurantId) {
-            const restaurant = restaurants.find(r => r.id === selectedRestaurantId);
-            if (restaurant) {
-              useStore.getState().setSelectedRestaurant(restaurant);
-            }
-          }
+          // НЕ восстанавливаем ресторан из хранилища, если нет избранного
+          // Это позволит показать поп-ап выбора ресторана для новых пользователей
+          // Ресторан будет выбран через поп-ап или через явный выбор в index.tsx
         } else if (selectedRestaurant && favoriteRestaurant) {
           // Если уже есть выбранный ресторан, но он не избранный, заменяем на избранный
           if (selectedRestaurant.id !== favoriteRestaurant.id) {

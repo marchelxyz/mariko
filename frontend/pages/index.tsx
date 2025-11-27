@@ -119,13 +119,30 @@ export default function Home({
     }
 
     // Показываем селектор ресторана, если нет выбранного ресторана и нет избранного
-    if (!initialFavoriteRestaurant && !restaurantId && !initialSelectedRestaurantId && initialRestaurants && initialRestaurants.length > 0) {
-      // Небольшая задержка перед показом popup
-      const timer = setTimeout(() => {
+    // Проверяем состояние после небольшой задержки, чтобы убедиться, что все инициализации завершены
+    const timer = setTimeout(() => {
+      const currentSelectedRestaurant = useStore.getState().selectedRestaurant;
+      const currentFavoriteRestaurant = useStore.getState().favoriteRestaurant;
+      
+      // Показываем поп-ап только если:
+      // 1. Нет избранного ресторана
+      // 2. Нет restaurantId в URL
+      // 3. Нет initialSelectedRestaurantId (явного выбора с сервера)
+      // 4. Нет выбранного ресторана в store (после всех инициализаций)
+      // 5. Есть рестораны для выбора
+      if (
+        !currentFavoriteRestaurant &&
+        !restaurantId &&
+        !initialSelectedRestaurantId &&
+        !currentSelectedRestaurant &&
+        initialRestaurants &&
+        initialRestaurants.length > 0
+      ) {
         setShowRestaurantSelector(true);
-      }, 500);
-      return () => clearTimeout(timer);
-    }
+      }
+    }, 500);
+    
+    return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
