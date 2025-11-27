@@ -19,9 +19,8 @@ interface MenuBlockProps {
 }
 
 export default function MenuBlock({ restaurantId }: MenuBlockProps) {
-  const { selectedRestaurant } = useStore();
+  const { selectedRestaurant, menuItems, menuItemsByRestaurant, setMenuItems } = useStore();
   const router = useRouter();
-  const [allMenuItems, setAllMenuItems] = useState<MenuItem[]>([]);
   const [displayCount, setDisplayCount] = useState(2);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -47,13 +46,24 @@ export default function MenuBlock({ restaurantId }: MenuBlockProps) {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Загружаем меню
+  // Получаем меню из store или загружаем, если его нет
+  const currentRestaurantId = restaurantId || selectedRestaurant?.id;
+  const cachedMenuItems = currentRestaurantId 
+    ? (menuItemsByRestaurant[currentRestaurantId] || menuItems)
+    : menuItems;
+
+  // Загружаем меню только если его нет в store
   useEffect(() => {
     // Пропускаем запрос на сервере
     if (typeof window === 'undefined') return;
     
-    const currentRestaurantId = restaurantId || selectedRestaurant?.id;
     if (!currentRestaurantId) return;
+
+    // Если меню уже есть в кэше, не загружаем
+    if (cachedMenuItems && cachedMenuItems.length > 0) {
+      setIsLoading(false);
+      return;
+    }
 
     const fetchMenu = async () => {
       setIsLoading(true);
@@ -69,7 +79,8 @@ export default function MenuBlock({ restaurantId }: MenuBlockProps) {
           }
         });
         
-        setAllMenuItems(allItems);
+        // Сохраняем в store
+        setMenuItems(allItems, currentRestaurantId);
       } catch (error) {
         console.error('Failed to fetch menu:', error);
       } finally {
@@ -78,10 +89,10 @@ export default function MenuBlock({ restaurantId }: MenuBlockProps) {
     };
 
     fetchMenu();
-  }, [restaurantId, selectedRestaurant]);
+  }, [restaurantId, selectedRestaurant, currentRestaurantId, cachedMenuItems]);
 
   // Получаем блюда для отображения
-  const menuItems = allMenuItems.slice(0, displayCount);
+  const menuItemsToDisplay = cachedMenuItems.slice(0, displayCount);
 
   const handleMenuClick = () => {
     const currentRestaurantId = restaurantId || selectedRestaurant?.id;
@@ -92,7 +103,7 @@ export default function MenuBlock({ restaurantId }: MenuBlockProps) {
     }
   };
 
-  if (isLoading || allMenuItems.length === 0) {
+  if (isLoading || !cachedMenuItems || cachedMenuItems.length === 0) {
     return null;
   }
 
@@ -131,7 +142,7 @@ export default function MenuBlock({ restaurantId }: MenuBlockProps) {
       {/* Блюда */}
       <div className="px-4 w-full overflow-x-hidden md:px-0">
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 gap-4 md:justify-items-start">
-          {menuItems.map((item) => (
+          {menuItemsToDisplay.map((item) => (
             <div
               key={item.id}
               className="bg-[#F7F7F7] rounded-xl p-3 flex flex-col w-full min-w-0"

@@ -46,6 +46,16 @@ interface Banner {
   linkUrl?: string;
 }
 
+interface MenuItem {
+  id: string;
+  name: string;
+  description: string;
+  price: number;
+  category: string;
+  imageUrl?: string;
+  calories?: number;
+}
+
 interface Store {
   user: User | null;
   restaurants: Restaurant[];
@@ -53,20 +63,25 @@ interface Store {
   favoriteRestaurant: Restaurant | null;
   banners: Banner[];
   bannersByRestaurant: Record<string, Banner[]>;
+  menuItems: MenuItem[];
+  menuItemsByRestaurant: Record<string, MenuItem[]>;
   token: string | null;
   isLoading: boolean;
   error: string | null;
   setToken: (token: string | null) => void;
   setUser: (user: User | null) => void;
+  setRestaurants: (restaurants: Restaurant[]) => void;
   fetchRestaurants: () => Promise<void>;
   setSelectedRestaurant: (restaurant: Restaurant | null) => void;
   fetchProfile: () => Promise<void>;
   updateProfile: (data: Partial<User>) => Promise<void>;
+  setFavoriteRestaurant: (restaurant: Restaurant | null) => void;
   fetchFavoriteRestaurant: () => Promise<void>;
-  setFavoriteRestaurant: (restaurantId: string) => Promise<void>;
+  setFavoriteRestaurantById: (restaurantId: string) => Promise<void>;
   fetchBanners: (restaurantId?: string) => Promise<void>;
   prefetchBanners: (restaurantId?: string) => Promise<void>;
   setBannersForRestaurant: (restaurantId: string | null, banners: Banner[]) => void;
+  setMenuItems: (menuItems: MenuItem[], restaurantId?: string) => void;
 }
 
 // Инициализация токена из SecureStorage
@@ -107,6 +122,8 @@ export const useStore = create<Store>((set, get) => {
     favoriteRestaurant: null,
     banners: [],
     bannersByRestaurant: {},
+    menuItems: [],
+    menuItemsByRestaurant: {},
     token: initialToken,
     isLoading: false,
     error: null,
@@ -121,6 +138,29 @@ export const useStore = create<Store>((set, get) => {
     },
 
     setUser: (user) => set({ user }),
+
+    setRestaurants: (restaurants) => {
+      set({ restaurants });
+      // Автоматически выбираем ресторан, если еще не выбран
+      const currentSelected = get().selectedRestaurant;
+      const favoriteRestaurant = get().favoriteRestaurant;
+      
+      if (!currentSelected && restaurants.length > 0) {
+        if (favoriteRestaurant) {
+          const favoriteInList = restaurants.find(r => r.id === favoriteRestaurant.id);
+          if (favoriteInList) {
+            set({ selectedRestaurant: favoriteInList });
+            deviceStorage.setItem(STORAGE_KEYS.SELECTED_RESTAURANT_ID, favoriteInList.id).catch(console.error);
+          } else {
+            set({ selectedRestaurant: restaurants[0] });
+            deviceStorage.setItem(STORAGE_KEYS.SELECTED_RESTAURANT_ID, restaurants[0].id).catch(console.error);
+          }
+        } else {
+          set({ selectedRestaurant: restaurants[0] });
+          deviceStorage.setItem(STORAGE_KEYS.SELECTED_RESTAURANT_ID, restaurants[0].id).catch(console.error);
+        }
+      }
+    },
 
     fetchRestaurants: async () => {
       // Пропускаем запрос на сервере
@@ -220,6 +260,10 @@ export const useStore = create<Store>((set, get) => {
       }
     },
 
+    setFavoriteRestaurant: (restaurant) => {
+      set({ favoriteRestaurant: restaurant });
+    },
+
     fetchFavoriteRestaurant: async () => {
       if (typeof window === 'undefined') return;
       
@@ -251,7 +295,7 @@ export const useStore = create<Store>((set, get) => {
       }
     },
 
-    setFavoriteRestaurant: async (restaurantId) => {
+    setFavoriteRestaurantById: async (restaurantId) => {
       try {
         const currentFavorite = get().favoriteRestaurant;
         const isRemoving = currentFavorite?.id === restaurantId;
@@ -272,6 +316,21 @@ export const useStore = create<Store>((set, get) => {
       } catch (error: any) {
         console.error('Failed to set favorite restaurant:', error);
         throw error;
+      }
+    },
+
+    setMenuItems: (menuItems, restaurantId) => {
+      if (restaurantId) {
+        set((state) => ({
+          menuItemsByRestaurant: {
+            ...state.menuItemsByRestaurant,
+            [restaurantId]: menuItems,
+          },
+          // Если это меню для текущего ресторана, обновляем и текущее меню
+          menuItems: menuItems,
+        }));
+      } else {
+        set({ menuItems });
       }
     },
 

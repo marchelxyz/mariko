@@ -1,38 +1,77 @@
-import { Router, Request, Response } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import { AppDataSource } from '../config/database';
 import { Restaurant } from '../models/Restaurant';
 import { Banner } from '../models/Banner';
 import { MenuItem } from '../models/MenuItem';
 import { DishImage } from '../models/DishImage';
+import { User } from '../models/User';
 import { In } from 'typeorm';
+import jwt from 'jsonwebtoken';
 import {
   getHomePageFromCache,
   setHomePageToCache,
   getMenuPageFromCache,
   setMenuPageToCache,
 } from '../services/cacheService';
+import { AuthRequest } from '../middleware/auth';
 
 const router = Router();
+
+/**
+ * Опциональный middleware для аутентификации
+ * Если токен есть и валиден, устанавливает userId, иначе просто продолжает
+ */
+const optionalAuthenticate = async (
+  req: Request | AuthRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const token = req.headers.authorization?.split(' ')[1];
+
+    if (!token) {
+      next();
+      return;
+    }
+
+    const jwtSecret = process.env.JWT_SECRET || 'your-secret-key';
+    const decoded = jwt.verify(token, jwtSecret) as { userId: string; role: string };
+    const authReq = req as AuthRequest;
+    authReq.userId = decoded.userId;
+    next();
+  } catch (error) {
+    // Если токен невалиден, просто продолжаем без авторизации
+    next();
+  }
+};
 
 /**
  * GET /api/pages/home
  * Получить полные данные для главной страницы
  * Поддерживает кэширование через Redis
+ * Теперь также возвращает меню и любимый ресторан пользователя
  */
-router.get('/home', async (req: Request, res: Response) => {
+router.get('/home', optionalAuthenticate, async (req: Request | AuthRequest, res: Response) => {
   try {
     const { restaurantId } = req.query;
     const restaurantIdStr = restaurantId as string | undefined;
+    const authReq = req as AuthRequest;
+    const userId = authReq.userId;
 
-    // Пытаемся получить из кэша
-    const cached = await getHomePageFromCache(restaurantIdStr);
-    if (cached) {
-      console.log('✅ Данные главной страницы получены из кэша');
-      return res.json({ success: true, data: cached, cached: true });
+    // Пытаемся получить из кэша (но только если нет авторизации, т.к. любимый ресторан может отличаться)
+    const cacheKey = userId ? `${restaurantIdStr || 'default'}_${userId}` : restaurantIdStr;
+    if (!userId) {
+      const cached = await getHomePageFromCache(restaurantIdStr);
+      if (cached) {
+        console.log('✅ Данные главной страницы получены из кэша');
+        return res.json({ success: true, data: cached, cached: true });
+      }
     }
 
     const bannerRepository = AppDataSource.getRepository(Banner);
     const restaurantRepository = AppDataSource.getRepository(Restaurant);
+    const menuItemRepository = AppDataSource.getRepository(MenuItem);
+    const dishImageRepository = AppDataSource.getRepository(DishImage);
 
     // Загружаем горизонтальные баннеры
     const queryBuilder = bannerRepository.createQueryBuilder('banner');
@@ -58,14 +97,91 @@ router.get('/home', async (req: Request, res: Response) => {
       order: { city: 'ASC', name: 'ASC' },
     });
 
+    // Определяем ресторан для загрузки меню
+    let targetRestaurantId = restaurantIdStr;
+    let favoriteRestaurant = null;
+
+    // Если пользователь авторизован, загружаем его любимый ресторан
+    if (userId) {
+      const userRepository = AppDataSource.getRepository(User);
+      const user = await userRepository.findOne({
+        where: { id: userId },
+      });
+
+      if (user?.favoriteRestaurantId) {
+        const favorite = await restaurantRepository.findOne({
+          where: { id: user.favoriteRestaurantId },
+        });
+        if (favorite && favorite.isActive) {
+          favoriteRestaurant = favorite;
+          // Если не указан restaurantId, используем любимый ресторан
+          if (!targetRestaurantId) {
+            targetRestaurantId = favorite.id;
+          }
+        }
+      }
+    }
+
+    // Если ресторан не определен, используем первый из списка
+    if (!targetRestaurantId && restaurants.length > 0) {
+      targetRestaurantId = restaurants[0].id;
+    }
+
+    // Загружаем меню для выбранного ресторана
+    let menuItems = null;
+    if (targetRestaurantId) {
+      const menuItemsData = await menuItemRepository.find({
+        where: { restaurantId: targetRestaurantId, isAvailable: true },
+        order: { category: 'ASC', name: 'ASC' },
+      });
+
+      // Получаем все изображения для меню
+      const dishImageIds = menuItemsData
+        .map(item => item.dishImageId)
+        .filter((id): id is string => !!id);
+
+      const dishImages = dishImageIds.length > 0
+        ? await dishImageRepository.find({
+            where: { id: In(dishImageIds) },
+          })
+        : [];
+
+      const dishImageMap = new Map(dishImages.map(img => [img.id, img]));
+
+      // Формируем ответ с данными о блюдах и их изображениях
+      menuItems = menuItemsData.map(item => {
+        const dishImage = item.dishImageId ? dishImageMap.get(item.dishImageId) : null;
+        return {
+          id: item.id,
+          name: item.name,
+          description: item.description,
+          price: item.price,
+          category: item.category,
+          calories: item.calories,
+          ingredients: item.ingredients,
+          imageUrl: dishImage?.imageUrl || item.imageUrl,
+          dishImageId: item.dishImageId,
+          internalDishId: item.internalDishId,
+          isAvailable: item.isAvailable,
+          createdAt: item.createdAt,
+          updatedAt: item.updatedAt,
+        };
+      });
+    }
+
     const pageData = {
       banners,
       restaurants,
       restaurantId: restaurantIdStr || null,
+      menuItems: menuItems || [],
+      favoriteRestaurant,
+      selectedRestaurantId: targetRestaurantId || null,
     };
 
-    // Сохраняем в кэш
-    await setHomePageToCache(restaurantIdStr, pageData);
+    // Сохраняем в кэш только для неавторизованных пользователей
+    if (!userId) {
+      await setHomePageToCache(restaurantIdStr, pageData);
+    }
 
     res.json({ success: true, data: pageData, cached: false });
   } catch (error) {
