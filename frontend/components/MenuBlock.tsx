@@ -49,33 +49,53 @@ export default function MenuBlock({ restaurantId, initialMenuItems }: MenuBlockP
     ? (menuItemsByRestaurant[currentRestaurantId] || [])
     : menuItems;
   
-  // Используем предзагруженные элементы меню только если они соответствуют текущему ресторану
-  // или если ресторан не указан (общее меню)
-  const shouldUseInitialMenuItems = initialMenuItems && initialMenuItems.length > 0 && 
-    (!currentRestaurantId || cachedMenuItems.length === 0);
   // Фильтруем initialMenuItems, чтобы убедиться, что у всех есть обязательные поля
   const validInitialMenuItems = initialMenuItems?.filter(item => 
     item && item.id && item.name && typeof item.price === 'number'
   ) || [];
+  
+  // Используем предзагруженные элементы меню только если они соответствуют текущему ресторану
+  // или если ресторан не указан (общее меню)
+  const shouldUseInitialMenuItems = validInitialMenuItems.length > 0 && 
+    (!currentRestaurantId || cachedMenuItems.length === 0);
+  
   const menuItemsToUse = cachedMenuItems.length > 0 ? cachedMenuItems : (shouldUseInitialMenuItems ? validInitialMenuItems : []);
+  
+  // Отладочное логирование (только в development)
+  if (process.env.NODE_ENV === 'development') {
+    console.debug('MenuBlock:', {
+      currentRestaurantId,
+      cachedMenuItemsCount: cachedMenuItems.length,
+      initialMenuItemsCount: initialMenuItems?.length || 0,
+      validInitialMenuItemsCount: validInitialMenuItems.length,
+      menuItemsToUseCount: menuItemsToUse.length,
+      isLoading,
+    });
+  }
 
   // Загружаем меню только если его нет в store
   useEffect(() => {
     // Пропускаем запрос на сервере
     if (typeof window === 'undefined') return;
     
-    if (!currentRestaurantId) return;
+    if (!currentRestaurantId) {
+      setIsLoading(false);
+      return;
+    }
 
     // Если меню уже есть в кэше для этого ресторана, не загружаем
-    if (menuItemsByRestaurant[currentRestaurantId] && menuItemsByRestaurant[currentRestaurantId].length > 0) {
+    const cachedItems = menuItemsByRestaurant[currentRestaurantId];
+    if (cachedItems && cachedItems.length > 0) {
       setIsLoading(false);
       return;
     }
     
-    // Если есть initialMenuItems для текущего ресторана, не делаем запрос
-    // Но только если меню для этого ресторана еще не загружено
-    if (initialMenuItems && initialMenuItems.length > 0 && 
-        !menuItemsByRestaurant[currentRestaurantId]) {
+    // Если есть initialMenuItems для текущего ресторана, сохраняем их и не делаем запрос
+    // Но только если это первый рендер (initialMenuItems еще не были сохранены)
+    // Проверяем, что меню для этого ресторана еще не загружено
+    if (validInitialMenuItems.length > 0 && !cachedItems) {
+      // Сохраняем initialMenuItems в store
+      setMenuItems(validInitialMenuItems, currentRestaurantId);
       setIsLoading(false);
       return;
     }
@@ -98,17 +118,38 @@ export default function MenuBlock({ restaurantId, initialMenuItems }: MenuBlockP
           }
         });
         
-        // Сохраняем в store
-        setMenuItems(allItems, currentRestaurantId);
-      } catch (error) {
+        if (process.env.NODE_ENV === 'development') {
+          console.debug('MenuBlock: Fetched menu items:', {
+            restaurantId: currentRestaurantId,
+            groupedCategories: Object.keys(groupedMenu),
+            totalItems: allItems.length,
+          });
+        }
+        
+        // Сохраняем в store только если получили данные
+        if (allItems.length > 0) {
+          setMenuItems(allItems, currentRestaurantId);
+        }
+      } catch (error: any) {
         console.error('Failed to fetch menu:', error);
+        if (process.env.NODE_ENV === 'development') {
+          console.error('MenuBlock: Error details:', {
+            restaurantId: currentRestaurantId,
+            errorMessage: error?.message,
+            errorResponse: error?.response?.data,
+            errorStatus: error?.response?.status,
+          });
+        }
+        // Устанавливаем isLoading в false даже при ошибке, чтобы компонент мог отобразиться
+        setIsLoading(false);
       } finally {
         setIsLoading(false);
       }
     };
 
     fetchMenu();
-  }, [restaurantId, selectedRestaurant?.id, currentRestaurantId, menuItemsByRestaurant, initialMenuItems, setMenuItems]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [restaurantId, selectedRestaurant?.id, currentRestaurantId]);
 
   // Получаем блюда для отображения
   // Убеждаемся, что все элементы имеют правильный тип
@@ -130,7 +171,20 @@ export default function MenuBlock({ restaurantId, initialMenuItems }: MenuBlockP
     }
   };
 
-  if (isLoading || menuItemsToUse.length === 0) {
+  // Показываем индикатор загрузки только если идет загрузка и нет данных
+  if (isLoading && menuItemsToUse.length === 0) {
+    return (
+      <div className="bg-white rounded-lg py-6 w-full md:bg-transparent md:py-0">
+        <div className="px-4 md:px-0">
+          <div className="text-[#000000] font-normal text-base mb-4">Рекомендуем попробовать</div>
+          <div className="text-center py-8 text-text-primary">Загрузка меню...</div>
+        </div>
+      </div>
+    );
+  }
+
+  // Не показываем компонент только если меню пустое и не загружается
+  if (!isLoading && menuItemsToUse.length === 0) {
     return null;
   }
 
