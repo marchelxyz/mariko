@@ -122,12 +122,30 @@ app.use(cors({
 
 // Дополнительное логирование для отладки CORS (особенно preflight запросов)
 app.use((req, res, next) => {
+  // Логируем ВСЕ входящие запросы для диагностики
+  const timestamp = new Date().toISOString();
+  console.log(`[${timestamp}] 📥 Входящий запрос: ${req.method} ${req.path}`);
+  console.log(`   Origin: ${req.headers.origin || 'none'}`);
+  console.log(`   User-Agent: ${req.headers['user-agent'] || 'none'}`);
+  console.log(`   Referer: ${req.headers.referer || 'none'}`);
+  console.log(`   IP: ${req.ip || req.socket.remoteAddress || 'unknown'}`);
+  
   if (req.method === 'OPTIONS') {
-    console.log(`🔍 Preflight request: ${req.method} ${req.path}`);
-    console.log(`   Origin: ${req.headers.origin || 'none'}`);
+    console.log(`   🔍 Preflight request detected`);
     console.log(`   Access-Control-Request-Method: ${req.headers['access-control-request-method'] || 'none'}`);
     console.log(`   Access-Control-Request-Headers: ${req.headers['access-control-request-headers'] || 'none'}`);
   }
+  
+  // Логируем query параметры
+  if (Object.keys(req.query).length > 0) {
+    console.log(`   Query params:`, req.query);
+  }
+  
+  // Логируем завершение запроса
+  res.on('finish', () => {
+    console.log(`[${new Date().toISOString()}] ✅ Запрос завершен: ${req.method} ${req.path} - ${res.statusCode}`);
+  });
+  
   next();
 });
 

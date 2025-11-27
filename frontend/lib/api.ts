@@ -36,17 +36,30 @@ const api = axios.create({
 // Добавляем токен к каждому запросу
 api.interceptors.request.use(async (config) => {
   if (typeof window !== 'undefined') {
+    // Детальное логирование для диагностики
+    const timestamp = new Date().toISOString();
+    console.log(`[${timestamp}] 🚀 Отправка запроса: ${config.method?.toUpperCase()} ${config.url}`);
+    console.log(`   Base URL: ${config.baseURL}`);
+    console.log(`   Full URL: ${config.baseURL}${config.url}`);
+    console.log(`   NEXT_PUBLIC_API_URL: ${process.env.NEXT_PUBLIC_API_URL || 'не установлена'}`);
+    
     try {
       const { secureStorage, STORAGE_KEYS } = await import('./storage');
       const token = await secureStorage.getItem(STORAGE_KEYS.TOKEN);
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;
+        console.log(`   ✅ Токен добавлен (из SecureStorage)`);
+      } else {
+        console.log(`   ⚠️  Токен не найден в SecureStorage`);
       }
     } catch (error) {
       // Fallback на localStorage для обратной совместимости
       const token = localStorage.getItem('token');
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;
+        console.log(`   ✅ Токен добавлен (из localStorage fallback)`);
+      } else {
+        console.log(`   ⚠️  Токен не найден (ни в SecureStorage, ни в localStorage)`);
       }
     }
   }
@@ -56,9 +69,11 @@ api.interceptors.request.use(async (config) => {
 // Обработка ошибок
 api.interceptors.response.use(
   (response) => {
-    // Логируем успешные запросы только в development
+    // Логируем успешные запросы
+    const timestamp = new Date().toISOString();
+    console.log(`[${timestamp}] ✅ API успешный ответ: ${response.config.method?.toUpperCase()} ${response.config.url} - ${response.status}`);
     if (process.env.NODE_ENV === 'development') {
-      console.log(`✅ API ${response.config.method?.toUpperCase()} ${response.config.url} - ${response.status}`);
+      console.log(`   Данные:`, response.data);
     }
     return response;
   },
