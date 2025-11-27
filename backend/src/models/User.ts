@@ -62,7 +62,7 @@ export class User {
   role!: UserRole;
 
   @Column({ nullable: true })
-  favoriteRestaurantId?: string;
+  favoriteRestaurantId?: string | null;
 
   @CreateDateColumn()
   createdAt!: Date;
