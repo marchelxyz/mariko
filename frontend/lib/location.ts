@@ -25,29 +25,45 @@ export async function requestLocation(): Promise<Location | null> {
       return null;
     }
 
-    // Проверяем, поддерживается ли запрос местоположения
-    if (typeof WebApp.requestLocation !== 'function') {
-      console.warn('[Location] Метод requestLocation не поддерживается');
+    // Проверяем версию SDK (requestLocation доступен с версии 6.0+)
+    const isVersionSupported = WebApp.isVersionAtLeast 
+      ? WebApp.isVersionAtLeast('6.0')
+      : false;
+
+    if (!isVersionSupported) {
+      console.warn('[Location] Версия Telegram WebApp SDK слишком старая. Требуется 6.0+');
       return null;
     }
+
+    // Проверяем, поддерживается ли запрос местоположения
+    if (typeof WebApp.requestLocation !== 'function') {
+      console.warn('[Location] Метод requestLocation не поддерживается в этой версии Telegram');
+      return null;
+    }
+
+    console.log('[Location] Запрашиваем местоположение пользователя...');
 
     // Telegram WebApp.requestLocation принимает callback
     return new Promise<Location | null>((resolve) => {
       try {
         // Устанавливаем таймаут на случай, если callback никогда не вызовется
         const timeout = setTimeout(() => {
-          console.warn('[Location] Таймаут при запросе местоположения');
+          console.warn('[Location] Таймаут при запросе местоположения (10 секунд)');
           resolve(null);
         }, 10000); // 10 секунд
 
+        // Вызываем requestLocation с callback
         WebApp.requestLocation((location: Location | null) => {
           clearTimeout(timeout);
           
-          if (location && location.latitude && location.longitude) {
-            console.log('[Location] Местоположение получено:', location);
+          if (location && typeof location.latitude === 'number' && typeof location.longitude === 'number') {
+            console.log('[Location] Местоположение получено:', {
+              latitude: location.latitude,
+              longitude: location.longitude
+            });
             resolve(location);
           } else {
-            console.log('[Location] Пользователь не предоставил местоположение');
+            console.log('[Location] Пользователь не предоставил местоположение или данные некорректны');
             resolve(null);
           }
         });
@@ -57,7 +73,7 @@ export async function requestLocation(): Promise<Location | null> {
       }
     });
   } catch (error) {
-    console.error('[Location] Ошибка:', error);
+    console.error('[Location] Критическая ошибка:', error);
     return null;
   }
 }
