@@ -3,16 +3,8 @@ import { useRouter } from 'next/router';
 import Image from 'next/image';
 import { useStore } from '@/store/useStore';
 import api from '@/lib/api';
-
-interface MenuItem {
-  id: string;
-  name: string;
-  description: string;
-  price: number;
-  category: string;
-  imageUrl?: string;
-  calories?: number;
-}
+import DishCard from './DishCard';
+import { MenuItem } from '@/types/menu';
 
 interface MenuBlockProps {
   restaurantId?: string;
@@ -24,6 +16,7 @@ export default function MenuBlock({ restaurantId, initialMenuItems }: MenuBlockP
   const router = useRouter();
   const [displayCount, setDisplayCount] = useState(2);
   const [isLoading, setIsLoading] = useState(false);
+  const [selectedDish, setSelectedDish] = useState<MenuItem | null>(null);
 
   // Определяем количество блюд в зависимости от размера экрана
   useEffect(() => {
@@ -60,7 +53,11 @@ export default function MenuBlock({ restaurantId, initialMenuItems }: MenuBlockP
   // или если ресторан не указан (общее меню)
   const shouldUseInitialMenuItems = initialMenuItems && initialMenuItems.length > 0 && 
     (!currentRestaurantId || cachedMenuItems.length === 0);
-  const menuItemsToUse = cachedMenuItems.length > 0 ? cachedMenuItems : (shouldUseInitialMenuItems ? initialMenuItems : []);
+  // Фильтруем initialMenuItems, чтобы убедиться, что у всех есть обязательные поля
+  const validInitialMenuItems = initialMenuItems?.filter(item => 
+    item && item.id && item.name && typeof item.price === 'number'
+  ) || [];
+  const menuItemsToUse = cachedMenuItems.length > 0 ? cachedMenuItems : (shouldUseInitialMenuItems ? validInitialMenuItems : []);
 
   // Загружаем меню только если его нет в store
   useEffect(() => {
@@ -93,7 +90,11 @@ export default function MenuBlock({ restaurantId, initialMenuItems }: MenuBlockP
         const allItems: MenuItem[] = [];
         Object.values(groupedMenu).forEach((categoryItems: any) => {
           if (Array.isArray(categoryItems)) {
-            allItems.push(...categoryItems);
+            // Фильтруем и проверяем, что у каждого элемента есть обязательные поля
+            const validItems = categoryItems.filter((item: any) => 
+              item && item.id && item.name && typeof item.price === 'number'
+            );
+            allItems.push(...validItems);
           }
         });
         
@@ -110,7 +111,15 @@ export default function MenuBlock({ restaurantId, initialMenuItems }: MenuBlockP
   }, [restaurantId, selectedRestaurant?.id, currentRestaurantId, menuItemsByRestaurant, initialMenuItems, setMenuItems]);
 
   // Получаем блюда для отображения
-  const menuItemsToDisplay = menuItemsToUse.slice(0, displayCount);
+  // Убеждаемся, что все элементы имеют правильный тип
+  const menuItemsToDisplay: MenuItem[] = menuItemsToUse
+    .filter((item): item is MenuItem => 
+      item != null && 
+      typeof item.id === 'string' && 
+      typeof item.name === 'string' && 
+      typeof item.price === 'number'
+    )
+    .slice(0, displayCount);
 
   const handleMenuClick = () => {
     const currentRestaurantId = restaurantId || selectedRestaurant?.id;
@@ -161,9 +170,10 @@ export default function MenuBlock({ restaurantId, initialMenuItems }: MenuBlockP
       <div className="px-4 w-full overflow-x-hidden md:px-0">
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 gap-4 md:justify-items-start">
           {menuItemsToDisplay.map((item) => (
-            <div
+            <button
               key={item.id}
-              className="bg-[#F7F7F7] rounded-xl p-3 flex flex-col w-full min-w-0"
+              onClick={() => setSelectedDish(item)}
+              className="bg-[#F7F7F7] rounded-xl p-3 flex flex-col w-full min-w-0 text-left hover:opacity-90 transition-opacity cursor-pointer"
             >
               {/* Фото блюда */}
               {item.imageUrl ? (
@@ -211,10 +221,17 @@ export default function MenuBlock({ restaurantId, initialMenuItems }: MenuBlockP
                   {item.calories} ккал
                 </div>
               )}
-            </div>
+            </button>
           ))}
         </div>
       </div>
+
+      {/* Карточка блюда */}
+      <DishCard
+        item={selectedDish}
+        isOpen={!!selectedDish}
+        onClose={() => setSelectedDish(null)}
+      />
     </div>
   );
 }

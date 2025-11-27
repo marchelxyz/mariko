@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import api from '@/lib/api';
 import { deviceStorage, secureStorage, STORAGE_KEYS } from '@/lib/storage';
+import { MenuItem } from '@/types/menu';
 
 interface User {
   id: string;
@@ -48,15 +49,8 @@ interface Banner {
   linkUrl?: string;
 }
 
-interface MenuItem {
-  id: string;
-  name: string;
-  description: string;
-  price?: number; // Опционально для общего меню
-  category: string;
-  imageUrl?: string;
-  calories?: number;
-}
+// Используем общий тип MenuItem из types/menu.ts
+// Примечание: price обязателен в типе, но может быть undefined в данных из API
 
 interface Store {
   user: User | null;

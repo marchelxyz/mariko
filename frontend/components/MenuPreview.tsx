@@ -2,15 +2,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import { useStore } from '@/store/useStore';
 import api from '@/lib/api';
-
-interface MenuItem {
-  id: string;
-  name: string;
-  description: string;
-  price: number;
-  category: string;
-  imageUrl?: string;
-}
+import { MenuItem } from '@/types/menu';
 
 interface MenuPreviewProps {
   restaurantId?: string;
