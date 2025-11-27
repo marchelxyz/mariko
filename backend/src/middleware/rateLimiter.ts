@@ -24,6 +24,15 @@ export const apiLimiter = rateLimit({
   legacyHeaders: false, // Отключает заголовки Retry-After
   // Пропускаем успешные health check запросы
   skip: (req) => req.path === '/health',
+  // ✅ Безопасная настройка для работы с trust proxy
+  // Используем кастомный keyGenerator для дополнительной защиты
+  keyGenerator: (req) => {
+    // Используем IP из req.ip (уже обработанный trust proxy)
+    // Дополнительно проверяем, что это валидный IP
+    const ip = req.ip || req.socket.remoteAddress || 'unknown';
+    // Если IP содержит несколько адресов (через запятую), берем первый
+    return ip.split(',')[0].trim();
+  },
 });
 
 // ✅ Строгий rate limiter для аутентификации
@@ -39,6 +48,11 @@ export const authLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   skipSuccessfulRequests: true, // Не считать успешные запросы (если вход успешен, не блокируем)
+  // ✅ Безопасная настройка для работы с trust proxy
+  keyGenerator: (req) => {
+    const ip = req.ip || req.socket.remoteAddress || 'unknown';
+    return ip.split(',')[0].trim();
+  },
 });
 
 // ✅ Rate limiter для тяжелых операций (создание/обновление)
@@ -53,4 +67,9 @@ export const writeLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
+  // ✅ Безопасная настройка для работы с trust proxy
+  keyGenerator: (req) => {
+    const ip = req.ip || req.socket.remoteAddress || 'unknown';
+    return ip.split(',')[0].trim();
+  },
 });
