@@ -43,6 +43,7 @@ Backend будет доступен на `http://localhost:5000`
 - `FRONTEND_URL` - URL фронтенда для CORS
 - `TELEGRAM_ADMIN_IDS` - Список Telegram ID администраторов через запятую (например: `123456789,987654321`)
 - `TELEGRAM_BOT_TOKEN` - Токен Telegram бота для отправки уведомлений (получить у @BotFather)
+- `YANDEX_GEOCODING_API_KEY` - API ключ Yandex Geocoding для геокодирования адресов ресторанов (опционально, см. [LOCATION_FEATURE.md](./LOCATION_FEATURE.md))
 
 #### Frontend (Vercel)
 - `NEXT_PUBLIC_API_URL` - URL бекенд API

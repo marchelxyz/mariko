@@ -5,7 +5,7 @@ import api from '@/lib/api';
 
 export default function TelegramAuth() {
   const router = useRouter();
-  const { setToken, setUser, fetchProfile, fetchFavoriteRestaurant } = useStore();
+  const { setToken, setUser, fetchProfile, fetchFavoriteRestaurant, fetchRestaurants } = useStore();
 
   useEffect(() => {
     const initTelegramAuth = async () => {
@@ -80,6 +80,8 @@ export default function TelegramAuth() {
               await fetchProfile();
               // Загружаем любимый ресторан после авторизации
               await fetchFavoriteRestaurant();
+              // Загружаем рестораны (внутри fetchRestaurants будет попытка выбрать ближайший)
+              await fetchRestaurants();
             } catch (error) {
               console.error('Failed to fetch profile after auth:', error);
             }
@@ -91,7 +93,7 @@ export default function TelegramAuth() {
     };
 
     initTelegramAuth();
-  }, [setToken, setUser, fetchProfile, fetchFavoriteRestaurant]);
+  }, [setToken, setUser, fetchProfile, fetchFavoriteRestaurant, fetchRestaurants]);
 
   return null;
 }
