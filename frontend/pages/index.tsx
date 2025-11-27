@@ -119,7 +119,7 @@ export default function Home({
           <div className="px-4">
             <Banners restaurantId={selectedRestaurant?.id || restaurantId} initialBanners={initialBanners} />
           </div>
-          <MenuBlock restaurantId={selectedRestaurant?.id || restaurantId} />
+          <MenuBlock restaurantId={selectedRestaurant?.id || restaurantId} initialMenuItems={initialMenuItems} />
         </div>
       </div>
 
@@ -129,7 +129,7 @@ export default function Home({
           {/* Левая колонка - кнопки, заголовок и блюда */}
           <div className="flex-1 flex flex-col">
             <ActionButtons />
-            <MenuBlock restaurantId={selectedRestaurant?.id || restaurantId} />
+            <MenuBlock restaurantId={selectedRestaurant?.id || restaurantId} initialMenuItems={initialMenuItems} />
           </div>
 
           {/* Правая колонка - баннер */}
