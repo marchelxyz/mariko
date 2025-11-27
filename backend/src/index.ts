@@ -23,7 +23,7 @@ import pagesRoutes from './routes/pages';
 import * as cron from 'node-cron';
 import { syncAllRestaurantsMenu } from './services/syncService';
 import { initializeBot, stopBot } from './services/telegramBot';
-import { autoGeocodeRestaurants } from '../scripts/auto-geocode';
+import { autoGeocodeRestaurants } from './services/autoGeocodeService';
 
 const app = express();
 const PORT: number = Number(process.env.PORT) || 5000;
