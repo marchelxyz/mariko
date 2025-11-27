@@ -12,6 +12,8 @@ import { Restaurant } from './Restaurant';
 
 @Entity('menu_items')
 @Index(['restaurantId', 'isAvailable']) // ✅ Составной индекс для быстрого поиска доступных блюд ресторана
+@Index(['category']) // ✅ Индекс для сортировки по категориям
+@Index(['dishImageId']) // ✅ Индекс для JOIN с DishImage
 export class MenuItem {
   @PrimaryGeneratedColumn('uuid')
   id!: string;

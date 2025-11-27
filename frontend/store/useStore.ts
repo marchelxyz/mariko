@@ -341,14 +341,27 @@ export const useStore = create<Store>((set, get) => {
 
     setMenuItems: (menuItems, restaurantId) => {
       if (restaurantId) {
-        set((state) => ({
-          menuItemsByRestaurant: {
-            ...state.menuItemsByRestaurant,
-            [restaurantId]: menuItems,
-          },
-          // Если это меню для текущего ресторана, обновляем и текущее меню
-          menuItems: menuItems,
-        }));
+        set((state) => {
+          const MAX_CACHED_RESTAURANTS = 10; // Максимальное количество ресторанов в кэше
+          const restaurantIds = Object.keys(state.menuItemsByRestaurant);
+          
+          // Ограничиваем размер кэша: удаляем старые рестораны, если превышен лимит
+          let updatedCache = { ...state.menuItemsByRestaurant };
+          if (restaurantIds.length >= MAX_CACHED_RESTAURANTS && !updatedCache[restaurantId]) {
+            // Удаляем самый старый ресторан (первый в списке), если добавляем новый
+            const oldestRestaurantId = restaurantIds[0];
+            delete updatedCache[oldestRestaurantId];
+          }
+          
+          // Добавляем/обновляем меню для текущего ресторана
+          updatedCache[restaurantId] = menuItems;
+          
+          return {
+            menuItemsByRestaurant: updatedCache,
+            // Если это меню для текущего ресторана, обновляем и текущее меню
+            menuItems: menuItems,
+          };
+        });
       } else {
         set({ menuItems });
       }

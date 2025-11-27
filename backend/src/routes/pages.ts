@@ -138,24 +138,26 @@ router.get('/home', optionalAuthenticate, async (req: Request | AuthRequest, res
     }
     
     if (targetRestaurantId) {
-      // Загружаем меню конкретного ресторана
+      // Загружаем меню конкретного ресторана с использованием индексов
       const menuItemsData = await menuItemRepository.find({
         where: { restaurantId: targetRestaurantId, isAvailable: true },
         order: { category: 'ASC', name: 'ASC' },
+        // Используем индексы: [restaurantId, isAvailable] и [category]
       });
 
-      // Получаем все изображения для меню
+      // Оптимизированная загрузка изображений: один батч-запрос для всех изображений
       const dishImageIds = menuItemsData
         .map(item => item.dishImageId)
         .filter((id): id is string => !!id);
 
-      const dishImages = dishImageIds.length > 0
-        ? await dishImageRepository.find({
-            where: { id: In(dishImageIds) },
-          })
-        : [];
-
-      const dishImageMap = new Map(dishImages.map(img => [img.id, img]));
+      const dishImageMap = new Map<string, DishImage>();
+      if (dishImageIds.length > 0) {
+        // Используем In() для батч-загрузки всех изображений за один запрос
+        const dishImages = await dishImageRepository.find({
+          where: { id: In(dishImageIds) },
+        });
+        dishImages.forEach(img => dishImageMap.set(img.id, img));
+      }
 
       // Формируем ответ с данными о блюдах и их изображениях
       menuItems = menuItemsData.map(item => {
@@ -229,24 +231,27 @@ router.get('/menu/:restaurantId', async (req: Request, res: Response) => {
       return;
     }
 
-    // Загружаем меню
+    // Загружаем меню с использованием индексов для оптимизации
     const menuItems = await menuItemRepository.find({
       where: { restaurantId, isAvailable: true },
       order: { category: 'ASC', name: 'ASC' },
+      // Используем индексы: [restaurantId, isAvailable] и [category]
     });
 
-    // Получаем все изображения для меню
+    // Оптимизированная загрузка изображений: один батч-запрос для всех изображений
     const dishImageIds = menuItems
       .map(item => item.dishImageId)
       .filter((id): id is string => !!id);
 
-    const dishImages = dishImageIds.length > 0
-      ? await dishImageRepository.find({
-          where: { id: In(dishImageIds) },
-        })
-      : [];
-
-    const dishImageMap = new Map(dishImages.map(img => [img.id, img]));
+    const dishImageMap = new Map<string, DishImage>();
+    if (dishImageIds.length > 0) {
+      // Используем In() для батч-загрузки всех изображений за один запрос
+      // Индекс на dishImageId ускорит этот запрос
+      const dishImages = await dishImageRepository.find({
+        where: { id: In(dishImageIds) },
+      });
+      dishImages.forEach(img => dishImageMap.set(img.id, img));
+    }
 
     // Формируем ответ с данными о блюдах и их изображениях
     const menuItemsWithImages = menuItems.map(item => {

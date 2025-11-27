@@ -169,7 +169,7 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
         'Content-Type': 'application/json',
         ...(token && { Authorization: `Bearer ${token}` }),
       },
-      timeout: 10000,
+      timeout: 30000, // 30 секунд таймаут (увеличено для больших меню)
     });
 
     // Используем эндпоинт для получения полных данных главной страницы

@@ -28,18 +28,19 @@ router.get('/', async (req: Request, res: Response) => {
       order: { category: 'ASC', name: 'ASC' },
     });
     
-    // Получаем все изображения для меню
+    // Оптимизированная загрузка изображений: один батч-запрос для всех изображений
     const dishImageIds = menuItems
       .map(item => item.dishImageId)
       .filter((id): id is string => !!id);
     
-    const dishImages = dishImageIds.length > 0
-      ? await dishImageRepository.find({
-          where: { id: In(dishImageIds) },
-        })
-      : [];
-    
-    const dishImageMap = new Map(dishImages.map(img => [img.id, img]));
+    const dishImageMap = new Map<string, DishImage>();
+    if (dishImageIds.length > 0) {
+      // Используем In() для батч-загрузки всех изображений за один запрос
+      const dishImages = await dishImageRepository.find({
+        where: { id: In(dishImageIds) },
+      });
+      dishImages.forEach(img => dishImageMap.set(img.id, img));
+    }
     
     // Формируем ответ с данными о блюдах и их изображениях
     const menuItemsWithImages = menuItems.map(item => {

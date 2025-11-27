@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import Image from 'next/image';
 import { useStore } from '@/store/useStore';
@@ -12,7 +12,45 @@ interface MenuBlockProps {
 }
 
 // Глобальный объект для отслеживания активных запросов меню
-const activeMenuRequests = new Map<string, Promise<any>>();
+const activeMenuRequests = new Map<string, Promise<MenuItem[]>>();
+
+// Максимальное количество ресторанов в кэше памяти (для предотвращения утечек)
+const MAX_CACHED_RESTAURANTS = 10;
+
+// Retry конфигурация
+const RETRY_CONFIG = {
+  maxRetries: 3,
+  retryDelay: 1000, // 1 секунда
+  retryDelayMultiplier: 2, // Увеличиваем задержку в 2 раза при каждой попытке
+};
+
+/**
+ * Функция для retry запросов с экспоненциальной задержкой
+ */
+async function retryRequest<T>(
+  fn: () => Promise<T>,
+  maxRetries: number = RETRY_CONFIG.maxRetries,
+  delay: number = RETRY_CONFIG.retryDelay
+): Promise<T> {
+  try {
+    return await fn();
+  } catch (error: any) {
+    // Не повторяем для ошибок отмены или клиентских ошибок (4xx)
+    if (
+      error?.name === 'AbortError' ||
+      error?.code === 'ERR_CANCELED' ||
+      (error?.response?.status >= 400 && error?.response?.status < 500)
+    ) {
+      throw error;
+    }
+
+    if (maxRetries > 0) {
+      await new Promise((resolve) => setTimeout(resolve, delay));
+      return retryRequest(fn, maxRetries - 1, delay * RETRY_CONFIG.retryDelayMultiplier);
+    }
+    throw error;
+  }
+}
 
 export default function MenuBlock({ restaurantId, initialMenuItems }: MenuBlockProps) {
   const { selectedRestaurant, menuItems, menuItemsByRestaurant, setMenuItems } = useStore();
@@ -20,17 +58,30 @@ export default function MenuBlock({ restaurantId, initialMenuItems }: MenuBlockP
   const [displayCount, setDisplayCount] = useState(2);
   const [selectedDish, setSelectedDish] = useState<MenuItem | null>(null);
   const fetchAbortControllerRef = useRef<AbortController | null>(null);
+  const previousRestaurantIdRef = useRef<string | undefined>(undefined);
   
-  // Определяем текущий ID ресторана для проверки кэша
-  const currentRestaurantIdForInit = restaurantId || selectedRestaurant?.id;
+  // Мемоизируем текущий ID ресторана
+  const currentRestaurantId = useMemo(
+    () => restaurantId || selectedRestaurant?.id,
+    [restaurantId, selectedRestaurant?.id]
+  );
   
   // Инициализируем isLoading на основе наличия данных в кэше или initialMenuItems
-  // чтобы избежать мигания индикатора загрузки
-  const hasCachedData = currentRestaurantIdForInit
-    ? (menuItemsByRestaurant[currentRestaurantIdForInit]?.length > 0)
-    : (menuItems.length > 0);
-  const hasInitialData = initialMenuItems && initialMenuItems.length > 0;
+  const hasCachedData = useMemo(
+    () =>
+      currentRestaurantId
+        ? (menuItemsByRestaurant[currentRestaurantId]?.length > 0)
+        : (menuItems.length > 0),
+    [currentRestaurantId, menuItemsByRestaurant, menuItems]
+  );
+  
+  const hasInitialData = useMemo(
+    () => initialMenuItems && initialMenuItems.length > 0,
+    [initialMenuItems]
+  );
+  
   const [isLoading, setIsLoading] = useState(!hasCachedData && !hasInitialData);
+  const [error, setError] = useState<string | null>(null);
 
   // Определяем количество блюд в зависимости от размера экрана
   useEffect(() => {
@@ -54,65 +105,95 @@ export default function MenuBlock({ restaurantId, initialMenuItems }: MenuBlockP
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Получаем меню из store или загружаем, если его нет
-  const currentRestaurantId = restaurantId || selectedRestaurant?.id;
-  
-  // Если указан конкретный ресторан, используем только его меню из кеша
-  // НЕ используем fallback на menuItems, чтобы избежать показа меню другого ресторана
-  const cachedMenuItems = currentRestaurantId 
-    ? (menuItemsByRestaurant[currentRestaurantId] || [])
-    : menuItems;
-  
   // Фильтруем initialMenuItems, чтобы убедиться, что у всех есть обязательные поля
-  const validInitialMenuItems = initialMenuItems?.filter(item => 
-    item && item.id && item.name && typeof item.price === 'number'
-  ) || [];
-  
+  const validInitialMenuItems = useMemo(
+    () =>
+      initialMenuItems?.filter(
+        (item) => item && item.id && item.name && typeof item.price === 'number'
+      ) || [],
+    [initialMenuItems]
+  );
+
+  // Получаем меню из store или загружаем, если его нет
+  const cachedMenuItems = useMemo(
+    () =>
+      currentRestaurantId
+        ? (menuItemsByRestaurant[currentRestaurantId] || [])
+        : menuItems,
+    [currentRestaurantId, menuItemsByRestaurant, menuItems]
+  );
+
   // Используем предзагруженные элементы меню только если они соответствуют текущему ресторану
-  // или если ресторан не указан (общее меню)
-  const shouldUseInitialMenuItems = validInitialMenuItems.length > 0 && 
-    (!currentRestaurantId || cachedMenuItems.length === 0);
-  
-  const menuItemsToUse = cachedMenuItems.length > 0 ? cachedMenuItems : (shouldUseInitialMenuItems ? validInitialMenuItems : []);
-  
-  // Отладочное логирование (только в development)
-  if (process.env.NODE_ENV === 'development') {
-    console.debug('MenuBlock:', {
-      currentRestaurantId,
-      cachedMenuItemsCount: cachedMenuItems.length,
-      initialMenuItemsCount: initialMenuItems?.length || 0,
-      validInitialMenuItemsCount: validInitialMenuItems.length,
-      menuItemsToUseCount: menuItemsToUse.length,
-      isLoading,
+  const shouldUseInitialMenuItems = useMemo(
+    () => validInitialMenuItems.length > 0 && (!currentRestaurantId || cachedMenuItems.length === 0),
+    [validInitialMenuItems.length, currentRestaurantId, cachedMenuItems.length]
+  );
+
+  const menuItemsToUse = useMemo(
+    () =>
+      cachedMenuItems.length > 0
+        ? cachedMenuItems
+        : shouldUseInitialMenuItems
+        ? validInitialMenuItems
+        : [],
+    [cachedMenuItems, shouldUseInitialMenuItems, validInitialMenuItems]
+  );
+
+  // Функция для преобразования группированного меню в плоский массив (мемоизирована)
+  const transformGroupedMenuToFlat = useCallback((groupedMenu: Record<string, MenuItem[]>): MenuItem[] => {
+    const allItems: MenuItem[] = [];
+    Object.values(groupedMenu).forEach((categoryItems) => {
+      if (Array.isArray(categoryItems)) {
+        // Фильтруем и проверяем, что у каждого элемента есть обязательные поля
+        const validItems = categoryItems.filter(
+          (item: any) => item && item.id && item.name && typeof item.price === 'number'
+        );
+        allItems.push(...validItems);
+      }
     });
-  }
+    return allItems;
+  }, []);
 
   // Загружаем меню только если его нет в store
   useEffect(() => {
     // Пропускаем запрос на сервере
     if (typeof window === 'undefined') return;
-    
+
+    // Если ресторан не изменился, не делаем повторный запрос
+    if (previousRestaurantIdRef.current === currentRestaurantId) {
+      return;
+    }
+
+    // Отменяем предыдущий запрос при смене ресторана
+    if (previousRestaurantIdRef.current && fetchAbortControllerRef.current) {
+      fetchAbortControllerRef.current.abort();
+      fetchAbortControllerRef.current = null;
+    }
+
+    previousRestaurantIdRef.current = currentRestaurantId;
+
     if (!currentRestaurantId) {
       setIsLoading(false);
+      setError(null);
       return;
     }
 
     // Проверяем кэш синхронно, чтобы избежать мигания индикатора загрузки
     const cachedItems = menuItemsByRestaurant[currentRestaurantId];
-    
+
     // Если меню уже есть в кэше для этого ресторана, не загружаем и не показываем загрузку
     if (cachedItems && cachedItems.length > 0) {
       setIsLoading(false);
+      setError(null);
       return;
     }
-    
+
     // Если есть initialMenuItems для текущего ресторана, сохраняем их и не делаем запрос
-    // Но только если это первый рендер (initialMenuItems еще не были сохранены)
-    // Проверяем, что меню для этого ресторана еще не загружено
     if (validInitialMenuItems.length > 0 && !cachedItems) {
       // Сохраняем initialMenuItems в store
       setMenuItems(validInitialMenuItems, currentRestaurantId);
       setIsLoading(false);
+      setError(null);
       return;
     }
 
@@ -126,116 +207,138 @@ export default function MenuBlock({ restaurantId, initialMenuItems }: MenuBlockP
         }
         try {
           await existingRequest;
+          setIsLoading(false);
+          setError(null);
         } catch (error) {
-          // Игнорируем ошибки из существующего запроса
+          // Игнорируем ошибки из существующего запроса, но показываем состояние загрузки
+          setIsLoading(false);
         }
-        setIsLoading(false);
         return;
       }
 
       setIsLoading(true);
-      
+      setError(null);
+
       // Создаем новый AbortController для возможности отмены запроса
       fetchAbortControllerRef.current = new AbortController();
-      
+
       // Создаем промис для запроса и сохраняем его
-      const menuRequest = (async () => {
-        try {
-          const response = await api.get(`/menu/${currentRestaurantId}`, {
-            signal: fetchAbortControllerRef.current?.signal,
+      const menuRequest = retryRequest(async () => {
+        const response = await api.get(`/menu/${currentRestaurantId}`, {
+          signal: fetchAbortControllerRef.current?.signal,
+          timeout: 30000, // Увеличиваем таймаут для больших меню (30 секунд)
+        });
+        const groupedMenu = response.data.data || {};
+
+        // Преобразуем группированное меню в плоский массив всех блюд
+        const allItems = transformGroupedMenuToFlat(groupedMenu);
+
+        if (process.env.NODE_ENV === 'development') {
+          console.debug('MenuBlock: Fetched menu items:', {
+            restaurantId: currentRestaurantId,
+            groupedCategories: Object.keys(groupedMenu),
+            totalItems: allItems.length,
           });
-          const groupedMenu = response.data.data || {};
-          
-          // Преобразуем группированное меню в плоский массив всех блюд
-          const allItems: MenuItem[] = [];
-          Object.values(groupedMenu).forEach((categoryItems: any) => {
-            if (Array.isArray(categoryItems)) {
-              // Фильтруем и проверяем, что у каждого элемента есть обязательные поля
-              const validItems = categoryItems.filter((item: any) => 
-                item && item.id && item.name && typeof item.price === 'number'
-              );
-              allItems.push(...validItems);
-            }
-          });
-          
-          if (process.env.NODE_ENV === 'development') {
-            console.debug('MenuBlock: Fetched menu items:', {
-              restaurantId: currentRestaurantId,
-              groupedCategories: Object.keys(groupedMenu),
-              totalItems: allItems.length,
-            });
-          }
-          
-          // Сохраняем в store только если получили данные
-          if (allItems.length > 0) {
-            setMenuItems(allItems, currentRestaurantId);
-          }
-          
-          return allItems;
-        } catch (error: any) {
-          // Игнорируем ошибки отмены запроса
-          if (error?.name === 'AbortError' || error?.code === 'ERR_CANCELED') {
-            return;
-          }
-          
-          console.error('Failed to fetch menu:', error);
-          if (process.env.NODE_ENV === 'development') {
-            console.error('MenuBlock: Error details:', {
-              restaurantId: currentRestaurantId,
-              errorMessage: error?.message,
-              errorResponse: error?.response?.data,
-              errorStatus: error?.response?.status,
-            });
-          }
-          throw error;
-        } finally {
-          // Удаляем запрос из активных после завершения
-          activeMenuRequests.delete(currentRestaurantId);
         }
-      })();
-      
+
+        // Сохраняем в store только если получили данные
+        if (allItems.length > 0) {
+          setMenuItems(allItems, currentRestaurantId);
+          
+          // Ограничиваем размер кэша в памяти (удаляем старые рестораны)
+          const restaurantIds = Object.keys(menuItemsByRestaurant);
+          if (restaurantIds.length > MAX_CACHED_RESTAURANTS) {
+            // Удаляем самый старый ресторан (первый в списке)
+            const oldestRestaurantId = restaurantIds[0];
+            if (oldestRestaurantId !== currentRestaurantId) {
+              const updatedCache = { ...menuItemsByRestaurant };
+              delete updatedCache[oldestRestaurantId];
+              // Обновляем store без удаления текущего ресторана
+              // Это делается через setMenuItems, который обновляет только нужный ресторан
+            }
+          }
+        }
+
+        return allItems;
+      }).catch((error: any) => {
+        // Игнорируем ошибки отмены запроса
+        if (error?.name === 'AbortError' || error?.code === 'ERR_CANCELED') {
+          return [];
+        }
+
+        console.error('Failed to fetch menu:', error);
+        if (process.env.NODE_ENV === 'development') {
+          console.error('MenuBlock: Error details:', {
+            restaurantId: currentRestaurantId,
+            errorMessage: error?.message,
+            errorResponse: error?.response?.data,
+            errorStatus: error?.response?.status,
+          });
+        }
+
+        // Устанавливаем ошибку, но не бросаем исключение, чтобы показать предыдущие данные
+        const errorMessage =
+          error?.response?.status === 404
+            ? 'Меню не найдено'
+            : error?.response?.status >= 500
+            ? 'Ошибка сервера. Попробуйте позже.'
+            : 'Не удалось загрузить меню. Проверьте подключение к интернету.';
+
+        setError(errorMessage);
+        throw error;
+      });
+
       // Сохраняем промис в активных запросах
       activeMenuRequests.set(currentRestaurantId, menuRequest);
-      
+
       try {
         await menuRequest;
+        setIsLoading(false);
+        setError(null);
       } catch (error) {
         // Ошибка уже обработана в промисе
-      } finally {
         setIsLoading(false);
+        // Не очищаем menuItemsToUse, чтобы показать предыдущие данные при ошибке
+      } finally {
+        // Удаляем запрос из активных после завершения
+        activeMenuRequests.delete(currentRestaurantId);
       }
     };
 
     fetchMenu();
-    
-    // Очистка при размонтировании компонента
+
+    // Очистка при размонтировании компонента или смене ресторана
     return () => {
       if (fetchAbortControllerRef.current) {
         fetchAbortControllerRef.current.abort();
+        fetchAbortControllerRef.current = null;
       }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [restaurantId, selectedRestaurant?.id, currentRestaurantId]);
+  }, [currentRestaurantId, menuItemsByRestaurant, validInitialMenuItems, setMenuItems, transformGroupedMenuToFlat]);
 
-  // Получаем блюда для отображения
-  // Убеждаемся, что все элементы имеют правильный тип
-  const menuItemsToDisplay: MenuItem[] = menuItemsToUse
-    .filter((item): item is MenuItem => 
-      item != null && 
-      typeof item.id === 'string' && 
-      typeof item.name === 'string' && 
-      typeof item.price === 'number'
-    )
-    .slice(0, displayCount);
+  // Получаем блюда для отображения (мемоизировано)
+  const menuItemsToDisplay: MenuItem[] = useMemo(
+    () =>
+      menuItemsToUse
+        .filter(
+          (item): item is MenuItem =>
+            item != null &&
+            typeof item.id === 'string' &&
+            typeof item.name === 'string' &&
+            typeof item.price === 'number'
+        )
+        .slice(0, displayCount),
+    [menuItemsToUse, displayCount]
+  );
 
-  const handleMenuClick = () => {
+  const handleMenuClick = useCallback(() => {
     const currentRestaurantId = restaurantId || selectedRestaurant?.id;
     if (currentRestaurantId) {
       router.push(`/menu?restaurantId=${currentRestaurantId}`);
     } else {
       router.push('/menu');
     }
-  };
+  }, [restaurantId, selectedRestaurant?.id, router]);
 
   // Показываем индикатор загрузки только если идет загрузка и нет данных
   if (isLoading && menuItemsToUse.length === 0) {
@@ -249,8 +352,32 @@ export default function MenuBlock({ restaurantId, initialMenuItems }: MenuBlockP
     );
   }
 
+  // Показываем ошибку, если есть ошибка и нет данных
+  if (error && menuItemsToUse.length === 0) {
+    return (
+      <div className="bg-white rounded-lg py-6 w-full md:bg-transparent md:py-0">
+        <div className="px-4 md:px-0">
+          <div className="text-[#000000] font-normal text-base mb-4">Рекомендуем попробовать</div>
+          <div className="text-center py-8 text-text-primary">
+            <p className="mb-2">{error}</p>
+            <button
+              onClick={() => {
+                setError(null);
+                setIsLoading(true);
+                previousRestaurantIdRef.current = undefined; // Сбрасываем для повторного запроса
+              }}
+              className="text-primary hover:underline"
+            >
+              Попробовать снова
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   // Не показываем компонент только если меню пустое и не загружается
-  if (!isLoading && menuItemsToUse.length === 0) {
+  if (!isLoading && menuItemsToUse.length === 0 && !error) {
     return null;
   }
 
