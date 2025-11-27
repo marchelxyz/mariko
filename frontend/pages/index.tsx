@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { GetServerSideProps } from 'next';
 import { useRouter } from 'next/router';
 import { useStore } from '@/store/useStore';
@@ -7,7 +7,7 @@ import Header from '@/components/Header';
 import ActionButtons from '@/components/ActionButtons';
 import Banners from '@/components/Banners';
 import MenuBlock from '@/components/MenuBlock';
-import LocationRequest from '@/components/LocationRequest';
+import RestaurantSelector from '@/components/RestaurantSelector';
 
 interface Banner {
   id: string;
@@ -43,7 +43,6 @@ interface HomeProps {
   initialMenuItems: MenuItem[];
   initialSelectedRestaurantId: string | null;
   initialFavoriteRestaurant: Restaurant | null;
-  isGeneralMenu?: boolean;
   restaurantId?: string;
 }
 
@@ -53,7 +52,6 @@ export default function Home({
   initialMenuItems,
   initialSelectedRestaurantId,
   initialFavoriteRestaurant,
-  isGeneralMenu,
   restaurantId,
 }: HomeProps) {
   const router = useRouter();
@@ -64,8 +62,8 @@ export default function Home({
     setSelectedRestaurant,
     setFavoriteRestaurant,
     setMenuItems,
-    selectNearestRestaurantByLocation,
   } = useStore();
+  const [showRestaurantSelector, setShowRestaurantSelector] = useState(false);
 
   // Инициализируем store с предзагруженными данными при первом рендере
   useEffect(() => {
@@ -77,18 +75,6 @@ export default function Home({
 
     // Инициализируем рестораны
     if (initialRestaurants && initialRestaurants.length > 0) {
-      // Логируем рестораны с координатами для отладки
-      const restaurantsWithCoords = initialRestaurants.filter(r => r.latitude != null && r.longitude != null);
-      console.log('[Home] Загружено ресторанов:', initialRestaurants.length);
-      console.log('[Home] Ресторанов с координатами:', restaurantsWithCoords.length);
-      if (restaurantsWithCoords.length > 0) {
-        console.log('[Home] Рестораны с координатами:', restaurantsWithCoords.map(r => ({
-          name: r.name,
-          city: r.city,
-          latitude: r.latitude,
-          longitude: r.longitude
-        })));
-      }
       setRestaurants(initialRestaurants);
     }
 
@@ -122,27 +108,41 @@ export default function Home({
         setSelectedRestaurant(restaurant);
       }
     }
-    // Если нет избранного и нет явно выбранного ресторана,
-    // НЕ выбираем ресторан автоматически - показываем общее меню
-    // и предлагаем пользователю поделиться геолокацией
+    // НЕ выбираем ресторан автоматически, если нет избранного - покажем popup
 
     // Инициализируем меню
     if (initialMenuItems && initialMenuItems.length > 0) {
       // Используем restaurantId только если он явно указан (избранный или из URL)
-      const targetRestaurantId = initialSelectedRestaurantId || restaurantId || undefined;
+      // Если ресторан не выбран, бэкенд вернет меню первого ресторана по умолчанию
+      const targetRestaurantId = initialSelectedRestaurantId || restaurantId || (initialRestaurants?.[0]?.id) || undefined;
       setMenuItems(initialMenuItems, targetRestaurantId);
     }
 
-    // НЕ выбираем ресторан автоматически, если нет избранного и нет restaurantId в URL
-    // Пользователь увидит общее меню и сможет поделиться геолокацией через компонент LocationRequest
+    // Показываем селектор ресторана, если нет выбранного ресторана и нет избранного
+    if (!initialFavoriteRestaurant && !restaurantId && !initialSelectedRestaurantId && initialRestaurants && initialRestaurants.length > 0) {
+      // Небольшая задержка перед показом popup
+      const timer = setTimeout(() => {
+        setShowRestaurantSelector(true);
+      }, 500);
+      return () => clearTimeout(timer);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const handleRestaurantConfirm = (restaurantId: string) => {
+    setShowRestaurantSelector(false);
+    // Ресторан уже выбран в компоненте RestaurantSelector
+    // Обновляем URL без перезагрузки страницы
+    router.replace(`/?restaurantId=${restaurantId}`, undefined, { shallow: true });
+  };
 
   return (
     <Layout>
       <Header />
-      {/* Компонент запроса геолокации - показывается только если нет выбранного ресторана и нет restaurantId в URL */}
-      {!restaurantId && !selectedRestaurant && <LocationRequest />}
+      {/* Компонент выбора ресторана - показывается только если нет выбранного ресторана и нет избранного */}
+      {showRestaurantSelector && !selectedRestaurant && !restaurantId && (
+        <RestaurantSelector onConfirm={handleRestaurantConfirm} />
+      )}
       
       {/* Мобильная версия */}
       <div className="md:hidden">
@@ -154,7 +154,6 @@ export default function Home({
           <MenuBlock 
             restaurantId={selectedRestaurant?.id || restaurantId} 
             initialMenuItems={initialMenuItems}
-            isGeneralMenu={isGeneralMenu && !selectedRestaurant && !restaurantId}
           />
         </div>
       </div>
@@ -168,7 +167,6 @@ export default function Home({
             <MenuBlock 
               restaurantId={selectedRestaurant?.id || restaurantId} 
               initialMenuItems={initialMenuItems}
-              isGeneralMenu={isGeneralMenu && !selectedRestaurant && !restaurantId}
             />
           </div>
 
@@ -216,7 +214,6 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
     const menuItems = pageData.menuItems || [];
     const selectedRestaurantId = pageData.selectedRestaurantId || null;
     const favoriteRestaurant = pageData.favoriteRestaurant || null;
-    const isGeneralMenu = pageData.isGeneralMenu || false;
 
     return {
       props: {
@@ -225,7 +222,6 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
         initialMenuItems: menuItems,
         initialSelectedRestaurantId: selectedRestaurantId,
         initialFavoriteRestaurant: favoriteRestaurant,
-        isGeneralMenu,
         restaurantId: restaurantId as string || null,
       },
     };
@@ -239,7 +235,6 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
         initialMenuItems: [],
         initialSelectedRestaurantId: null,
         initialFavoriteRestaurant: null,
-        isGeneralMenu: false,
         restaurantId: null,
       },
     };

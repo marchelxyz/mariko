@@ -17,10 +17,9 @@ interface MenuItem {
 interface MenuBlockProps {
   restaurantId?: string;
   initialMenuItems?: MenuItem[];
-  isGeneralMenu?: boolean;
 }
 
-export default function MenuBlock({ restaurantId, initialMenuItems, isGeneralMenu = false }: MenuBlockProps) {
+export default function MenuBlock({ restaurantId, initialMenuItems }: MenuBlockProps) {
   const { selectedRestaurant, menuItems, menuItemsByRestaurant, setMenuItems } = useStore();
   const router = useRouter();
   const [displayCount, setDisplayCount] = useState(2);
@@ -194,8 +193,8 @@ export default function MenuBlock({ restaurantId, initialMenuItems, isGeneralMen
                 </div>
               )}
 
-              {/* Цена - показываем только если это не общее меню */}
-              {!isGeneralMenu && item.price && (
+              {/* Цена */}
+              {item.price && (
                 <div className="text-sm font-bold text-black mb-1">
                   {item.price} ₽
                 </div>
