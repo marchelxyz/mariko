@@ -44,10 +44,21 @@ const allowedOrigins = [
 ].filter(Boolean) as string[];
 
 // Паттерны для разрешенных доменов (например, все домены Vercel)
+// Улучшенные паттерны для Vercel доменов (с учетом query параметров и хэшей)
 const allowedOriginPatterns = [
-  /^https:\/\/.*\.vercel\.app$/,
-  /^https:\/\/.*\.vercel\.app\/.*$/,
+  /^https:\/\/[^\/]+\.vercel\.app$/,
+  /^https:\/\/[^\/]+\.vercel\.app\/.*$/,
 ];
+
+// Функция для извлечения базового origin из URL (убирает query параметры и хэш)
+const getBaseOrigin = (origin: string): string => {
+  try {
+    const url = new URL(origin);
+    return `${url.protocol}//${url.host}`;
+  } catch {
+    return origin;
+  }
+};
 
 app.use(cors({
   origin: (origin, callback) => {
@@ -57,21 +68,29 @@ app.use(cors({
       return;
     }
 
+    // Извлекаем базовый origin (без query параметров и хэша)
+    const baseOrigin = getBaseOrigin(origin);
+
     // Проверяем точное совпадение с разрешенными origins
-    if (allowedOrigins.includes(origin)) {
+    if (allowedOrigins.includes(origin) || allowedOrigins.includes(baseOrigin)) {
+      console.log(`✅ CORS: Allowed origin (exact match): ${origin}`);
       callback(null, true);
       return;
     }
 
     // Проверяем паттерны (например, для Vercel доменов)
-    const matchesPattern = allowedOriginPatterns.some(pattern => pattern.test(origin));
+    const matchesPattern = allowedOriginPatterns.some(pattern => 
+      pattern.test(origin) || pattern.test(baseOrigin)
+    );
     if (matchesPattern) {
+      console.log(`✅ CORS: Allowed origin (pattern match): ${origin}`);
       callback(null, true);
       return;
     }
 
     // Если не прошло проверку - блокируем
-    console.warn(`CORS: Blocked origin ${origin}`);
+    console.warn(`❌ CORS: Blocked origin ${origin} (base: ${baseOrigin})`);
+    console.warn(`   Allowed origins: ${allowedOrigins.join(', ')}`);
     callback(new Error('Not allowed by CORS'));
   },
   credentials: true,
@@ -83,12 +102,25 @@ app.use(cors({
     'Accept',
     'Origin',
     'Access-Control-Request-Method',
-    'Access-Control-Request-Headers'
+    'Access-Control-Request-Headers',
+    'X-Telegram-Bot-Api-Secret-Token'
   ],
   exposedHeaders: ['Content-Length', 'X-Foo', 'X-Bar'],
   preflightContinue: false,
   optionsSuccessStatus: 204,
+  maxAge: 86400, // 24 часа кэширования preflight запросов
 }));
+
+// Дополнительное логирование для отладки CORS (особенно preflight запросов)
+app.use((req, res, next) => {
+  if (req.method === 'OPTIONS') {
+    console.log(`🔍 Preflight request: ${req.method} ${req.path}`);
+    console.log(`   Origin: ${req.headers.origin || 'none'}`);
+    console.log(`   Access-Control-Request-Method: ${req.headers['access-control-request-method'] || 'none'}`);
+    console.log(`   Access-Control-Request-Headers: ${req.headers['access-control-request-headers'] || 'none'}`);
+  }
+  next();
+});
 
 // Middleware
 // Настраиваем Helmet так, чтобы он не блокировал CORS заголовки
