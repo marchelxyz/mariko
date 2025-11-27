@@ -157,11 +157,13 @@ export const initializeBot = async (): Promise<void> => {
 
     // Graceful stop - используем once, чтобы избежать множественных обработчиков
     if (!process.listeners('SIGINT').some((listener: any) => listener.name === 'telegramBotSIGINT')) {
-      const stopHandler = () => {
+      const stopHandler = async () => {
         if (bot) {
-          bot.stop('SIGINT').catch((err) => {
+          try {
+            await Promise.resolve(bot.stop('SIGINT'));
+          } catch (err: unknown) {
             console.error('[telegramBot] Error stopping bot:', err);
-          });
+          }
         }
       };
       stopHandler.name = 'telegramBotSIGINT';
@@ -169,11 +171,13 @@ export const initializeBot = async (): Promise<void> => {
     }
 
     if (!process.listeners('SIGTERM').some((listener: any) => listener.name === 'telegramBotSIGTERM')) {
-      const stopHandler = () => {
+      const stopHandler = async () => {
         if (bot) {
-          bot.stop('SIGTERM').catch((err) => {
+          try {
+            await Promise.resolve(bot.stop('SIGTERM'));
+          } catch (err: unknown) {
             console.error('[telegramBot] Error stopping bot:', err);
-          });
+          }
         }
       };
       stopHandler.name = 'telegramBotSIGTERM';
