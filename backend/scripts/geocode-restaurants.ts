@@ -52,8 +52,8 @@ async function geocodeRestaurants() {
         failCount++;
       }
 
-      // Небольшая задержка, чтобы не превысить лимиты API
-      await new Promise(resolve => setTimeout(resolve, 200));
+      // Задержка для соблюдения rate limit Nominatim (1 запрос в секунду)
+      await new Promise(resolve => setTimeout(resolve, 1000));
     }
 
     console.log(`\n✅ Геокодирование завершено!`);
