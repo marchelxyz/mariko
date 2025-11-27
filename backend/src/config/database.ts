@@ -187,3 +187,65 @@ export const connectDatabase = async (): Promise<void> => {
     throw error;
   }
 };
+
+// Функция для корректного закрытия всех соединений БД
+export const closeDatabase = async (): Promise<void> => {
+  if (!AppDataSource.isInitialized) {
+    console.log('ℹ️  База данных не была инициализирована');
+    return;
+  }
+
+  try {
+    console.log('🔄 Закрытие всех активных соединений БД...');
+    
+    // Получаем драйвер для доступа к пулу соединений
+    const driver = AppDataSource.driver as any;
+    
+    // Логируем статистику пула перед закрытием
+    if (driver.master && driver.master.pool) {
+      const pool = driver.master.pool;
+      const totalConnections = pool.totalCount || 0;
+      const idleConnections = pool.idleCount || 0;
+      const activeConnections = totalConnections - idleConnections;
+      
+      console.log(`📊 Статистика пула: всего ${totalConnections}, активных ${activeConnections}, свободных ${idleConnections}`);
+      
+      // Для PostgreSQL драйвера TypeORM использует pg-pool
+      // Метод destroy() закрывает все соединения автоматически
+      // Но мы можем попробовать закрыть пул явно, если доступен метод end()
+      if (typeof pool.end === 'function') {
+        try {
+          await Promise.race([
+            pool.end(),
+            new Promise((_, reject) => 
+              setTimeout(() => reject(new Error('Pool close timeout')), 5000)
+            )
+          ]);
+          console.log('✅ Все соединения из пула закрыты');
+        } catch (poolError) {
+          console.warn('⚠️  Ошибка при закрытии пула (продолжаем):', poolError);
+        }
+      }
+    }
+    
+    // Закрываем DataSource с таймаутом
+    console.log('🔄 Закрытие DataSource...');
+    await Promise.race([
+      AppDataSource.destroy(),
+      new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('DataSource destroy timeout')), 10000)
+      )
+    ]);
+    console.log('✅ DataSource закрыт');
+  } catch (error) {
+    console.error('⚠️  Ошибка при закрытии базы данных:', error);
+    // Пытаемся принудительно закрыть, даже если была ошибка
+    try {
+      await AppDataSource.destroy().catch(() => {
+        // Игнорируем ошибки при принудительном закрытии
+      });
+    } catch (destroyError) {
+      console.error('❌ Критическая ошибка при принудительном закрытии БД:', destroyError);
+    }
+  }
+};
