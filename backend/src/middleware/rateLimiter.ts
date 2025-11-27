@@ -1,4 +1,5 @@
-import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
+import rateLimit from 'express-rate-limit';
+import { Request } from 'express';
 
 // ✅ Общий rate limiter для всех API запросов
 // Настройки можно переопределить через переменные окружения
@@ -9,6 +10,25 @@ const getApiMaxRequests = (): number => {
   // По умолчанию: 100 запросов за 15 минут (безопасно для Starter плана)
   // Для Pro плана можно установить RATE_LIMIT_API_MAX=200
   return 100;
+};
+
+// ✅ Функция для безопасного извлечения IP адреса с поддержкой IPv6 и trust proxy
+const getClientIp = (req: Request): string => {
+  // Получаем IP из заголовков (если используется trust proxy)
+  const forwarded = req.headers['x-forwarded-for'];
+  const ip = forwarded 
+    ? (Array.isArray(forwarded) ? forwarded[0] : forwarded.split(',')[0].trim())
+    : req.socket.remoteAddress || req.ip || 'unknown';
+  
+  // Обработка IPv6 адресов (упрощенная версия)
+  // Если это IPv6, используем первые 64 бита (первые 4 группы) для группировки
+  if (ip.includes(':')) {
+    const parts = ip.split(':');
+    // Возвращаем первые 4 группы IPv6 адреса для группировки похожих адресов
+    return parts.slice(0, 4).join(':');
+  }
+  
+  return ip;
 };
 
 export const apiLimiter = rateLimit({
@@ -25,8 +45,7 @@ export const apiLimiter = rateLimit({
   // Пропускаем успешные health check запросы и preflight (OPTIONS) запросы
   skip: (req) => req.path === '/health' || req.method === 'OPTIONS',
   // ✅ Безопасная настройка для работы с trust proxy и IPv6
-  // Используем ipKeyGenerator для правильной обработки IPv6 адресов
-  keyGenerator: ipKeyGenerator,
+  keyGenerator: getClientIp,
 });
 
 // ✅ Строгий rate limiter для аутентификации
@@ -43,7 +62,7 @@ export const authLimiter = rateLimit({
   legacyHeaders: false,
   skipSuccessfulRequests: true, // Не считать успешные запросы (если вход успешен, не блокируем)
   // ✅ Безопасная настройка для работы с trust proxy и IPv6
-  keyGenerator: ipKeyGenerator,
+  keyGenerator: getClientIp,
 });
 
 // ✅ Rate limiter для тяжелых операций (создание/обновление)
@@ -59,5 +78,5 @@ export const writeLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   // ✅ Безопасная настройка для работы с trust proxy и IPv6
-  keyGenerator: ipKeyGenerator,
+  keyGenerator: getClientIp,
 });
