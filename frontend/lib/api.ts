@@ -2,9 +2,20 @@ import axios from 'axios';
 
 // Убеждаемся, что baseURL всегда заканчивается на /api
 const getBaseURL = () => {
+  // В production переменная NEXT_PUBLIC_API_URL должна быть установлена в Vercel Environment Variables
+  // В development используем localhost по умолчанию
   const url = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+  
   // Если URL не заканчивается на /api, добавляем его
-  return url.endsWith('/api') ? url : `${url.replace(/\/$/, '')}/api`;
+  const baseURL = url.endsWith('/api') ? url : `${url.replace(/\/$/, '')}/api`;
+  
+  // В production предупреждаем, если используется localhost (значит переменная не установлена)
+  if (typeof window !== 'undefined' && baseURL.includes('localhost') && process.env.NODE_ENV === 'production') {
+    console.error('⚠️ ВНИМАНИЕ: NEXT_PUBLIC_API_URL не установлена в Vercel! Используется localhost, что не будет работать в production.');
+    console.error('📝 Установите переменную окружения NEXT_PUBLIC_API_URL в настройках Vercel проекта.');
+  }
+  
+  return baseURL;
 };
 
 const api = axios.create({
