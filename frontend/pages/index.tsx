@@ -21,6 +21,8 @@ interface Restaurant {
   city: string;
   address: string;
   phoneNumber: string;
+  latitude?: number;
+  longitude?: number;
 }
 
 interface MenuItem {
@@ -57,6 +59,7 @@ export default function Home({
     setSelectedRestaurant,
     setFavoriteRestaurant,
     setMenuItems,
+    selectNearestRestaurantByLocation,
   } = useStore();
 
   // Инициализируем store с предзагруженными данными при первом рендере
@@ -69,6 +72,18 @@ export default function Home({
 
     // Инициализируем рестораны
     if (initialRestaurants && initialRestaurants.length > 0) {
+      // Логируем рестораны с координатами для отладки
+      const restaurantsWithCoords = initialRestaurants.filter(r => r.latitude != null && r.longitude != null);
+      console.log('[Home] Загружено ресторанов:', initialRestaurants.length);
+      console.log('[Home] Ресторанов с координатами:', restaurantsWithCoords.length);
+      if (restaurantsWithCoords.length > 0) {
+        console.log('[Home] Рестораны с координатами:', restaurantsWithCoords.map(r => ({
+          name: r.name,
+          city: r.city,
+          latitude: r.latitude,
+          longitude: r.longitude
+        })));
+      }
       setRestaurants(initialRestaurants);
     }
 
@@ -95,15 +110,54 @@ export default function Home({
       if (restaurant) {
         setSelectedRestaurant(restaurant);
       }
-    } else if (initialRestaurants && initialRestaurants.length > 0) {
-      // Если нет выбранного ресторана, выбираем первый
-      setSelectedRestaurant(initialRestaurants[0]);
     }
+    // Если нет избранного и нет явно выбранного ресторана, 
+    // не выбираем первый сразу - попробуем выбрать ближайший по местоположению
+    // (см. код ниже)
 
     // Инициализируем меню
     if (initialMenuItems && initialMenuItems.length > 0) {
       const targetRestaurantId = initialSelectedRestaurantId || restaurantId || initialRestaurants?.[0]?.id;
       setMenuItems(initialMenuItems, targetRestaurantId || undefined);
+    }
+
+    // Автоматически определяем ближайший ресторан, если нет избранного ресторана
+    // и нет явно выбранного ресторана из URL или сервера
+    if (!initialFavoriteRestaurant && !initialSelectedRestaurantId && initialRestaurants && initialRestaurants.length > 0) {
+      // Проверяем, есть ли рестораны с координатами
+      // Координаты могут приходить как строки из БД (decimal), преобразуем в числа
+      const restaurantsWithCoords = initialRestaurants.filter(r => {
+        const lat = typeof r.latitude === 'string' ? parseFloat(r.latitude) : r.latitude;
+        const lon = typeof r.longitude === 'string' ? parseFloat(r.longitude) : r.longitude;
+        return lat != null && !isNaN(lat) && lon != null && !isNaN(lon);
+      });
+      
+      if (restaurantsWithCoords.length > 0) {
+        // Небольшая задержка, чтобы дать время для инициализации store
+        setTimeout(async () => {
+          try {
+            console.log('[Home] Пытаемся выбрать ближайший ресторан из', restaurantsWithCoords.length, 'ресторанов с координатами');
+            const success = await selectNearestRestaurantByLocation();
+            
+            // Если ближайший ресторан не был выбран (пользователь отказал или ошибка),
+            // выбираем первый ресторан как fallback
+            if (!success && initialRestaurants.length > 0) {
+              console.log('[Home] Ближайший ресторан не выбран, используем первый ресторан как fallback');
+              setSelectedRestaurant(initialRestaurants[0]);
+            }
+          } catch (error) {
+            console.log('[Home] Не удалось выбрать ближайший ресторан:', error);
+            // В случае ошибки выбираем первый ресторан
+            if (initialRestaurants.length > 0) {
+              setSelectedRestaurant(initialRestaurants[0]);
+            }
+          }
+        }, 500);
+      } else {
+        console.log('[Home] Нет ресторанов с координатами, выбираем первый ресторан');
+        // Если нет ресторанов с координатами, выбираем первый
+        setSelectedRestaurant(initialRestaurants[0]);
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

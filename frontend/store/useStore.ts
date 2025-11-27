@@ -85,7 +85,7 @@ interface Store {
   setBannersForRestaurant: (restaurantId: string | null, banners: Banner[]) => void;
   setMenuItems: (menuItems: MenuItem[], restaurantId?: string) => void;
   findNearestRestaurant: (latitude: number, longitude: number) => Promise<Restaurant | null>;
-  selectNearestRestaurantByLocation: () => Promise<void>;
+  selectNearestRestaurantByLocation: () => Promise<boolean>;
 }
 
 // Инициализация токена из SecureStorage
@@ -164,10 +164,26 @@ export const useStore = create<Store>((set, get) => {
           }
         }
         
-        // Если нет избранного ресторана, выбираем первый или сохраняем текущий
+        // Если нет избранного ресторана и нет текущего выбранного,
+        // проверяем, есть ли рестораны с координатами для автоматического выбора
         if (!currentSelected) {
-          set({ selectedRestaurant: restaurants[0] });
-          deviceStorage.setItem(STORAGE_KEYS.SELECTED_RESTAURANT_ID, restaurants[0].id).catch(console.error);
+          // Координаты могут приходить как строки из БД (decimal), преобразуем в числа
+          const restaurantsWithCoords = restaurants.filter(r => {
+            const lat = typeof r.latitude === 'string' ? parseFloat(r.latitude) : r.latitude;
+            const lon = typeof r.longitude === 'string' ? parseFloat(r.longitude) : r.longitude;
+            return lat != null && !isNaN(lat) && lon != null && !isNaN(lon);
+          });
+          
+          // Если есть рестораны с координатами, не выбираем первый сразу
+          // Дадим возможность выбрать ближайший по местоположению
+          // (это будет сделано в fetchRestaurants или в компоненте)
+          if (restaurantsWithCoords.length === 0) {
+            // Если нет ресторанов с координатами, выбираем первый
+            set({ selectedRestaurant: restaurants[0] });
+            deviceStorage.setItem(STORAGE_KEYS.SELECTED_RESTAURANT_ID, restaurants[0].id).catch(console.error);
+          }
+          // Если есть рестораны с координатами, не выбираем ничего здесь
+          // Выбор будет сделан через selectNearestRestaurantByLocation
         }
       }
     },
@@ -225,10 +241,15 @@ export const useStore = create<Store>((set, get) => {
             }
           }
           
-          // Если нет избранного ресторана и нет текущего выбранного, пробуем выбрать ближайший
-          if (!currentSelected) {
-            // Проверяем, есть ли рестораны с координатами
-            const restaurantsWithCoords = restaurants.filter(r => r.latitude != null && r.longitude != null);
+            // Если нет избранного ресторана и нет текущего выбранного, пробуем выбрать ближайший
+            if (!currentSelected) {
+              // Проверяем, есть ли рестораны с координатами
+              // Координаты могут приходить как строки из БД (decimal), преобразуем в числа
+              const restaurantsWithCoords = restaurants.filter(r => {
+                const lat = typeof r.latitude === 'string' ? parseFloat(r.latitude) : r.latitude;
+                const lon = typeof r.longitude === 'string' ? parseFloat(r.longitude) : r.longitude;
+                return lat != null && !isNaN(lat) && lon != null && !isNaN(lon);
+              });
             
             if (restaurantsWithCoords.length > 0) {
               // Пробуем выбрать ближайший ресторан по местоположению
@@ -473,10 +494,13 @@ export const useStore = create<Store>((set, get) => {
           params: { latitude, longitude },
         });
         
+        console.log('[Store] Ответ API /restaurants/nearest:', response.data);
+        
         if (response.data.success && response.data.data?.restaurant) {
           const restaurant = response.data.data.restaurant;
           const distance = response.data.data.distance;
-          console.log(`[Store] Найден ближайший ресторан: ${restaurant.name} (расстояние: ${distance} км)`);
+          console.log(`[Store] ✅ Найден ближайший ресторан: ${restaurant.name} (${restaurant.city}), расстояние: ${distance} км`);
+          console.log('[Store] Координаты ресторана:', { latitude: restaurant.latitude, longitude: restaurant.longitude });
           return restaurant;
         }
         
@@ -502,8 +526,30 @@ export const useStore = create<Store>((set, get) => {
         const restaurants = get().restaurants;
         if (!restaurants || restaurants.length === 0) {
           console.log('[Store] Нет ресторанов для выбора ближайшего');
-          return;
+          return false;
         }
+
+        // Проверяем, есть ли рестораны с координатами
+        // Координаты могут приходить как строки из БД (decimal), преобразуем в числа
+        const restaurantsWithCoords = restaurants.filter(r => {
+          const lat = typeof r.latitude === 'string' ? parseFloat(r.latitude) : r.latitude;
+          const lon = typeof r.longitude === 'string' ? parseFloat(r.longitude) : r.longitude;
+          return lat != null && !isNaN(lat) && lon != null && !isNaN(lon);
+        });
+        
+        if (restaurantsWithCoords.length === 0) {
+          console.log('[Store] Нет ресторанов с координатами для выбора ближайшего');
+          console.log('[Store] Все рестораны:', restaurants.map(r => ({
+            name: r.name,
+            latitude: r.latitude,
+            longitude: r.longitude,
+            latType: typeof r.latitude,
+            lonType: typeof r.longitude
+          })));
+          return false;
+        }
+        
+        console.log(`[Store] Найдено ${restaurantsWithCoords.length} ресторанов с координатами`);
 
         // Пробуем получить сохраненное местоположение
         let location = getStoredLocation();
@@ -515,13 +561,13 @@ export const useStore = create<Store>((set, get) => {
           
           if (location) {
             storeLocation(location);
-            console.log('[Store] Местоположение сохранено');
+            console.log('[Store] Местоположение сохранено:', location);
           } else {
             console.log('[Store] Пользователь не предоставил местоположение или произошла ошибка');
-            return;
+            return false;
           }
         } else {
-          console.log('[Store] Используем сохраненное местоположение');
+          console.log('[Store] Используем сохраненное местоположение:', location);
         }
 
         // Ищем ближайший ресторан
@@ -530,19 +576,27 @@ export const useStore = create<Store>((set, get) => {
         
         if (nearestRestaurant) {
           const favoriteRestaurant = get().favoriteRestaurant;
+          const currentSelected = get().selectedRestaurant;
           
-          // Если нет избранного ресторана, выбираем ближайший
-          if (!favoriteRestaurant) {
+          // Если нет избранного ресторана и нет текущего выбранного, выбираем ближайший
+          if (!favoriteRestaurant && !currentSelected) {
             await get().setSelectedRestaurant(nearestRestaurant);
             console.log(`[Store] ✅ Выбран ближайший ресторан: ${nearestRestaurant.name} (${nearestRestaurant.city})`);
-          } else {
+            return true;
+          } else if (favoriteRestaurant) {
             console.log(`[Store] Избранный ресторан имеет приоритет над ближайшим`);
+            return false;
+          } else {
+            console.log(`[Store] Ресторан уже выбран, не перезаписываем`);
+            return false;
           }
         } else {
           console.log('[Store] Ближайший ресторан не найден');
+          return false;
         }
       } catch (error) {
         console.error('[Store] Ошибка при выборе ближайшего ресторана:', error);
+        return false;
       }
     },
   };
