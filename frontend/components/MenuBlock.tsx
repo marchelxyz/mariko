@@ -89,7 +89,7 @@ export default function MenuBlock({ restaurantId }: MenuBlockProps) {
     };
 
     fetchMenu();
-  }, [restaurantId, selectedRestaurant, currentRestaurantId, cachedMenuItems]);
+  }, [restaurantId, selectedRestaurant, currentRestaurantId, cachedMenuItems, setMenuItems]);
 
   // Получаем блюда для отображения
   const menuItemsToDisplay = cachedMenuItems.slice(0, displayCount);

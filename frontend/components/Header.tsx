@@ -11,7 +11,7 @@ interface HeaderProps {
 }
 
 export default function Header({ title, showLogo = false, showBackButton = false, onBack }: HeaderProps) {
-  const { selectedRestaurant, restaurants, setSelectedRestaurant, isLoading, favoriteRestaurant, setFavoriteRestaurant, token } = useStore();
+  const { selectedRestaurant, restaurants, setSelectedRestaurant, isLoading, favoriteRestaurant, setFavoriteRestaurantById, token } = useStore();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isSettingFavorite, setIsSettingFavorite] = useState(false);
   const router = useRouter();
@@ -31,7 +31,7 @@ export default function Header({ title, showLogo = false, showBackButton = false
     try {
       setIsSettingFavorite(true);
       // Переключаем состояние: если уже избранный, убираем, если нет - добавляем
-      await setFavoriteRestaurant(selectedRestaurant.id);
+      await setFavoriteRestaurantById(selectedRestaurant.id);
     } catch (error) {
       console.error('Failed to set favorite restaurant:', error);
       alert('Не удалось установить любимый ресторан');
