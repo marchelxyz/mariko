@@ -8,6 +8,7 @@ import ActionButtons from '@/components/ActionButtons';
 import Banners from '@/components/Banners';
 import MenuBlock from '@/components/MenuBlock';
 import RestaurantSelector from '@/components/RestaurantSelector';
+import { MenuItem } from '@/types/menu';
 
 interface Banner {
   id: string;
@@ -27,15 +28,7 @@ interface Restaurant {
   longitude?: number;
 }
 
-interface MenuItem {
-  id: string;
-  name: string;
-  description: string;
-  price: number;
-  category: string;
-  imageUrl?: string;
-  calories?: number;
-}
+// Используем общий тип MenuItem из types/menu.ts
 
 interface HomeProps {
   initialBanners: Banner[];

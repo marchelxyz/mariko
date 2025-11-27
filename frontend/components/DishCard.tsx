@@ -1,16 +1,6 @@
 import { useEffect } from 'react';
 import Image from 'next/image';
-
-interface MenuItem {
-  id: string;
-  name: string;
-  description: string;
-  price: number;
-  category: string;
-  imageUrl?: string;
-  calories?: number;
-  ingredients?: string;
-}
+import { MenuItem } from '@/types/menu';
 
 interface DishCardProps {
   item: MenuItem | null;

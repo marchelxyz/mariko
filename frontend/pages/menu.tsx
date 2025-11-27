@@ -6,17 +6,7 @@ import Layout from '@/components/Layout';
 import Header from '@/components/Header';
 import DishCard from '@/components/DishCard';
 import { useStore } from '@/store/useStore';
-
-interface MenuItem {
-  id: string;
-  name: string;
-  description: string;
-  price: number;
-  category: string;
-  imageUrl?: string;
-  calories?: number;
-  ingredients?: string;
-}
+import { MenuItem } from '@/types/menu';
 
 interface MenuProps {
   initialMenuItems: Record<string, MenuItem[]>;

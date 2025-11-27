@@ -4,17 +4,7 @@ import Image from 'next/image';
 import { useStore } from '@/store/useStore';
 import api from '@/lib/api';
 import DishCard from './DishCard';
-
-interface MenuItem {
-  id: string;
-  name: string;
-  description: string;
-  price: number;
-  category: string;
-  imageUrl?: string;
-  calories?: number;
-  ingredients?: string;
-}
+import { MenuItem } from '@/types/menu';
 
 interface MenuBlockProps {
   restaurantId?: string;
@@ -63,7 +53,11 @@ export default function MenuBlock({ restaurantId, initialMenuItems }: MenuBlockP
   // или если ресторан не указан (общее меню)
   const shouldUseInitialMenuItems = initialMenuItems && initialMenuItems.length > 0 && 
     (!currentRestaurantId || cachedMenuItems.length === 0);
-  const menuItemsToUse = cachedMenuItems.length > 0 ? cachedMenuItems : (shouldUseInitialMenuItems ? initialMenuItems : []);
+  // Фильтруем initialMenuItems, чтобы убедиться, что у всех есть обязательные поля
+  const validInitialMenuItems = initialMenuItems?.filter(item => 
+    item && item.id && item.name && typeof item.price === 'number'
+  ) || [];
+  const menuItemsToUse = cachedMenuItems.length > 0 ? cachedMenuItems : (shouldUseInitialMenuItems ? validInitialMenuItems : []);
 
   // Загружаем меню только если его нет в store
   useEffect(() => {
@@ -96,7 +90,11 @@ export default function MenuBlock({ restaurantId, initialMenuItems }: MenuBlockP
         const allItems: MenuItem[] = [];
         Object.values(groupedMenu).forEach((categoryItems: any) => {
           if (Array.isArray(categoryItems)) {
-            allItems.push(...categoryItems);
+            // Фильтруем и проверяем, что у каждого элемента есть обязательные поля
+            const validItems = categoryItems.filter((item: any) => 
+              item && item.id && item.name && typeof item.price === 'number'
+            );
+            allItems.push(...validItems);
           }
         });
         
@@ -113,7 +111,15 @@ export default function MenuBlock({ restaurantId, initialMenuItems }: MenuBlockP
   }, [restaurantId, selectedRestaurant?.id, currentRestaurantId, menuItemsByRestaurant, initialMenuItems, setMenuItems]);
 
   // Получаем блюда для отображения
-  const menuItemsToDisplay = menuItemsToUse.slice(0, displayCount);
+  // Убеждаемся, что все элементы имеют правильный тип
+  const menuItemsToDisplay: MenuItem[] = menuItemsToUse
+    .filter((item): item is MenuItem => 
+      item != null && 
+      typeof item.id === 'string' && 
+      typeof item.name === 'string' && 
+      typeof item.price === 'number'
+    )
+    .slice(0, displayCount);
 
   const handleMenuClick = () => {
     const currentRestaurantId = restaurantId || selectedRestaurant?.id;
