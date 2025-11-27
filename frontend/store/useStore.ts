@@ -517,7 +517,7 @@ export const useStore = create<Store>((set, get) => {
     },
 
     selectNearestRestaurantByLocation: async () => {
-      if (typeof window === 'undefined') return;
+      if (typeof window === 'undefined') return false;
       
       try {
         const { requestLocation, getStoredLocation, storeLocation } = await import('@/lib/location');
