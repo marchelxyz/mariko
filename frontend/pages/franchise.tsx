@@ -35,12 +35,12 @@ export default function Franchise() {
                 Не удалось загрузить страницу. Пожалуйста, перейдите по ссылке:
               </p>
               <a 
-                href="https://marikodostavka.ru/" 
+                href="https://vhachapuri.ru/franshiza" 
                 target="_blank" 
                 rel="noopener noreferrer"
                 className="text-primary underline hover:text-primary-dark"
               >
-                https://marikodostavka.ru/
+                https://vhachapuri.ru/franshiza
               </a>
             </div>
           </div>
@@ -55,7 +55,7 @@ export default function Franchise() {
               </div>
             )}
             <iframe
-              src="https://marikodostavka.ru/"
+              src="https://vhachapuri.ru/franshiza"
               className="w-full h-full border-0 absolute inset-0"
               onError={handleIframeError}
               onLoad={() => setIsLoading(false)}
