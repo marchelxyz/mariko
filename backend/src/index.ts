@@ -111,8 +111,15 @@ app.get('/health', async (req, res) => {
         await queryRunner.query('SELECT 1');
         await queryRunner.release();
         dbDetails.status = 'connected';
-        dbDetails.activeConnections = AppDataSource.driver.pool?.totalCount || 0;
-        dbDetails.idleConnections = AppDataSource.driver.pool?.idleCount || 0;
+        // Безопасный доступ к пулу соединений PostgreSQL
+        const driver = AppDataSource.driver as any;
+        if (driver.master && driver.master.pool) {
+          dbDetails.activeConnections = driver.master.pool.totalCount || 0;
+          dbDetails.idleConnections = driver.master.pool.idleCount || 0;
+        } else {
+          dbDetails.activeConnections = 0;
+          dbDetails.idleConnections = 0;
+        }
       } catch (dbError) {
         dbDetails.status = 'error';
         dbDetails.error = dbError instanceof Error ? dbError.message : String(dbError);
