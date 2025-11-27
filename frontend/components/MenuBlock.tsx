@@ -16,9 +16,10 @@ interface MenuItem {
 
 interface MenuBlockProps {
   restaurantId?: string;
+  initialMenuItems?: MenuItem[];
 }
 
-export default function MenuBlock({ restaurantId }: MenuBlockProps) {
+export default function MenuBlock({ restaurantId, initialMenuItems }: MenuBlockProps) {
   const { selectedRestaurant, menuItems, menuItemsByRestaurant, setMenuItems } = useStore();
   const router = useRouter();
   const [displayCount, setDisplayCount] = useState(2);
@@ -51,6 +52,9 @@ export default function MenuBlock({ restaurantId }: MenuBlockProps) {
   const cachedMenuItems = currentRestaurantId 
     ? (menuItemsByRestaurant[currentRestaurantId] || menuItems)
     : menuItems;
+  
+  // Используем предзагруженные элементы меню, если они есть и кэш пуст
+  const menuItemsToUse = cachedMenuItems.length > 0 ? cachedMenuItems : (initialMenuItems || []);
 
   // Загружаем меню только если его нет в store
   useEffect(() => {
@@ -61,6 +65,12 @@ export default function MenuBlock({ restaurantId }: MenuBlockProps) {
 
     // Если меню уже есть в кэше, не загружаем
     if (cachedMenuItems && cachedMenuItems.length > 0) {
+      setIsLoading(false);
+      return;
+    }
+    
+    // Если есть initialMenuItems, не делаем запрос
+    if (initialMenuItems && initialMenuItems.length > 0) {
       setIsLoading(false);
       return;
     }
@@ -89,10 +99,10 @@ export default function MenuBlock({ restaurantId }: MenuBlockProps) {
     };
 
     fetchMenu();
-  }, [restaurantId, selectedRestaurant, currentRestaurantId, cachedMenuItems, setMenuItems]);
+  }, [restaurantId, selectedRestaurant, currentRestaurantId, cachedMenuItems, initialMenuItems, setMenuItems]);
 
   // Получаем блюда для отображения
-  const menuItemsToDisplay = cachedMenuItems.slice(0, displayCount);
+  const menuItemsToDisplay = menuItemsToUse.slice(0, displayCount);
 
   const handleMenuClick = () => {
     const currentRestaurantId = restaurantId || selectedRestaurant?.id;
@@ -103,7 +113,7 @@ export default function MenuBlock({ restaurantId }: MenuBlockProps) {
     }
   };
 
-  if (isLoading || !cachedMenuItems || cachedMenuItems.length === 0) {
+  if (isLoading || menuItemsToUse.length === 0) {
     return null;
   }
 
