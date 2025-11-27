@@ -7,7 +7,6 @@ import Header from '@/components/Header';
 import ActionButtons from '@/components/ActionButtons';
 import Banners from '@/components/Banners';
 import MenuBlock from '@/components/MenuBlock';
-import RestaurantSelector from '@/components/RestaurantSelector';
 import { MenuItem } from '@/types/menu';
 
 interface Banner {
@@ -56,7 +55,6 @@ export default function Home({
     setFavoriteRestaurant,
     setMenuItems,
   } = useStore();
-  const [showRestaurantSelector, setShowRestaurantSelector] = useState(false);
 
   // Инициализируем store с предзагруженными данными при первом рендере
   useEffect(() => {
@@ -101,7 +99,6 @@ export default function Home({
         setSelectedRestaurant(restaurant);
       }
     }
-    // НЕ выбираем ресторан автоматически, если нет избранного - покажем popup
 
     // Инициализируем меню
     if (initialMenuItems && initialMenuItems.length > 0) {
@@ -110,49 +107,12 @@ export default function Home({
       const targetRestaurantId = initialSelectedRestaurantId || restaurantId || (initialRestaurants?.[0]?.id) || undefined;
       setMenuItems(initialMenuItems, targetRestaurantId);
     }
-
-    // Показываем селектор ресторана, если нет выбранного ресторана и нет избранного
-    // Проверяем состояние после небольшой задержки, чтобы убедиться, что все инициализации завершены
-    const timer = setTimeout(() => {
-      const currentSelectedRestaurant = useStore.getState().selectedRestaurant;
-      const currentFavoriteRestaurant = useStore.getState().favoriteRestaurant;
-      
-      // Показываем поп-ап только если:
-      // 1. Нет избранного ресторана
-      // 2. Нет restaurantId в URL
-      // 3. Нет initialSelectedRestaurantId (явного выбора с сервера)
-      // 4. Нет выбранного ресторана в store (после всех инициализаций)
-      // 5. Есть рестораны для выбора
-      if (
-        !currentFavoriteRestaurant &&
-        !restaurantId &&
-        !initialSelectedRestaurantId &&
-        !currentSelectedRestaurant &&
-        initialRestaurants &&
-        initialRestaurants.length > 0
-      ) {
-        setShowRestaurantSelector(true);
-      }
-    }, 500);
-    
-    return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  const handleRestaurantConfirm = (restaurantId: string) => {
-    setShowRestaurantSelector(false);
-    // Ресторан уже выбран в компоненте RestaurantSelector
-    // Обновляем URL без перезагрузки страницы
-    router.replace(`/?restaurantId=${restaurantId}`, undefined, { shallow: true });
-  };
 
   return (
     <Layout>
       <Header />
-      {/* Компонент выбора ресторана - показывается только если нет выбранного ресторана и нет избранного */}
-      {showRestaurantSelector && !selectedRestaurant && !restaurantId && (
-        <RestaurantSelector onConfirm={handleRestaurantConfirm} />
-      )}
       
       {/* Мобильная версия */}
       <div className="md:hidden">
