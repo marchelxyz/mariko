@@ -89,11 +89,27 @@ GET /api/restaurants/nearest?latitude=53.2001&longitude=45.0046
 ### Запрос местоположения пользователя
 
 ```typescript
-import { requestLocation } from '@/lib/location';
+import { requestLocation, checkLocationPermission, openLocationSettings } from '@/lib/location';
 
+// Простой запрос местоположения (автоматически использует лучший доступный API)
 const location = await requestLocation();
 if (location) {
   console.log(`Координаты: ${location.latitude}, ${location.longitude}`);
+  console.log(`Точность: ${location.horizontalAccuracy} метров`);
+}
+
+// Проверка статуса разрешений (только для Bot API 8.0+)
+const permissionStatus = await checkLocationPermission();
+if (permissionStatus) {
+  console.log('Геолокация доступна:', permissionStatus.isLocationAvailable);
+  console.log('Разрешение запрошено:', permissionStatus.isPermissionRequested);
+  console.log('Разрешение предоставлено:', permissionStatus.isPermissionGranted);
+  
+  if (!permissionStatus.isPermissionGranted) {
+    // Открыть настройки для запроса разрешения
+    // ВАЖНО: можно вызвать только в ответ на действие пользователя (клик по кнопке)
+    await openLocationSettings();
+  }
 }
 ```
 
@@ -127,9 +143,32 @@ const nearest = await findNearestRestaurant(53.2001, 45.0046);
 - Для больших объемов рекомендуется использовать платный тариф
 - Задержка между запросами в скрипте геокодирования: 200мс (чтобы не превысить лимиты)
 
+## Технические детали
+
+### Используемые API Telegram
+
+Приложение использует два API для работы с геолокацией:
+
+1. **LocationManager API (Bot API 8.0+)** - новый рекомендуемый способ
+   - Полный контроль над разрешениями
+   - Информация о точности местоположения
+   - События для отслеживания изменений статуса
+   - Метод `openSettings()` для запроса разрешений
+
+2. **requestLocation API (Bot API 6.0+)** - старый способ (fallback)
+   - Используется автоматически, если LocationManager недоступен
+   - Обеспечивает совместимость со старыми версиями Telegram
+
+Код автоматически выбирает лучший доступный API и использует fallback при необходимости.
+
+### Инициализация LocationManager
+
+LocationManager автоматически инициализируется при загрузке приложения (`_app.tsx`), что обеспечивает лучшую производительность при первом запросе местоположения.
+
 ## Будущие улучшения
 
 - Добавление полей координат в админ-панель для ручного редактирования
-- Кнопка "Обновить местоположение" в интерфейсе
+- Кнопка "Обновить местоположение" в интерфейсе с использованием `openLocationSettings()`
 - Отображение расстояния до ресторанов в списке
 - Кэширование результатов геокодирования
+- Использование точности (`horizontalAccuracy`) для фильтрации неточных данных
