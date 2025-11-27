@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/router';
 import Image from 'next/image';
 import { useStore } from '@/store/useStore';
@@ -11,11 +11,15 @@ interface MenuBlockProps {
   initialMenuItems?: MenuItem[];
 }
 
+// Глобальный объект для отслеживания активных запросов меню
+const activeMenuRequests = new Map<string, Promise<any>>();
+
 export default function MenuBlock({ restaurantId, initialMenuItems }: MenuBlockProps) {
   const { selectedRestaurant, menuItems, menuItemsByRestaurant, setMenuItems } = useStore();
   const router = useRouter();
   const [displayCount, setDisplayCount] = useState(2);
   const [selectedDish, setSelectedDish] = useState<MenuItem | null>(null);
+  const fetchAbortControllerRef = useRef<AbortController | null>(null);
   
   // Определяем текущий ID ресторана для проверки кэша
   const currentRestaurantIdForInit = restaurantId || selectedRestaurant?.id;
@@ -114,53 +118,102 @@ export default function MenuBlock({ restaurantId, initialMenuItems }: MenuBlockP
 
     // Только если данных нет ни в кэше, ни в initialMenuItems, делаем запрос
     const fetchMenu = async () => {
-      setIsLoading(true);
-      try {
-        const response = await api.get(`/menu/${currentRestaurantId}`);
-        const groupedMenu = response.data.data || {};
-        
-        // Преобразуем группированное меню в плоский массив всех блюд
-        const allItems: MenuItem[] = [];
-        Object.values(groupedMenu).forEach((categoryItems: any) => {
-          if (Array.isArray(categoryItems)) {
-            // Фильтруем и проверяем, что у каждого элемента есть обязательные поля
-            const validItems = categoryItems.filter((item: any) => 
-              item && item.id && item.name && typeof item.price === 'number'
-            );
-            allItems.push(...validItems);
-          }
-        });
-        
+      // Проверяем, не идет ли уже загрузка для этого ресторана
+      const existingRequest = activeMenuRequests.get(currentRestaurantId);
+      if (existingRequest) {
         if (process.env.NODE_ENV === 'development') {
-          console.debug('MenuBlock: Fetched menu items:', {
-            restaurantId: currentRestaurantId,
-            groupedCategories: Object.keys(groupedMenu),
-            totalItems: allItems.length,
-          });
+          console.debug('MenuBlock: Используем существующий запрос для ресторана:', currentRestaurantId);
         }
-        
-        // Сохраняем в store только если получили данные
-        if (allItems.length > 0) {
-          setMenuItems(allItems, currentRestaurantId);
+        try {
+          await existingRequest;
+        } catch (error) {
+          // Игнорируем ошибки из существующего запроса
         }
-      } catch (error: any) {
-        console.error('Failed to fetch menu:', error);
-        if (process.env.NODE_ENV === 'development') {
-          console.error('MenuBlock: Error details:', {
-            restaurantId: currentRestaurantId,
-            errorMessage: error?.message,
-            errorResponse: error?.response?.data,
-            errorStatus: error?.response?.status,
-          });
-        }
-        // Устанавливаем isLoading в false даже при ошибке, чтобы компонент мог отобразиться
         setIsLoading(false);
+        return;
+      }
+
+      setIsLoading(true);
+      
+      // Создаем новый AbortController для возможности отмены запроса
+      fetchAbortControllerRef.current = new AbortController();
+      
+      // Создаем промис для запроса и сохраняем его
+      const menuRequest = (async () => {
+        try {
+          const response = await api.get(`/menu/${currentRestaurantId}`, {
+            signal: fetchAbortControllerRef.current?.signal,
+          });
+          const groupedMenu = response.data.data || {};
+          
+          // Преобразуем группированное меню в плоский массив всех блюд
+          const allItems: MenuItem[] = [];
+          Object.values(groupedMenu).forEach((categoryItems: any) => {
+            if (Array.isArray(categoryItems)) {
+              // Фильтруем и проверяем, что у каждого элемента есть обязательные поля
+              const validItems = categoryItems.filter((item: any) => 
+                item && item.id && item.name && typeof item.price === 'number'
+              );
+              allItems.push(...validItems);
+            }
+          });
+          
+          if (process.env.NODE_ENV === 'development') {
+            console.debug('MenuBlock: Fetched menu items:', {
+              restaurantId: currentRestaurantId,
+              groupedCategories: Object.keys(groupedMenu),
+              totalItems: allItems.length,
+            });
+          }
+          
+          // Сохраняем в store только если получили данные
+          if (allItems.length > 0) {
+            setMenuItems(allItems, currentRestaurantId);
+          }
+          
+          return allItems;
+        } catch (error: any) {
+          // Игнорируем ошибки отмены запроса
+          if (error?.name === 'AbortError' || error?.code === 'ERR_CANCELED') {
+            return;
+          }
+          
+          console.error('Failed to fetch menu:', error);
+          if (process.env.NODE_ENV === 'development') {
+            console.error('MenuBlock: Error details:', {
+              restaurantId: currentRestaurantId,
+              errorMessage: error?.message,
+              errorResponse: error?.response?.data,
+              errorStatus: error?.response?.status,
+            });
+          }
+          throw error;
+        } finally {
+          // Удаляем запрос из активных после завершения
+          activeMenuRequests.delete(currentRestaurantId);
+        }
+      })();
+      
+      // Сохраняем промис в активных запросах
+      activeMenuRequests.set(currentRestaurantId, menuRequest);
+      
+      try {
+        await menuRequest;
+      } catch (error) {
+        // Ошибка уже обработана в промисе
       } finally {
         setIsLoading(false);
       }
     };
 
     fetchMenu();
+    
+    // Очистка при размонтировании компонента
+    return () => {
+      if (fetchAbortControllerRef.current) {
+        fetchAbortControllerRef.current.abort();
+      }
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [restaurantId, selectedRestaurant?.id, currentRestaurantId]);
 
