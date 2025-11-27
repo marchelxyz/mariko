@@ -14,6 +14,7 @@ import { performanceMonitor, getMetrics, resetMetrics } from './middleware/perfo
 import authRoutes from './routes/auth';
 import restaurantRoutes from './routes/restaurants';
 import menuRoutes from './routes/menu';
+import generalMenuRoutes from './routes/generalMenu';
 import bannerRoutes from './routes/banners';
 import profileRoutes from './routes/profile';
 import adminRoutes from './routes/admin';
@@ -129,6 +130,7 @@ app.get('/health', async (req, res) => {
 app.use('/api/auth', authLimiter, authRoutes);
 app.use('/api/restaurants', restaurantRoutes);
 app.use('/api/menu', menuRoutes);
+app.use('/api/general-menu', generalMenuRoutes);
 app.use('/api/banners', bannerRoutes);
 app.use('/api/profile', profileRoutes);
 app.use('/api/pages', pagesRoutes);

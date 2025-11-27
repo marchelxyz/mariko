@@ -7,6 +7,7 @@ const CACHE_PREFIXES = {
   RESTAURANTS: 'restaurants',
   RESTAURANT: 'restaurant',
   MENU: 'menu',
+  GENERAL_MENU: 'general-menu',
   BANNERS: 'banners',
   PAGE_HOME: 'page:home',
   PAGE_MENU: 'page:menu',
@@ -19,6 +20,7 @@ const CACHE_TTL = {
   RESTAURANTS: 3600, // 1 час
   RESTAURANT: 3600, // 1 час
   MENU: 1800, // 30 минут
+  GENERAL_MENU: 1800, // 30 минут
   BANNERS: 1800, // 30 минут
   PAGE_HOME: 1800, // 30 минут
   PAGE_MENU: 1800, // 30 минут
@@ -159,6 +161,23 @@ export const invalidateMenuCache = async (restaurantId: string) => {
 
 export const invalidateAllMenuCache = async () => {
   await deleteByPattern(`${CACHE_PREFIXES.MENU}:*`);
+};
+
+// ========== Специфичные функции для общего меню ==========
+
+export const getGeneralMenuFromCache = async () => {
+  const key = getCacheKey(CACHE_PREFIXES.GENERAL_MENU, 'all');
+  return getFromCache(key);
+};
+
+export const setGeneralMenuToCache = async (data: any) => {
+  const key = getCacheKey(CACHE_PREFIXES.GENERAL_MENU, 'all');
+  await setToCache(key, data, CACHE_TTL.GENERAL_MENU);
+};
+
+export const invalidateGeneralMenuCache = async () => {
+  const key = getCacheKey(CACHE_PREFIXES.GENERAL_MENU, 'all');
+  await deleteFromCache(key);
 };
 
 // ========== Специфичные функции для баннеров ==========

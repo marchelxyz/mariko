@@ -52,7 +52,7 @@ interface MenuItem {
   id: string;
   name: string;
   description: string;
-  price: number;
+  price?: number; // Опционально для общего меню
   category: string;
   imageUrl?: string;
   calories?: number;
@@ -165,26 +165,8 @@ export const useStore = create<Store>((set, get) => {
         }
         
         // Если нет избранного ресторана и нет текущего выбранного,
-        // проверяем, есть ли рестораны с координатами для автоматического выбора
-        if (!currentSelected) {
-          // Координаты могут приходить как строки из БД (decimal), преобразуем в числа
-          const restaurantsWithCoords = restaurants.filter(r => {
-            const lat = typeof r.latitude === 'string' ? parseFloat(r.latitude) : r.latitude;
-            const lon = typeof r.longitude === 'string' ? parseFloat(r.longitude) : r.longitude;
-            return lat != null && !isNaN(lat) && lon != null && !isNaN(lon);
-          });
-          
-          // Если есть рестораны с координатами, не выбираем первый сразу
-          // Дадим возможность выбрать ближайший по местоположению
-          // (это будет сделано в fetchRestaurants или в компоненте)
-          if (restaurantsWithCoords.length === 0) {
-            // Если нет ресторанов с координатами, выбираем первый
-            set({ selectedRestaurant: restaurants[0] });
-            deviceStorage.setItem(STORAGE_KEYS.SELECTED_RESTAURANT_ID, restaurants[0].id).catch(console.error);
-          }
-          // Если есть рестораны с координатами, не выбираем ничего здесь
-          // Выбор будет сделан через selectNearestRestaurantByLocation
-        }
+        // НЕ выбираем ресторан автоматически - показываем общее меню
+        // Пользователь сможет выбрать ресторан через геолокацию или вручную
       }
     },
 
@@ -267,9 +249,8 @@ export const useStore = create<Store>((set, get) => {
               console.log('[Store] Нет ресторанов с координатами, пропускаем выбор по местоположению');
             }
             
-            // Если не удалось выбрать ближайший, выбираем первый
-            set({ selectedRestaurant: restaurants[0] });
-            await deviceStorage.setItem(STORAGE_KEYS.SELECTED_RESTAURANT_ID, restaurants[0].id);
+        // Если не удалось выбрать ближайший, НЕ выбираем первый автоматически
+        // Пользователь увидит общее меню и сможет выбрать ресторан вручную
           }
         }
       } catch (error: any) {

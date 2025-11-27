@@ -4,7 +4,9 @@ import { authenticate, AuthRequest, requireRole } from '../middleware/auth';
 import { Banner } from '../models/Banner';
 import { User, UserRole } from '../models/User';
 import { MenuItem } from '../models/MenuItem';
+import { GeneralMenuItem } from '../models/GeneralMenuItem';
 import { Restaurant } from '../models/Restaurant';
+import { DishImage } from '../models/DishImage';
 import { createGoogleSheetsService } from '../services/GoogleSheetsService';
 import { syncAllRestaurantsMenu } from '../services/syncService';
 import { getMetrics, resetMetrics } from '../middleware/performanceMonitor';
@@ -13,6 +15,7 @@ import {
   invalidateRestaurantCache,
   invalidateMenuCache,
   invalidateAllMenuCache,
+  invalidateGeneralMenuCache,
   invalidateHomePageCache,
   invalidateMenuPageCache,
   invalidateAllMenuPageCache
@@ -375,6 +378,144 @@ router.post('/metrics/reset', requireRole('admin'), async (req: AuthRequest, res
       success: false,
       message: 'Failed to reset metrics',
     });
+  }
+});
+
+// ========== Управление общим меню (без привязки к ресторанам, без цен) ==========
+
+// Получить все элементы общего меню
+router.get('/general-menu', requireRole('admin', 'manager'), async (req: AuthRequest, res: Response) => {
+  try {
+    const generalMenuItemRepository = AppDataSource.getRepository(GeneralMenuItem);
+    const menuItems = await generalMenuItemRepository.find({
+      order: { category: 'ASC', name: 'ASC' },
+    });
+    
+    res.json({ success: true, data: menuItems });
+  } catch (error) {
+    console.error('Error fetching general menu:', error);
+    res.status(500).json({ success: false, message: 'Failed to fetch general menu' });
+  }
+});
+
+// Создать элемент общего меню
+router.post('/general-menu', requireRole('admin', 'manager'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { name, description, category, imageUrl, dishImageId, calories, ingredients, internalDishId, isAvailable } = req.body;
+    
+    if (!name || !description || !category) {
+      res.status(400).json({ success: false, message: 'Missing required fields: name, description, category' });
+      return;
+    }
+    
+    const generalMenuItemRepository = AppDataSource.getRepository(GeneralMenuItem);
+    
+    // Проверяем существование dishImageId, если указан
+    if (dishImageId) {
+      const dishImageRepository = AppDataSource.getRepository(DishImage);
+      const dishImage = await dishImageRepository.findOne({ where: { id: dishImageId } });
+      if (!dishImage) {
+        res.status(404).json({ success: false, message: 'DishImage not found' });
+        return;
+      }
+    }
+    
+    const menuItem = generalMenuItemRepository.create({
+      name,
+      description,
+      category,
+      imageUrl: imageUrl || undefined,
+      dishImageId: dishImageId || undefined,
+      calories: calories ? Number(calories) : undefined,
+      ingredients: ingredients || undefined,
+      internalDishId: internalDishId || undefined,
+      isAvailable: isAvailable !== undefined ? Boolean(isAvailable) : true,
+    });
+    
+    const savedMenuItem = await generalMenuItemRepository.save(menuItem);
+    
+    // Инвалидируем кэш общего меню и главной страницы
+    await invalidateGeneralMenuCache();
+    await invalidateHomePageCache();
+    
+    res.json({ success: true, data: savedMenuItem });
+  } catch (error) {
+    console.error('Error creating general menu item:', error);
+    res.status(500).json({ success: false, message: 'Failed to create general menu item' });
+  }
+});
+
+// Обновить элемент общего меню
+router.put('/general-menu/:id', requireRole('admin', 'manager'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { name, description, category, imageUrl, dishImageId, calories, ingredients, internalDishId, isAvailable } = req.body;
+    
+    const generalMenuItemRepository = AppDataSource.getRepository(GeneralMenuItem);
+    const menuItem = await generalMenuItemRepository.findOne({
+      where: { id: req.params.id },
+    });
+    
+    if (!menuItem) {
+      res.status(404).json({ success: false, message: 'General menu item not found' });
+      return;
+    }
+    
+    // Проверяем существование dishImageId, если указан
+    if (dishImageId) {
+      const dishImageRepository = AppDataSource.getRepository(DishImage);
+      const dishImage = await dishImageRepository.findOne({ where: { id: dishImageId } });
+      if (!dishImage) {
+        res.status(404).json({ success: false, message: 'DishImage not found' });
+        return;
+      }
+    }
+    
+    if (name) menuItem.name = name;
+    if (description) menuItem.description = description;
+    if (category) menuItem.category = category;
+    if (imageUrl !== undefined) menuItem.imageUrl = imageUrl || undefined;
+    if (dishImageId !== undefined) menuItem.dishImageId = dishImageId || undefined;
+    if (calories !== undefined) menuItem.calories = calories ? Number(calories) : undefined;
+    if (ingredients !== undefined) menuItem.ingredients = ingredients || undefined;
+    if (internalDishId !== undefined) menuItem.internalDishId = internalDishId || undefined;
+    if (typeof isAvailable === 'boolean') menuItem.isAvailable = isAvailable;
+    
+    const updatedMenuItem = await generalMenuItemRepository.save(menuItem);
+    
+    // Инвалидируем кэш общего меню и главной страницы
+    await invalidateGeneralMenuCache();
+    await invalidateHomePageCache();
+    
+    res.json({ success: true, data: updatedMenuItem });
+  } catch (error) {
+    console.error('Error updating general menu item:', error);
+    res.status(500).json({ success: false, message: 'Failed to update general menu item' });
+  }
+});
+
+// Удалить элемент общего меню
+router.delete('/general-menu/:id', requireRole('admin', 'manager'), async (req: AuthRequest, res: Response) => {
+  try {
+    const generalMenuItemRepository = AppDataSource.getRepository(GeneralMenuItem);
+    const menuItem = await generalMenuItemRepository.findOne({
+      where: { id: req.params.id },
+    });
+    
+    if (!menuItem) {
+      res.status(404).json({ success: false, message: 'General menu item not found' });
+      return;
+    }
+    
+    await generalMenuItemRepository.remove(menuItem);
+    
+    // Инвалидируем кэш общего меню и главной страницы
+    await invalidateGeneralMenuCache();
+    await invalidateHomePageCache();
+    
+    res.json({ success: true, message: 'General menu item deleted' });
+  } catch (error) {
+    console.error('Error deleting general menu item:', error);
+    res.status(500).json({ success: false, message: 'Failed to delete general menu item' });
   }
 });
 

@@ -3,6 +3,7 @@ import { AppDataSource } from '../config/database';
 import { Restaurant } from '../models/Restaurant';
 import { Banner } from '../models/Banner';
 import { MenuItem } from '../models/MenuItem';
+import { GeneralMenuItem } from '../models/GeneralMenuItem';
 import { DishImage } from '../models/DishImage';
 import { User } from '../models/User';
 import { In } from 'typeorm';
@@ -71,6 +72,7 @@ router.get('/home', optionalAuthenticate, async (req: Request | AuthRequest, res
     const bannerRepository = AppDataSource.getRepository(Banner);
     const restaurantRepository = AppDataSource.getRepository(Restaurant);
     const menuItemRepository = AppDataSource.getRepository(MenuItem);
+    const generalMenuItemRepository = AppDataSource.getRepository(GeneralMenuItem);
     const dishImageRepository = AppDataSource.getRepository(DishImage);
 
     // Загружаем горизонтальные баннеры
@@ -129,16 +131,12 @@ router.get('/home', optionalAuthenticate, async (req: Request | AuthRequest, res
       selectedRestaurantId = restaurantIdStr;
     }
 
-    // Если ресторан не определен для загрузки меню, используем первый из списка
-    // Но НЕ устанавливаем selectedRestaurantId, чтобы фронтенд мог запросить местоположение
-    if (!targetRestaurantId && restaurants.length > 0) {
-      targetRestaurantId = restaurants[0].id;
-      // selectedRestaurantId остается null, чтобы фронтенд мог выбрать ближайший по местоположению
-    }
-
-    // Загружаем меню для выбранного ресторана
+    // Загружаем меню для выбранного ресторана или общее меню, если ресторан не выбран
     let menuItems = null;
+    let isGeneralMenu = false;
+    
     if (targetRestaurantId) {
+      // Загружаем меню конкретного ресторана
       const menuItemsData = await menuItemRepository.find({
         where: { restaurantId: targetRestaurantId, isAvailable: true },
         order: { category: 'ASC', name: 'ASC' },
@@ -176,6 +174,46 @@ router.get('/home', optionalAuthenticate, async (req: Request | AuthRequest, res
           updatedAt: item.updatedAt,
         };
       });
+    } else {
+      // Если ресторан не выбран, загружаем общее меню (без цен)
+      isGeneralMenu = true;
+      const generalMenuItemsData = await generalMenuItemRepository.find({
+        where: { isAvailable: true },
+        order: { category: 'ASC', name: 'ASC' },
+      });
+
+      // Получаем все изображения для меню
+      const dishImageIds = generalMenuItemsData
+        .map(item => item.dishImageId)
+        .filter((id): id is string => !!id);
+
+      const dishImages = dishImageIds.length > 0
+        ? await dishImageRepository.find({
+            where: { id: In(dishImageIds) },
+          })
+        : [];
+
+      const dishImageMap = new Map(dishImages.map(img => [img.id, img]));
+
+      // Формируем ответ с данными о блюдах и их изображениях (без цены)
+      menuItems = generalMenuItemsData.map(item => {
+        const dishImage = item.dishImageId ? dishImageMap.get(item.dishImageId) : null;
+        return {
+          id: item.id,
+          name: item.name,
+          description: item.description,
+          // Нет поля price - общее меню без цен
+          category: item.category,
+          calories: item.calories,
+          ingredients: item.ingredients,
+          imageUrl: dishImage?.imageUrl || item.imageUrl,
+          dishImageId: item.dishImageId,
+          internalDishId: item.internalDishId,
+          isAvailable: item.isAvailable,
+          createdAt: item.createdAt,
+          updatedAt: item.updatedAt,
+        };
+      });
     }
 
     const pageData = {
@@ -183,6 +221,7 @@ router.get('/home', optionalAuthenticate, async (req: Request | AuthRequest, res
       restaurants,
       restaurantId: restaurantIdStr || null,
       menuItems: menuItems || [],
+      isGeneralMenu, // Флаг, что это общее меню (без цен)
       favoriteRestaurant,
       selectedRestaurantId, // Теперь null, если нет явного выбора или избранного ресторана
     };
