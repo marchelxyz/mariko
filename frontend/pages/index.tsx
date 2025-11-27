@@ -73,9 +73,8 @@ export default function Home({
     }
 
     // Инициализируем любимый ресторан
-    if (initialFavoriteRestaurant) {
-      setFavoriteRestaurant(initialFavoriteRestaurant).catch(console.error);
-    }
+    // Важно: вызываем setFavoriteRestaurant всегда, даже если null, чтобы очистить старое значение из хранилища
+    setFavoriteRestaurant(initialFavoriteRestaurant).catch(console.error);
 
     // Инициализируем выбранный ресторан
     // Приоритет всегда у избранного ресторана

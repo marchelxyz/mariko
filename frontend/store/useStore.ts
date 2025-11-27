@@ -315,8 +315,11 @@ export const useStore = create<Store>((set, get) => {
         
         set({ favoriteRestaurant: restaurant });
         
-        // Если есть любимый ресторан, всегда выбираем его (приоритет избранному)
+        // Обновляем локальное хранилище: сохраняем или удаляем в зависимости от значения
         if (restaurant) {
+          await deviceStorage.setItem(STORAGE_KEYS.FAVORITE_RESTAURANT_ID, restaurant.id);
+          
+          // Если есть любимый ресторан, всегда выбираем его (приоритет избранному)
           const restaurants = get().restaurants;
           const currentSelected = get().selectedRestaurant;
           
@@ -330,6 +333,9 @@ export const useStore = create<Store>((set, get) => {
           }
           // Если рестораны еще не загружены, просто сохраняем любимый ресторан
           // Он будет выбран автоматически после загрузки ресторанов в fetchRestaurants
+        } else {
+          // Если сервер вернул null, очищаем локальное хранилище
+          await deviceStorage.removeItem(STORAGE_KEYS.FAVORITE_RESTAURANT_ID);
         }
       } catch (error: any) {
         console.error('Failed to fetch favorite restaurant:', error);
