@@ -1,14 +1,14 @@
 import axios from 'axios';
 
 /**
- * Сервис для геокодирования адресов через Yandex Geocoding API
+ * Сервис для геокодирования адресов через Nominatim (OpenStreetMap)
+ * Бесплатный сервис, не требует API ключа
  */
 export class GeocodingService {
-  private apiKey: string | null;
-  private baseUrl = 'https://geocode-maps.yandex.ru/1.x';
+  private baseUrl = 'https://nominatim.openstreetmap.org/search';
 
-  constructor(apiKey?: string) {
-    this.apiKey = apiKey || process.env.YANDEX_GEOCODING_API_KEY || null;
+  constructor() {
+    // Не требует API ключа
   }
 
   /**
@@ -17,33 +17,30 @@ export class GeocodingService {
    * @returns Координаты или null, если не удалось найти
    */
   async geocodeAddress(address: string): Promise<{ latitude: number; longitude: number } | null> {
-    if (!this.apiKey) {
-      console.warn('[GeocodingService] YANDEX_GEOCODING_API_KEY не установлен. Геокодирование недоступно.');
-      return null;
-    }
-
     try {
+      // Nominatim требует User-Agent для идентификации приложения
       const response = await axios.get(this.baseUrl, {
         params: {
-          apikey: this.apiKey,
-          geocode: address,
+          q: address,
           format: 'json',
-          results: 1,
+          limit: 1,
+          addressdetails: 1,
+        },
+        headers: {
+          'User-Agent': 'Mariko Restaurant App (geocoding)', // Требуется Nominatim
         },
       });
 
-      const featureMembers = response.data?.response?.GeoObjectCollection?.featureMember;
+      const results = response.data;
       
-      if (!featureMembers || featureMembers.length === 0) {
+      if (!results || !Array.isArray(results) || results.length === 0) {
         console.warn(`[GeocodingService] Адрес не найден: ${address}`);
         return null;
       }
 
-      const geoObject = featureMembers[0].GeoObject;
-      const pos = geoObject.Point.pos.split(' '); // Формат: "longitude latitude"
-      
-      const longitude = parseFloat(pos[0]);
-      const latitude = parseFloat(pos[1]);
+      const firstResult = results[0];
+      const latitude = parseFloat(firstResult.lat);
+      const longitude = parseFloat(firstResult.lon);
 
       if (isNaN(latitude) || isNaN(longitude)) {
         console.error(`[GeocodingService] Неверный формат координат для адреса: ${address}`);

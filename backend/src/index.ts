@@ -23,6 +23,7 @@ import pagesRoutes from './routes/pages';
 import * as cron from 'node-cron';
 import { syncAllRestaurantsMenu } from './services/syncService';
 import { initializeBot, stopBot } from './services/telegramBot';
+import { autoGeocodeRestaurants } from '../scripts/auto-geocode';
 
 const app = express();
 const PORT: number = Number(process.env.PORT) || 5000;
@@ -156,6 +157,13 @@ let server: any = null;
 const startServer = async () => {
   try {
     await connectDatabase();
+    
+    // Автоматическое геокодирование ресторанов без координат (запускается в фоне)
+    // Не блокирует запуск сервера
+    autoGeocodeRestaurants().catch((error) => {
+      console.error('[Startup] Ошибка при автоматическом геокодировании:', error);
+      // Не прерываем запуск приложения при ошибке геокодирования
+    });
     
     // Инициализируем Redis (если настроен)
     const redis = getRedisClient();
