@@ -121,6 +121,38 @@ function MyApp({ Component, pageProps }: AppProps) {
               webApp.expand();
             }
           });
+
+          // Инициализация LocationManager (Bot API 8.0+)
+          if (WebApp.isVersionAtLeast && WebApp.isVersionAtLeast('8.0') && WebApp.LocationManager) {
+            const locationManager = WebApp.LocationManager;
+            
+            // Инициализируем LocationManager заранее для лучшей производительности
+            if (!locationManager.isInitialized) {
+              locationManager.init((success) => {
+                if (success) {
+                  console.log('[App] LocationManager успешно инициализирован');
+                } else {
+                  console.warn('[App] Не удалось инициализировать LocationManager');
+                }
+              });
+            }
+
+            // Слушаем изменения состояния LocationManager
+            WebApp.onEvent('locationManagerUpdated', () => {
+              console.log('[App] LocationManager обновлен:', {
+                isLocationAvailable: locationManager.isLocationAvailable,
+                isPermissionRequested: locationManager.isPermissionRequested,
+                isPermissionGranted: locationManager.isPermissionGranted
+              });
+            });
+
+            // Слушаем запросы местоположения
+            WebApp.onEvent('locationRequested', (event: any) => {
+              if (event?.locationData) {
+                console.log('[App] Местоположение запрошено:', event.locationData);
+              }
+            });
+          }
         }
       }).catch((error) => {
         console.warn('Telegram WebApp SDK not available:', error);
