@@ -24,7 +24,7 @@ router.get('/', async (req: Request, res: Response) => {
     // Получаем все рестораны для отладки
     const allRestaurants = await restaurantRepository.find();
     console.log(`Total restaurants in DB: ${allRestaurants.length}`);
-    console.log('All restaurants:', allRestaurants.map(r => ({ id: r.id, name: r.name, city: r.city, isActive: r.isActive })));
+    console.log('All restaurants:', JSON.stringify(allRestaurants.map(r => ({ id: r.id, name: r.name, city: r.city, isActive: r.isActive })), null, 2));
     
     // Получаем только активные рестораны
     const restaurants = await restaurantRepository.find({
@@ -33,7 +33,7 @@ router.get('/', async (req: Request, res: Response) => {
     });
     
     console.log(`Active restaurants: ${restaurants.length}`);
-    console.log('Active restaurants:', restaurants.map(r => ({ id: r.id, name: r.name, city: r.city })));
+    console.log('Active restaurants:', JSON.stringify(restaurants.map(r => ({ id: r.id, name: r.name, city: r.city })), null, 2));
     
     // Сохраняем в кэш
     await setRestaurantsToCache(restaurants);

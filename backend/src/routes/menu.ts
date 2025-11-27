@@ -11,10 +11,14 @@ router.get('/:restaurantId', async (req: Request, res: Response) => {
   try {
     const { restaurantId } = req.params;
     
+    console.log(`[menu] Запрос меню для ресторана: ${restaurantId}`);
+    
     // Пытаемся получить из кэша
     const cached = await getMenuFromCache(restaurantId);
     if (cached) {
-      console.log(`✅ Меню ресторана ${restaurantId} получено из кэша`);
+      const categoriesCount = Object.keys(cached).length;
+      const itemsCount = Object.values(cached).reduce((sum: number, items: any) => sum + (Array.isArray(items) ? items.length : 0), 0);
+      console.log(`✅ Меню ресторана ${restaurantId} получено из кэша (${categoriesCount} категорий, ${itemsCount} блюд)`);
       return res.json({ success: true, data: cached, cached: true });
     }
 
@@ -69,6 +73,10 @@ router.get('/:restaurantId', async (req: Request, res: Response) => {
 
     // Сохраняем в кэш
     await setMenuToCache(restaurantId, groupedByCategory);
+
+    const categoriesCount = Object.keys(groupedByCategory).length;
+    const itemsCount = Object.values(groupedByCategory).reduce((sum: number, items: any) => sum + (Array.isArray(items) ? items.length : 0), 0);
+    console.log(`✅ Меню ресторана ${restaurantId} загружено из БД (${categoriesCount} категорий, ${itemsCount} блюд)`);
 
     res.json({ success: true, data: groupedByCategory, cached: false });
   } catch (error) {
