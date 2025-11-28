@@ -89,10 +89,10 @@ export default function MenuBlock({ restaurantId, initialMenuItems }: MenuBlockP
     
     const getItemsCount = () => {
       const width = window.innerWidth;
-      if (width >= 1024) return 6; // lg и больше
-      if (width >= 768) return 4; // md
-      if (width >= 640) return 3; // sm
-      return 2; // мобильные
+      if (width >= 1024) return 12; // lg и больше
+      if (width >= 768) return 8; // md
+      if (width >= 640) return 6; // sm
+      return 4; // мобильные
     };
     
     setDisplayCount(getItemsCount());
