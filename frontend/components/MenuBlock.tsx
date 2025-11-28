@@ -108,9 +108,16 @@ export default function MenuBlock({ restaurantId, initialMenuItems }: MenuBlockP
   // Фильтруем initialMenuItems, чтобы убедиться, что у всех есть обязательные поля
   const validInitialMenuItems = useMemo(
     () =>
-      initialMenuItems?.filter(
-        (item) => item && item.id && item.name && typeof item.price === 'number'
-      ) || [],
+      initialMenuItems?.filter((item) => {
+        if (!item) return false;
+        const hasValidId = item.id != null && (typeof item.id === 'string' || typeof item.id === 'number');
+        const hasValidName = item.name != null && typeof item.name === 'string' && item.name.trim().length > 0;
+        const hasValidPrice = item.price != null && (
+          typeof item.price === 'number' || 
+          (typeof item.price === 'string' && !isNaN(parseFloat(item.price)))
+        );
+        return hasValidId && hasValidName && hasValidPrice;
+      }) || [],
     [initialMenuItems]
   );
 
@@ -144,10 +151,17 @@ export default function MenuBlock({ restaurantId, initialMenuItems }: MenuBlockP
     const allItems: MenuItem[] = [];
     Object.values(groupedMenu).forEach((categoryItems) => {
       if (Array.isArray(categoryItems)) {
-        // Фильтруем и проверяем, что у каждого элемента есть обязательные поля
-        const validItems = categoryItems.filter(
-          (item: any) => item && item.id && item.name && typeof item.price === 'number'
-        );
+        // Более гибкая фильтрация - проверяем наличие обязательных полей
+        const validItems = categoryItems.filter((item: any) => {
+          if (!item) return false;
+          const hasValidId = item.id != null && (typeof item.id === 'string' || typeof item.id === 'number');
+          const hasValidName = item.name != null && typeof item.name === 'string' && item.name.trim().length > 0;
+          const hasValidPrice = item.price != null && (
+            typeof item.price === 'number' || 
+            (typeof item.price === 'string' && !isNaN(parseFloat(item.price)))
+          );
+          return hasValidId && hasValidName && hasValidPrice;
+        });
         allItems.push(...validItems);
       }
     });
@@ -318,16 +332,45 @@ export default function MenuBlock({ restaurantId, initialMenuItems }: MenuBlockP
 
   // Получаем блюда для отображения (мемоизировано)
   const menuItemsToDisplay: MenuItem[] = useMemo(
-    () =>
-      menuItemsToUse
-        .filter(
-          (item): item is MenuItem =>
-            item != null &&
-            typeof item.id === 'string' &&
-            typeof item.name === 'string' &&
-            typeof item.price === 'number'
-        )
-        .slice(0, displayCount),
+    () => {
+      const filtered = menuItemsToUse.filter(
+        (item): item is MenuItem => {
+          if (!item) return false;
+          // Более гибкая проверка id - может быть строка или число
+          const hasValidId = item.id != null && (typeof item.id === 'string' || typeof item.id === 'number');
+          // Проверяем name
+          const hasValidName = item.name != null && typeof item.name === 'string' && item.name.trim().length > 0;
+          // Более гибкая проверка price - может быть строка или число
+          const hasValidPrice = item.price != null && (
+            typeof item.price === 'number' || 
+            (typeof item.price === 'string' && !isNaN(parseFloat(item.price)))
+          );
+          
+          return hasValidId && hasValidName && hasValidPrice;
+        }
+      );
+      
+      // Отладочная информация в development режиме
+      if (process.env.NODE_ENV === 'development') {
+        if (menuItemsToUse.length > 0 && filtered.length === 0) {
+          console.warn('MenuBlock: Все элементы отфильтрованы!', {
+            totalItems: menuItemsToUse.length,
+            firstItem: menuItemsToUse[0],
+            filteredCount: filtered.length
+          });
+        }
+        if (menuItemsToUse.length > 0) {
+          console.debug('MenuBlock: Отображение блюд', {
+            totalItems: menuItemsToUse.length,
+            filteredItems: filtered.length,
+            displayCount,
+            willDisplay: Math.min(filtered.length, displayCount)
+          });
+        }
+      }
+      
+      return filtered.slice(0, displayCount);
+    },
     [menuItemsToUse, displayCount]
   );
 
@@ -415,8 +458,17 @@ export default function MenuBlock({ restaurantId, initialMenuItems }: MenuBlockP
 
       {/* Блюда */}
       <div className="px-4 w-full overflow-x-hidden md:px-0">
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 gap-4 md:justify-items-start">
-          {menuItemsToDisplay.map((item) => (
+        {menuItemsToDisplay.length === 0 && menuItemsToUse.length > 0 ? (
+          <div className="text-center py-4 text-sm text-gray-500">
+            Не удалось отобразить блюда. Проверьте формат данных.
+          </div>
+        ) : menuItemsToDisplay.length === 0 ? (
+          <div className="text-center py-4 text-sm text-gray-500">
+            Меню пусто
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 gap-4 md:justify-items-start">
+            {menuItemsToDisplay.map((item) => (
             <button
               key={item.id}
               onClick={() => setSelectedDish(item)}
@@ -469,8 +521,9 @@ export default function MenuBlock({ restaurantId, initialMenuItems }: MenuBlockP
                 </div>
               )}
             </button>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Карточка блюда */}
