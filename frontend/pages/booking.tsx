@@ -60,6 +60,7 @@ export default function Booking() {
     } else {
       setHallSchemes([]);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedRestaurant?.id]);
 
   // Загружаем слоты при изменении даты или количества гостей
@@ -72,6 +73,7 @@ export default function Booking() {
       setSelectedTableIds([]);
       setFormData(prev => ({ ...prev, time: '' }));
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formData.date, formData.guests_count, selectedRestaurant?.id]);
 
   // Загрузка схем залов

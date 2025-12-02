@@ -273,7 +273,6 @@ export default function TableSchemeViewer({
   // Получаем SVG для стола
   const getTableSvg = (table: TableInfo): string => {
     const capacity = Math.min(table.capacity, table.shape === 'round' ? 8 : 10);
-    const capacityKey = String(capacity);
     
     // Проверяем кастомный дизайн
     if (table.design_id && tablesData.design?.[String(table.design_id)]?.svg) {
@@ -282,7 +281,18 @@ export default function TableSchemeViewer({
 
     // Используем стандартный SVG
     const shapeSvgs = svgTables[table.shape];
-    return shapeSvgs[capacityKey] || shapeSvgs['1'] || '';
+    if (!shapeSvgs) {
+      return '';
+    }
+
+    // Безопасный доступ к SVG по ключу вместимости
+    const capacityKey = String(capacity);
+    if (capacityKey in shapeSvgs) {
+      return (shapeSvgs as Record<string, string>)[capacityKey] || '';
+    }
+    
+    // Fallback на стол на 1 персону
+    return shapeSvgs['1'] || '';
   };
 
   return (
