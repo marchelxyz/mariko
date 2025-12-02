@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { HallScheme, TablePosition, TableBundle } from '@/types/booking';
 
 interface HallSchemeViewerProps {
@@ -23,12 +23,70 @@ export default function HallSchemeViewer({
   const [selectedHall, setSelectedHall] = useState<HallScheme | null>(
     hallSchemes.length > 0 ? hallSchemes[0] : null
   );
+  const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
+  const [isPanning, setIsPanning] = useState(false);
+  const [panStart, setPanStart] = useState({ x: 0, y: 0 });
+  const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (hallSchemes.length > 0 && !selectedHall) {
       setSelectedHall(hallSchemes[0]);
     }
   }, [hallSchemes, selectedHall]);
+
+  // Сброс pan при смене зала
+  useEffect(() => {
+    setPanOffset({ x: 0, y: 0 });
+  }, [selectedHall]);
+
+  // Обработчики для pan (перемещения)
+  const handleMouseDown = (e: React.MouseEvent) => {
+    // Игнорируем клики по столам
+    if ((e.target as HTMLElement).closest('.table-element')) {
+      return;
+    }
+    setIsPanning(true);
+    setPanStart({ x: e.clientX - panOffset.x, y: e.clientY - panOffset.y });
+    e.preventDefault();
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isPanning) return;
+    setPanOffset({
+      x: e.clientX - panStart.x,
+      y: e.clientY - panStart.y,
+    });
+  };
+
+  const handleMouseUp = () => {
+    setIsPanning(false);
+  };
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    // Игнорируем касания по столам
+    if ((e.target as HTMLElement).closest('.table-element')) {
+      return;
+    }
+    if (e.touches.length === 1) {
+      setIsPanning(true);
+      setPanStart({
+        x: e.touches[0].clientX - panOffset.x,
+        y: e.touches[0].clientY - panOffset.y,
+      });
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!isPanning || e.touches.length !== 1) return;
+    setPanOffset({
+      x: e.touches[0].clientX - panStart.x,
+      y: e.touches[0].clientY - panStart.y,
+    });
+  };
+
+  const handleTouchEnd = () => {
+    setIsPanning(false);
+  };
 
   if (!hallSchemes || hallSchemes.length === 0) {
     return (
@@ -127,7 +185,7 @@ export default function HallSchemeViewer({
     return (
       <div
         key={table.tableId}
-        className={`${baseStyles} ${statusStyles[status]} ${isClickable ? '' : 'cursor-default'}`}
+        className={`table-element ${baseStyles} ${statusStyles[status]} ${isClickable ? '' : 'cursor-default'}`}
         style={{
           left: `${table.x}%`,
           top: `${table.y}%`,
@@ -173,26 +231,59 @@ export default function HallSchemeViewer({
 
       {/* Схема зала */}
       {selectedHall && (
-        <div className="relative bg-gray-50 rounded-lg overflow-hidden border-2 border-gray-200">
-          {/* Фоновое изображение зала (если есть) */}
-          {selectedHall.imageUrl ? (
-            <div className="relative" style={{ width: '100%', paddingBottom: selectedHall.height && selectedHall.width ? `${(selectedHall.height / selectedHall.width) * 100}%` : '75%' }}>
-              <img
-                src={selectedHall.imageUrl}
-                alt={`Схема зала ${selectedHall.roomName}`}
-                className="absolute inset-0 w-full h-full object-contain"
-              />
-              {/* Столы поверх изображения */}
-              <div className="absolute inset-0">
+        <div 
+          ref={containerRef}
+          className="relative bg-gray-50 rounded-lg overflow-hidden border-2 border-gray-200"
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
+          onMouseLeave={handleMouseUp}
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+          style={{
+            cursor: isPanning ? 'grabbing' : 'grab',
+            touchAction: 'none',
+          }}
+        >
+          <div
+            style={{
+              transform: `translate(${panOffset.x}px, ${panOffset.y}px)`,
+              transition: isPanning ? 'none' : 'transform 0.1s ease-out',
+            }}
+          >
+            {/* Фоновое изображение зала (если есть) */}
+            {selectedHall.imageUrl ? (
+              <div 
+                className="relative" 
+                style={{ 
+                  width: '100%', 
+                  paddingBottom: selectedHall.height && selectedHall.width ? `${(selectedHall.height / selectedHall.width) * 100}%` : '75%',
+                }}
+              >
+                <img
+                  src={selectedHall.imageUrl}
+                  alt={`Схема зала ${selectedHall.roomName}`}
+                  className="absolute inset-0 w-full h-full object-contain"
+                />
+                {/* Столы поверх изображения */}
+                <div className="absolute inset-0">
+                  {selectedHall.tables.map(renderTable)}
+                </div>
+              </div>
+            ) : (
+              /* Схема без изображения - только столы */
+              <div 
+                className="relative" 
+                style={{ 
+                  minHeight: '400px', 
+                  padding: '20px',
+                }}
+              >
                 {selectedHall.tables.map(renderTable)}
               </div>
-            </div>
-          ) : (
-            /* Схема без изображения - только столы */
-            <div className="relative" style={{ minHeight: '400px', padding: '20px' }}>
-              {selectedHall.tables.map(renderTable)}
-            </div>
-          )}
+            )}
+          </div>
 
           {/* Легенда */}
           <div className="p-4 bg-white border-t border-gray-200">
