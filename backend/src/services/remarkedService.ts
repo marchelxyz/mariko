@@ -33,6 +33,8 @@ import {
   IsReserveReadResponse,
   GetEventTagsRequest,
   GetEventTagsResponse,
+  GetTimesWithTablesRequest,
+  GetTimesWithTablesResponse,
   DatePeriod,
   ReserveData,
   ReserveFilters,
@@ -390,6 +392,30 @@ export class RemarkedService {
     };
 
     return this.request<GetEventTagsResponse>('/api', request);
+  }
+
+  /**
+   * Получает временные слоты со столами для указанной даты и количества гостей
+   * Возвращает полную информацию о залах, столах, их позициях и доступности
+   * 
+   * @param token - Токен, полученный методом getToken
+   * @param reserveDate - Дата бронирования в формате YYYY-MM-DD
+   * @param guestsCount - Количество гостей
+   * @returns Данные о залах, столах, интерьере и дизайнах
+   */
+  async getTimesWithTables(
+    token: string,
+    reserveDate: string,
+    guestsCount: number
+  ): Promise<GetTimesWithTablesResponse> {
+    const request: GetTimesWithTablesRequest = {
+      method: 'GetTimesWithTables',
+      token,
+      reserve_date: reserveDate,
+      guests_count: guestsCount,
+    };
+
+    return this.request<GetTimesWithTablesResponse>('/ApiReservesWidget', request);
   }
 }
 

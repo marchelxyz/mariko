@@ -328,6 +328,16 @@ export interface GetEventTagsRequest {
   id?: string;                       // IDEMPOTENCY KEY (UUID)
 }
 
+/**
+ * Запрос на получение временных слотов со столами
+ */
+export interface GetTimesWithTablesRequest {
+  method: "GetTimesWithTables";
+  token: string;                     // Токен от GetToken - Обязательно
+  reserve_date: string;              // Дата бронирования (формат: YYYY-MM-DD) - Обязательно
+  guests_count: number;              // Количество гостей (int64) - Обязательно
+}
+
 // ============================================================================
 // Ответы (Response)
 // ============================================================================
@@ -417,6 +427,70 @@ export interface GetEventTagsResponse {
   };
 }
 
+/**
+ * Временной слот стола
+ */
+export interface TableTimeSlot {
+  timestamp: number;                 // Unix timestamp
+  is_free: boolean;                  // Свободен ли стол в это время
+}
+
+/**
+ * Информация о столе из GetTimesWithTables
+ */
+export interface TableInfo {
+  id: number;                        // ID стола
+  left: number;                      // Позиция X в пикселях
+  top: number;                       // Позиция Y в пикселях
+  number: string;                    // Номер стола
+  room_id: number;                   // ID зала
+  shape: "round" | "square";         // Форма стола
+  capacity: number;                  // Вместимость стола
+  min_capacity: number;              // Минимальная вместимость
+  max_capacity: number;              // Максимальная вместимость
+  time_slots: TableTimeSlot[];       // Временные слоты стола
+  design_id?: number;                // ID дизайна стола (опционально)
+  price?: number;                    // Цена стола (опционально)
+}
+
+/**
+ * Информация о зале из GetTimesWithTables
+ */
+export interface RoomInfo {
+  id: number;                        // ID зала
+  name: string;                      // Название зала
+}
+
+/**
+ * Элемент интерьера зала
+ */
+export interface InteriorInfo {
+  id: number;                        // ID элемента интерьера
+  left_offset: number;               // Смещение по X в пикселях
+  top_offset: number;                // Смещение по Y в пикселях
+  svg: string;                       // SVG код элемента
+  room_id: number;                   // ID зала
+}
+
+/**
+ * Кастомный дизайн стола
+ */
+export interface TableDesign {
+  [designId: string]: {
+    svg: string;                     // SVG код дизайна
+  };
+}
+
+/**
+ * Ответ на получение временных слотов со столами
+ */
+export interface GetTimesWithTablesResponse {
+  rooms?: { [key: string]: RoomInfo };     // Объект залов (ключ - ID зала)
+  tables?: { [key: string]: TableInfo };  // Объект столов (ключ - ID стола)
+  interiors?: InteriorInfo[];              // Массив элементов интерьера
+  design?: TableDesign;                    // Кастомные дизайны столов
+}
+
 // ============================================================================
 // Ошибки
 // ============================================================================
@@ -494,7 +568,8 @@ export type RemarkedRequest =
   | GetReservesByPhoneRequest
   | ChangeReserveStatusRequest
   | GetReserveByIDRequest
-  | IsReserveReadRequest;
+  | IsReserveReadRequest
+  | GetTimesWithTablesRequest;
 
 /**
  * Тип объединения всех возможных ответов

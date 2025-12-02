@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { AppDataSource } from '../config/database';
 import { Restaurant } from '../models/Restaurant';
+import { authenticate, AuthRequest } from '../middleware/auth';
 import { 
   getRestaurantsFromCache, 
   setRestaurantsToCache,
@@ -278,6 +279,113 @@ router.post('/:id/sync-hall-schemes', async (req: Request, res: Response) => {
     res.status(500).json({
       success: false,
       message: error.message || 'Не удалось синхронизировать схемы залов',
+    });
+  }
+});
+
+/**
+ * Получение данных о столах для схемы зала через GetTimesWithTables
+ * GET /restaurants/:id/tables
+ * 
+ * Query параметры:
+ * - date: string (Дата для получения данных, формат YYYY-MM-DD) - обязательный
+ * - guests_count: number (Количество гостей) - обязательный
+ */
+router.get('/:id/tables', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { date, guests_count } = req.query;
+
+    if (!date || !guests_count) {
+      return res.status(400).json({
+        success: false,
+        message: 'Отсутствуют обязательные параметры: date, guests_count',
+      });
+    }
+
+    const restaurantRepository = AppDataSource.getRepository(Restaurant);
+    const restaurant = await restaurantRepository.findOne({
+      where: { id },
+    });
+
+    if (!restaurant) {
+      return res.status(404).json({
+        success: false,
+        message: 'Ресторан не найден',
+      });
+    }
+
+    if (!restaurant.isActive) {
+      return res.status(400).json({
+        success: false,
+        message: 'Ресторан неактивен',
+      });
+    }
+
+    if (!restaurant.remarkedPointId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Ресторан не настроен для бронирования (отсутствует ReMarked Point ID)',
+      });
+    }
+
+    // Получаем токен от ReMarked API
+    let token: string;
+    try {
+      const tokenResponse = await remarkedService.getToken(restaurant.remarkedPointId);
+      token = tokenResponse.token;
+    } catch (error: any) {
+      console.error('Ошибка получения токена ReMarked:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'Не удалось подключиться к сервису бронирования',
+      });
+    }
+
+    const dateStr = date as string;
+    const guestsCount = Number(guests_count);
+
+    // Получаем данные о столах через GetTimesWithTables
+    try {
+      const tablesData = await remarkedService.getTimesWithTables(
+        token,
+        dateStr,
+        guestsCount
+      );
+
+      return res.json({
+        success: true,
+        data: {
+          restaurantId: restaurant.id,
+          restaurantName: restaurant.name,
+          date: dateStr,
+          guests_count: guestsCount,
+          rooms: tablesData.rooms || {},
+          tables: tablesData.tables || {},
+          interiors: tablesData.interiors || [],
+          design: tablesData.design || {},
+        },
+      });
+    } catch (error: any) {
+      console.error('Ошибка получения данных о столах ReMarked:', error);
+
+      if (error.code === 400) {
+        return res.status(400).json({
+          success: false,
+          message: error.message || 'Неверные параметры запроса',
+        });
+      }
+
+      return res.status(500).json({
+        success: false,
+        message: error.message || 'Не удалось получить данные о столах из ReMarked API',
+      });
+    }
+  } catch (error: any) {
+    console.error('[restaurants/tables] Ошибка получения данных о столах:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Не удалось получить данные о столах',
     });
   }
 });
