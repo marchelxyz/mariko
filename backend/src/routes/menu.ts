@@ -3,32 +3,49 @@ import { In } from 'typeorm';
 import { AppDataSource } from '../config/database';
 import { MenuItem } from '../models/MenuItem';
 import { DishImage } from '../models/DishImage';
+import { getMenuFromCache, setMenuToCache } from '../services/cacheService';
 
 const router = Router();
 
 router.get('/:restaurantId', async (req: Request, res: Response) => {
   try {
     const { restaurantId } = req.params;
+    
+    console.log(`[menu] Запрос меню для ресторана: ${restaurantId}`);
+    
+    // Пытаемся получить из кэша
+    const cached = await getMenuFromCache(restaurantId);
+    if (cached) {
+      const categoriesCount = Object.keys(cached).length;
+      const itemsCount = Object.values(cached).reduce((sum: number, items: any) => sum + (Array.isArray(items) ? items.length : 0), 0);
+      console.log(`✅ Меню ресторана ${restaurantId} получено из кэша (${categoriesCount} категорий, ${itemsCount} блюд)`);
+      return res.json({ success: true, data: cached, cached: true });
+    }
+
     const menuItemRepository = AppDataSource.getRepository(MenuItem);
     const dishImageRepository = AppDataSource.getRepository(DishImage);
     
+    // Загружаем меню с использованием индексов для оптимизации
     const menuItems = await menuItemRepository.find({
       where: { restaurantId, isAvailable: true },
       order: { category: 'ASC', name: 'ASC' },
+      // Используем индексы: [restaurantId, isAvailable] и [category]
     });
     
-    // Получаем все изображения для меню
+    // Оптимизированная загрузка изображений: один батч-запрос для всех изображений
     const dishImageIds = menuItems
       .map(item => item.dishImageId)
       .filter((id): id is string => !!id);
     
-    const dishImages = dishImageIds.length > 0
-      ? await dishImageRepository.find({
-          where: { id: In(dishImageIds) },
-        })
-      : [];
-    
-    const dishImageMap = new Map(dishImages.map(img => [img.id, img]));
+    const dishImageMap = new Map<string, DishImage>();
+    if (dishImageIds.length > 0) {
+      // Используем In() для батч-загрузки всех изображений за один запрос
+      // Индекс на dishImageId ускорит этот запрос
+      const dishImages = await dishImageRepository.find({
+        where: { id: In(dishImageIds) },
+      });
+      dishImages.forEach(img => dishImageMap.set(img.id, img));
+    }
     
     // Формируем ответ с данными о блюдах и их изображениях
     const menuItemsWithImages = menuItems.map(item => {
@@ -58,7 +75,14 @@ router.get('/:restaurantId', async (req: Request, res: Response) => {
       return acc;
     }, {});
 
-    res.json({ success: true, data: groupedByCategory });
+    // Сохраняем в кэш
+    await setMenuToCache(restaurantId, groupedByCategory);
+
+    const categoriesCount = Object.keys(groupedByCategory).length;
+    const itemsCount = Object.values(groupedByCategory).reduce((sum: number, items: any) => sum + (Array.isArray(items) ? items.length : 0), 0);
+    console.log(`✅ Меню ресторана ${restaurantId} загружено из БД (${categoriesCount} категорий, ${itemsCount} блюд)`);
+
+    res.json({ success: true, data: groupedByCategory, cached: false });
   } catch (error) {
     console.error('Error fetching menu:', error);
     res.status(500).json({ success: false, message: 'Failed to fetch menu' });

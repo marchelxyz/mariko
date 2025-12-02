@@ -3,6 +3,7 @@ import { AppDataSource } from '../config/database';
 import { User } from '../models/User';
 import { Restaurant } from '../models/Restaurant';
 import { authenticate, AuthRequest } from '../middleware/auth';
+import { invalidateHomePageCache, invalidateUserCache } from '../services/cacheService';
 
 const router = Router();
 
@@ -70,9 +71,14 @@ router.get('/favorite-restaurant', authenticate, async (req: AuthRequest, res: R
     });
     
     if (!restaurant) {
-      // Если ресторан не найден, очищаем ссылку
-      user.favoriteRestaurantId = undefined;
+      // Если ресторан не найден, очищаем ссылку (устанавливаем NULL в БД)
+      user.favoriteRestaurantId = null;
       await userRepository.save(user);
+      
+      // Инвалидируем кеш главной страницы и кеш пользователя
+      await invalidateHomePageCache();
+      await invalidateUserCache(user.id);
+      
       res.json({ success: true, data: null });
       return;
     }
@@ -101,10 +107,15 @@ router.put('/favorite-restaurant', authenticate, async (req: AuthRequest, res: R
       return;
     }
     
-    // Если restaurantId не передан или null, убираем любимый ресторан
+    // Если restaurantId не передан или null, убираем любимый ресторан (устанавливаем NULL в БД)
     if (!restaurantId) {
-      user.favoriteRestaurantId = undefined;
+      user.favoriteRestaurantId = null;
       await userRepository.save(user);
+      
+      // Инвалидируем кеш главной страницы и кеш пользователя
+      await invalidateHomePageCache();
+      await invalidateUserCache(user.id);
+      
       res.json({ success: true, data: null });
       return;
     }
@@ -119,16 +130,26 @@ router.put('/favorite-restaurant', authenticate, async (req: AuthRequest, res: R
       return;
     }
     
-    // Если это тот же ресторан, что уже выбран, убираем его из избранного
+    // Если это тот же ресторан, что уже выбран, убираем его из избранного (устанавливаем NULL в БД)
     if (user.favoriteRestaurantId === restaurantId) {
-      user.favoriteRestaurantId = undefined;
+      user.favoriteRestaurantId = null;
       await userRepository.save(user);
+      
+      // Инвалидируем кеш главной страницы и кеш пользователя
+      await invalidateHomePageCache();
+      await invalidateUserCache(user.id);
+      
       res.json({ success: true, data: null });
       return;
     }
     
+    // Устанавливаем ID ресторана в БД
     user.favoriteRestaurantId = restaurantId;
     await userRepository.save(user);
+    
+    // Инвалидируем кеш главной страницы и кеш пользователя при изменении избранного ресторана
+    await invalidateHomePageCache();
+    await invalidateUserCache(user.id);
     
     res.json({ success: true, data: restaurant });
   } catch (error) {

@@ -2,15 +2,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import { useStore } from '@/store/useStore';
 import api from '@/lib/api';
-
-interface MenuItem {
-  id: string;
-  name: string;
-  description: string;
-  price: number;
-  category: string;
-  imageUrl?: string;
-}
+import { MenuItem } from '@/types/menu';
 
 interface MenuPreviewProps {
   restaurantId?: string;
@@ -73,7 +65,7 @@ export default function MenuPreview({ restaurantId }: MenuPreviewProps) {
         <h2 className="text-xl font-bold text-text-primary">Меню</h2>
         {selectedRestaurant && (
           <button
-            onClick={() => router.push('/menu')}
+            onClick={() => router.push(`/menu?restaurantId=${selectedRestaurant.id}`)}
             className="text-primary text-sm font-medium"
           >
             Смотреть все

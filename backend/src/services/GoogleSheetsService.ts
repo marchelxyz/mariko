@@ -54,7 +54,7 @@ export class GoogleSheetsService {
       // Добавляем заголовки
       await this.sheets.spreadsheets.values.update({
         spreadsheetId: this.spreadsheetId,
-        range: `${sheetName}!A1:G1`,
+        range: `${sheetName}!A1:H1`,
         valueInputOption: 'RAW',
         requestBody: {
           values: [
@@ -64,6 +64,7 @@ export class GoogleSheetsService {
               'Стоимость блюда',
               'Калорийность блюда',
               'Состав блюда',
+              'Описание блюда',
               'ID фотографии',
               'Категория блюда',
             ],
@@ -83,7 +84,7 @@ export class GoogleSheetsService {
                   startRowIndex: 0,
                   endRowIndex: 1,
                   startColumnIndex: 0,
-                  endColumnIndex: 7,
+                  endColumnIndex: 8,
                 },
                 cell: {
                   userEnteredFormat: {
@@ -138,7 +139,7 @@ export class GoogleSheetsService {
       // Получаем все данные из листа
       const response = await this.sheets.spreadsheets.values.get({
         spreadsheetId: this.spreadsheetId,
-        range: `${restaurant.googleSheetName}!A2:G`, // Пропускаем заголовок
+        range: `${restaurant.googleSheetName}!A2:H`, // Пропускаем заголовок
       });
 
       const rows = response.data.values || [];
@@ -162,9 +163,19 @@ export class GoogleSheetsService {
         const price = parseFloat(String(row[2] || 0));
         const calories = row[3] ? parseFloat(String(row[3])) : null;
         const ingredients = row[4] ? String(row[4]).trim() : null;
-        const dishImageId = row[5] ? String(row[5]).trim() : null;
+        
+        // Проверяем, есть ли новая колонка "Описание блюда" (обратная совместимость)
+        // Если в строке меньше 8 элементов, значит это старая структура без колонки описания
+        const hasDescriptionColumn = row.length >= 8;
+        
+        const description = hasDescriptionColumn && row[5] ? String(row[5]).trim() : null;
+        const dishImageId = hasDescriptionColumn 
+          ? (row[6] ? String(row[6]).trim() : null)
+          : (row[5] ? String(row[5]).trim() : null);
         // Нормализуем категорию: убираем пробелы и приводим к правильному формату
-        const category = row[6] ? String(row[6]).trim() : 'Без категории';
+        const category = hasDescriptionColumn
+          ? (row[7] ? String(row[7]).trim() : 'Без категории')
+          : (row[6] ? String(row[6]).trim() : 'Без категории');
 
         processedInternalIds.add(internalDishId);
 
@@ -192,7 +203,8 @@ export class GoogleSheetsService {
           menuItem.calories = calories || undefined;
           menuItem.ingredients = ingredients || undefined;
           menuItem.dishImageId = validDishImageId || undefined;
-          menuItem.description = ingredients || name; // Используем состав как описание
+          // Используем описание из таблицы, если оно есть, иначе состав, иначе название
+          menuItem.description = description || ingredients || name;
 
           await menuItemRepository.save(menuItem);
           updated++;
@@ -206,7 +218,8 @@ export class GoogleSheetsService {
             calories: calories || undefined,
             ingredients: ingredients || undefined,
             dishImageId: validDishImageId || undefined,
-            description: ingredients || name,
+            // Используем описание из таблицы, если оно есть, иначе состав, иначе название
+            description: description || ingredients || name,
             internalDishId,
             isAvailable: true,
           });

@@ -1,5 +1,5 @@
 import { useRouter } from 'next/router';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useMemo } from 'react';
 import { useStore } from '@/store/useStore';
 
 const baseNavItems = [
@@ -57,11 +57,11 @@ export default function SideNavigation() {
   const currentTopRef = useRef<number>(0);
 
   // Формируем список пунктов меню в зависимости от роли пользователя
-  const navItems = [
+  const navItems = useMemo(() => [
     ...baseNavItems,
     // Добавляем админский пункт меню, если пользователь админ
     ...(user && ['admin', 'ADMIN'].includes(user.role) ? [adminNavItem] : [])
-  ];
+  ], [user]);
 
   useEffect(() => {
     const updateIndicator = (attempt = 0) => {
@@ -158,6 +158,12 @@ export default function SideNavigation() {
               ref={(el) => { buttonRefs.current[index] = el; }}
               onClick={() => router.push(item.path)}
               onMouseEnter={() => {
+                // Предзагружаем страницу при наведении для быстрого переключения
+                if (!isActive) {
+                  router.prefetch(item.path).catch((error) => {
+                    console.debug(`Failed to prefetch ${item.path}:`, error);
+                  });
+                }
                 // Предзагружаем баннеры при наведении на главную страницу
                 if (isHomePage) {
                   const restaurantId = selectedRestaurant?.id;

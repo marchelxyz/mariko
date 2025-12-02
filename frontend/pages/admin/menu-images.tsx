@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
+import Image from 'next/image';
 import Layout from '@/components/Layout';
 import Header from '@/components/Header';
 import { useStore } from '@/store/useStore';
@@ -183,10 +184,13 @@ export default function AdminMenuImages() {
               >
                 {/* Превью изображения */}
                 <div className="w-full bg-gray-100 relative" style={{ aspectRatio: '1/1' }}>
-                  <img
+                  <Image
                     src={image.imageUrl}
                     alt={image.name || 'Изображение блюда'}
-                    className="w-full h-full object-cover"
+                    fill
+                    className="object-cover"
+                    sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                    unoptimized
                     onError={(e) => {
                       const target = e.target as HTMLImageElement;
                       target.style.display = 'none';
@@ -295,11 +299,14 @@ export default function AdminMenuImages() {
                         {formData.imageUrl && (
                           <div className="mt-2">
                             <p className="text-xs text-text-secondary mb-2">Превью:</p>
-                            <div className="w-32 bg-gray-100 rounded overflow-hidden">
-                              <img
+                            <div className="w-32 h-32 bg-gray-100 rounded overflow-hidden relative">
+                              <Image
                                 src={formData.imageUrl}
                                 alt="Preview"
-                                className="w-full h-auto"
+                                fill
+                                className="object-cover"
+                                sizes="128px"
+                                unoptimized
                                 onError={(e) => {
                                   const target = e.target as HTMLImageElement;
                                   target.style.display = 'none';

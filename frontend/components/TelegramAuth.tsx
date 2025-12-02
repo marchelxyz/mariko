@@ -5,31 +5,41 @@ import api from '@/lib/api';
 
 export default function TelegramAuth() {
   const router = useRouter();
-  const { setToken, setUser, fetchProfile, fetchFavoriteRestaurant } = useStore();
+  const { setToken, setUser, fetchProfile, fetchFavoriteRestaurant, fetchRestaurants } = useStore();
 
   useEffect(() => {
     const initTelegramAuth = async () => {
       if (typeof window === 'undefined') return;
 
       try {
-        // Проверяем, есть ли токен в localStorage
-        const existingToken = localStorage.getItem('token');
-        const { user } = useStore.getState();
+        // Проверяем, есть ли токен в SecureStorage
+        const { secureStorage, STORAGE_KEYS } = await import('@/lib/storage');
+        const existingToken = await secureStorage.getItem(STORAGE_KEYS.TOKEN);
+        const { user, token: storeToken } = useStore.getState();
+        
+        // Если токен есть в SecureStorage, но не в store, обновляем store
+        if (existingToken && !storeToken) {
+          await setToken(existingToken);
+        }
         
         // Если токен есть, но пользователь не загружен, загружаем профиль
-        if (existingToken && !user) {
+        // Проверяем, что запросы еще не выполняются
+        const { isLoadingProfile, isLoadingFavoriteRestaurant } = useStore.getState();
+        if (existingToken && !user && !isLoadingProfile) {
           try {
             await fetchProfile();
-            // Загружаем любимый ресторан после загрузки профиля
-            await fetchFavoriteRestaurant();
+            // Загружаем любимый ресторан после загрузки профиля (только если не загружается)
+            if (!isLoadingFavoriteRestaurant) {
+              await fetchFavoriteRestaurant();
+            }
           } catch (error) {
             console.error('Failed to fetch profile with existing token:', error);
             // Если токен невалидный, удаляем его
             if (error && typeof error === 'object' && 'response' in error) {
               const axiosError = error as any;
               if (axiosError.response?.status === 401) {
-                localStorage.removeItem('token');
-                setToken(null);
+                await secureStorage.removeItem(STORAGE_KEYS.TOKEN);
+                await setToken(null);
               }
             }
           }
@@ -70,10 +80,22 @@ export default function TelegramAuth() {
             setToken(response.data.token);
             setUser(response.data.user);
             // Загружаем актуальные данные профиля, чтобы убедиться, что роль обновлена
+            // Проверяем, что запросы еще не выполняются
+            const { isLoadingProfile, isLoadingFavoriteRestaurant, isLoadingRestaurants } = useStore.getState();
             try {
-              await fetchProfile();
-              // Загружаем любимый ресторан после авторизации
-              await fetchFavoriteRestaurant();
+              // Загружаем профиль только если он еще не загружается
+              if (!isLoadingProfile) {
+                await fetchProfile();
+              }
+              // Загружаем любимый ресторан после авторизации (только если не загружается)
+              if (!isLoadingFavoriteRestaurant) {
+                await fetchFavoriteRestaurant();
+              }
+              // Загружаем рестораны (внутри fetchRestaurants будет попытка выбрать ближайший)
+              // Только если они еще не загружаются и не загружены
+              if (!isLoadingRestaurants) {
+                await fetchRestaurants();
+              }
             } catch (error) {
               console.error('Failed to fetch profile after auth:', error);
             }
@@ -85,7 +107,7 @@ export default function TelegramAuth() {
     };
 
     initTelegramAuth();
-  }, [setToken, setUser, fetchProfile, fetchFavoriteRestaurant]);
+  }, [setToken, setUser, fetchProfile, fetchFavoriteRestaurant, fetchRestaurants]);
 
   return null;
 }

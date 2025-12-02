@@ -1,18 +1,16 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/router';
+import { GetServerSideProps } from 'next';
+import Image from 'next/image';
 import Layout from '@/components/Layout';
 import Header from '@/components/Header';
+import DishCard from '@/components/DishCard';
 import { useStore } from '@/store/useStore';
-import api from '@/lib/api';
+import { MenuItem } from '@/types/menu';
 
-interface MenuItem {
-  id: string;
-  name: string;
-  description: string;
-  price: number;
-  category: string;
-  imageUrl?: string;
-  calories?: number;
+interface MenuProps {
+  initialMenuItems: Record<string, MenuItem[]>;
+  restaurantId: string;
 }
 
 const CATEGORIES = [
@@ -26,56 +24,35 @@ const CATEGORIES = [
   'Детское',
 ];
 
-export default function Menu() {
+export default function Menu({ initialMenuItems, restaurantId }: MenuProps) {
   const router = useRouter();
   const { selectedRestaurant } = useStore();
-  const [menuItems, setMenuItems] = useState<Record<string, MenuItem[]>>({});
-  const [loading, setLoading] = useState(true);
+  const [menuItems] = useState<Record<string, MenuItem[]>>(initialMenuItems);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [selectedDish, setSelectedDish] = useState<MenuItem | null>(null);
 
-  useEffect(() => {
-    if (!selectedRestaurant?.id) {
-      router.push('/');
-      return;
-    }
+  // Используем restaurantId из props или из store
+  const currentRestaurantId = selectedRestaurant?.id || restaurantId;
 
-    const fetchMenu = async () => {
-      try {
-        setLoading(true);
-        const response = await api.get(`/menu/${selectedRestaurant.id}`);
-        setMenuItems(response.data.data || {});
-      } catch (error) {
-        console.error('Failed to fetch menu:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchMenu();
-  }, [selectedRestaurant, router]);
-
-  if (loading) {
-    return (
-      <Layout>
-        <Header title="Меню" />
-        <div className="px-4 py-6">
-          <div className="text-center text-text-primary">Загрузка...</div>
-        </div>
-      </Layout>
-    );
-  }
-
-  // Фильтруем категории, которые есть в меню
-  const availableCategories = CATEGORIES.filter(
-    (cat) => menuItems[cat] && menuItems[cat].length > 0
+  // Получаем все категории из данных меню (приоритет) и дополняем стандартными категориями
+  const allCategoriesFromData = Object.keys(menuItems).filter(
+    (cat) => menuItems[cat] && Array.isArray(menuItems[cat]) && menuItems[cat].length > 0
   );
+
+  // Объединяем категории из данных с стандартными категориями (уникальные)
+  const allAvailableCategories = Array.from(
+    new Set([...allCategoriesFromData, ...CATEGORIES])
+  ).filter((cat) => menuItems[cat] && Array.isArray(menuItems[cat]) && menuItems[cat].length > 0);
+
+  // Фильтруем категории, которые есть в меню (используем все доступные, не только из CATEGORIES)
+  const availableCategories = allAvailableCategories;
 
   // Если выбрана категория, показываем только её, иначе показываем все
   const categoriesToShow = selectedCategory
     ? [selectedCategory]
     : availableCategories.length > 0
     ? availableCategories
-    : Object.keys(menuItems).filter((cat) => menuItems[cat] && menuItems[cat].length > 0);
+    : allCategoriesFromData;
 
   // Получаем все блюда для отображения в сетке
   const allItemsToShow: MenuItem[] = [];
@@ -147,14 +124,22 @@ export default function Menu() {
         {/* Меню в виде сетки карточек */}
         {allItemsToShow.length === 0 ? (
           <div className="bg-white rounded-lg shadow-sm p-6 text-center">
-            <p className="text-text-primary">Меню пока пусто</p>
+            <p className="text-text-primary mb-2">Меню пока пусто</p>
+            {process.env.NODE_ENV === 'development' && (
+              <div className="text-xs text-gray-500 mt-2">
+                <p>Категории в данных: {Object.keys(menuItems).join(', ') || 'нет'}</p>
+                <p>Доступные категории: {availableCategories.join(', ') || 'нет'}</p>
+                <p>Всего блюд в данных: {Object.values(menuItems).reduce((sum: number, items: any) => sum + (Array.isArray(items) ? items.length : 0), 0)}</p>
+              </div>
+            )}
           </div>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
             {allItemsToShow.map((item) => (
-              <div
+              <button
                 key={item.id}
-                className="bg-[#F7F7F7] rounded-xl p-3 flex flex-col"
+                onClick={() => setSelectedDish(item)}
+                className="bg-[#F7F7F7] rounded-xl p-3 flex flex-col text-left hover:opacity-90 transition-opacity cursor-pointer"
               >
                 {/* Фото блюда */}
                 {item.imageUrl ? (
@@ -162,12 +147,15 @@ export default function Menu() {
                     className="w-full rounded-lg overflow-hidden mb-3"
                     style={{
                       aspectRatio: '4/3',
+                      position: 'relative',
                     }}
                   >
-                    <img
+                    <Image
                       src={item.imageUrl}
                       alt={item.name}
-                      className="w-full h-full object-cover"
+                      fill
+                      className="object-cover"
+                      sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                     />
                   </div>
                 ) : (
@@ -197,11 +185,130 @@ export default function Menu() {
                     {item.calories} ккал
                   </div>
                 )}
-              </div>
+              </button>
             ))}
           </div>
         )}
+
+        {/* Карточка блюда */}
+        <DishCard
+          item={selectedDish}
+          isOpen={!!selectedDish}
+          onClose={() => setSelectedDish(null)}
+        />
       </div>
     </Layout>
   );
 }
+
+export const getServerSideProps: GetServerSideProps = async (context) => {
+  try {
+    const { restaurantId } = context.query;
+
+    if (!restaurantId || typeof restaurantId !== 'string') {
+      return {
+        redirect: {
+          destination: '/',
+          permanent: false,
+        },
+      };
+    }
+
+    // Получаем токен из cookies, если он есть
+    const token = context.req.cookies.token || context.req.headers.authorization?.replace('Bearer ', '');
+    
+    // Создаем экземпляр axios для серверного запроса
+    const getBaseURL = () => {
+      const url = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+      const baseURL = url.endsWith('/api') ? url : `${url.replace(/\/$/, '')}/api`;
+      
+      // Логируем URL для диагностики
+      console.log('[menu.tsx getServerSideProps] API Base URL:', baseURL);
+      console.log('[menu.tsx getServerSideProps] NEXT_PUBLIC_API_URL:', process.env.NEXT_PUBLIC_API_URL || 'не установлена');
+      
+      return baseURL;
+    };
+
+    // Используем динамический импорт для axios на сервере
+    const axios = (await import('axios')).default;
+    const serverApi = axios.create({
+      baseURL: getBaseURL(),
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token && { Authorization: `Bearer ${token}` }),
+      },
+      timeout: 30000, // 30 секунд таймаут (увеличено для больших меню)
+    });
+
+    // Используем новый эндпоинт для получения полных данных страницы меню с кэшированием
+    console.log('[menu.tsx getServerSideProps] Fetching menu data for restaurantId:', restaurantId);
+    const pageResponse = await serverApi.get(`/pages/menu/${restaurantId}`);
+    console.log('[menu.tsx getServerSideProps] Response status:', pageResponse.status);
+
+    const pageData = pageResponse.data.data || {};
+    const menuItems = pageData.menuItems || {};
+
+    // Логирование для диагностики
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[menu.tsx] Server-side props:', {
+        restaurantId,
+        menuItemsKeys: Object.keys(menuItems),
+        menuItemsCount: Object.values(menuItems).reduce((sum: number, items: any) => sum + (Array.isArray(items) ? items.length : 0), 0),
+        categories: Object.keys(menuItems),
+        sampleCategory: Object.keys(menuItems)[0],
+        sampleItemsCount: Array.isArray(menuItems[Object.keys(menuItems)[0]]) ? menuItems[Object.keys(menuItems)[0]].length : 0,
+      });
+    }
+
+    return {
+      props: {
+        initialMenuItems: menuItems,
+        restaurantId,
+      },
+    };
+  } catch (error: any) {
+    console.error('❌ Error fetching menu page data on server:', {
+      message: error.message,
+      code: error.code,
+      response: error.response ? {
+        status: error.response.status,
+        statusText: error.response.statusText,
+        data: error.response.data,
+      } : null,
+      request: error.request ? {
+        url: error.config?.url,
+        baseURL: error.config?.baseURL,
+        method: error.config?.method,
+      } : null,
+      stack: error.stack,
+    });
+    
+    // Дополнительная диагностика
+    if (error.code === 'ECONNREFUSED') {
+      console.error('🔍 Диагностика: Соединение отклонено на сервере');
+      console.error('   Проверьте NEXT_PUBLIC_API_URL:', process.env.NEXT_PUBLIC_API_URL);
+    } else if (error.code === 'ETIMEDOUT') {
+      console.error('🔍 Диагностика: Таймаут запроса на сервере');
+    } else if (error.response) {
+      console.error('🔍 Диагностика: Сервер вернул ошибку:', error.response.status);
+    }
+    
+    // Если ресторан не найден, редиректим на главную
+    if (error.response?.status === 404) {
+      return {
+        redirect: {
+          destination: '/',
+          permanent: false,
+        },
+      };
+    }
+
+    // В случае другой ошибки возвращаем пустое меню
+    return {
+      props: {
+        initialMenuItems: {},
+        restaurantId: context.query.restaurantId as string || '',
+      },
+    };
+  }
+};

@@ -4,9 +4,22 @@ import { authenticate, AuthRequest, requireRole } from '../middleware/auth';
 import { Banner } from '../models/Banner';
 import { User, UserRole } from '../models/User';
 import { MenuItem } from '../models/MenuItem';
+import { GeneralMenuItem } from '../models/GeneralMenuItem';
 import { Restaurant } from '../models/Restaurant';
+import { DishImage } from '../models/DishImage';
 import { createGoogleSheetsService } from '../services/GoogleSheetsService';
 import { syncAllRestaurantsMenu } from '../services/syncService';
+import { getMetrics, resetMetrics } from '../middleware/performanceMonitor';
+import { 
+  invalidateRestaurantsCache, 
+  invalidateRestaurantCache,
+  invalidateMenuCache,
+  invalidateAllMenuCache,
+  invalidateGeneralMenuCache,
+  invalidateHomePageCache,
+  invalidateMenuPageCache,
+  invalidateAllMenuPageCache
+} from '../services/cacheService';
 
 const router = Router();
 
@@ -100,7 +113,8 @@ router.post('/restaurants', requireRole('admin'), async (req: AuthRequest, res: 
       deliveryAggregators,
       yandexMapsUrl,
       twoGisUrl,
-      socialNetworks
+      socialNetworks,
+      remarkedPointId
     } = req.body;
     
     if (!name || !city || !address || !phoneNumber) {
@@ -141,13 +155,14 @@ router.post('/restaurants', requireRole('admin'), async (req: AuthRequest, res: 
       isActive: true,
       googleSheetId: sheetId,
       googleSheetUrl: `https://docs.google.com/spreadsheets/d/${sheetId}`,
-      deliveryAggregators: deliveryAggregators || null,
-      yandexMapsUrl: yandexMapsUrl || null,
-      twoGisUrl: twoGisUrl || null,
-      socialNetworks: socialNetworks || null,
+      deliveryAggregators: deliveryAggregators || undefined,
+      yandexMapsUrl: yandexMapsUrl || undefined,
+      twoGisUrl: twoGisUrl || undefined,
+      socialNetworks: socialNetworks || undefined,
+      remarkedPointId: remarkedPointId ? Number(remarkedPointId) : undefined,
     });
     
-    const savedRestaurant = await restaurantRepository.save(restaurant);
+    const savedRestaurant = await restaurantRepository.save(restaurant) as Restaurant;
 
     // Создаем лист в Google Sheets для нового ресторана
     try {
@@ -161,6 +176,10 @@ router.post('/restaurants', requireRole('admin'), async (req: AuthRequest, res: 
       // Не прерываем создание ресторана, если не удалось создать лист
       // Администратор может создать лист вручную позже
     }
+    
+    // Инвалидируем кэш ресторанов и главной страницы
+    await invalidateRestaurantsCache();
+    await invalidateHomePageCache();
     
     res.json({ success: true, data: savedRestaurant });
   } catch (error) {
@@ -180,7 +199,8 @@ router.put('/restaurants/:id', requireRole('admin'), async (req: AuthRequest, re
       deliveryAggregators,
       yandexMapsUrl,
       twoGisUrl,
-      socialNetworks
+      socialNetworks,
+      remarkedPointId
     } = req.body;
     
     // Валидация доставки (до 5 агрегаторов)
@@ -214,12 +234,19 @@ router.put('/restaurants/:id', requireRole('admin'), async (req: AuthRequest, re
     if (address) restaurant.address = address;
     if (phoneNumber) restaurant.phoneNumber = phoneNumber;
     if (typeof isActive === 'boolean') restaurant.isActive = isActive;
-    if (deliveryAggregators !== undefined) restaurant.deliveryAggregators = deliveryAggregators.length > 0 ? deliveryAggregators : null;
-    if (yandexMapsUrl !== undefined) restaurant.yandexMapsUrl = yandexMapsUrl || null;
-    if (twoGisUrl !== undefined) restaurant.twoGisUrl = twoGisUrl || null;
-    if (socialNetworks !== undefined) restaurant.socialNetworks = socialNetworks.length > 0 ? socialNetworks : null;
+    if (deliveryAggregators !== undefined) restaurant.deliveryAggregators = deliveryAggregators.length > 0 ? deliveryAggregators : undefined;
+    if (yandexMapsUrl !== undefined) restaurant.yandexMapsUrl = yandexMapsUrl || undefined;
+    if (twoGisUrl !== undefined) restaurant.twoGisUrl = twoGisUrl || undefined;
+    if (socialNetworks !== undefined) restaurant.socialNetworks = socialNetworks.length > 0 ? socialNetworks : undefined;
+    if (remarkedPointId !== undefined) restaurant.remarkedPointId = remarkedPointId !== null && remarkedPointId !== '' ? Number(remarkedPointId) : undefined;
     
     const updatedRestaurant = await restaurantRepository.save(restaurant);
+    
+    // Инвалидируем кэш ресторанов, главной страницы и страницы меню для этого ресторана
+    await invalidateRestaurantCache(req.params.id);
+    await invalidateHomePageCache();
+    await invalidateMenuPageCache(req.params.id);
+    
     res.json({ success: true, data: updatedRestaurant });
   } catch (error) {
     console.error('Error updating restaurant:', error);
@@ -242,6 +269,12 @@ router.delete('/restaurants/:id', requireRole('admin'), async (req: AuthRequest,
     // Мягкое удаление - просто деактивируем ресторан
     restaurant.isActive = false;
     await restaurantRepository.save(restaurant);
+    
+    // Инвалидируем кэш ресторанов, главной страницы и страницы меню для этого ресторана
+    await invalidateRestaurantCache(req.params.id);
+    await invalidateHomePageCache();
+    await invalidateMenuPageCache(req.params.id);
+    
     res.json({ success: true, message: 'Restaurant deactivated' });
   } catch (error) {
     console.error('Error deleting restaurant:', error);
@@ -273,6 +306,10 @@ router.post('/restaurants/:id/sync', requireRole('admin', 'manager'), async (req
     const sheetsService = createGoogleSheetsService();
     const result = await sheetsService.syncMenuFromSheet(restaurant);
     
+    // Инвалидируем кэш меню и страницы меню для этого ресторана
+    await invalidateMenuCache(req.params.id);
+    await invalidateMenuPageCache(req.params.id);
+    
     res.json({ 
       success: true, 
       message: 'Синхронизация завершена',
@@ -291,6 +328,11 @@ router.post('/restaurants/:id/sync', requireRole('admin', 'manager'), async (req
 router.post('/restaurants/sync-all', requireRole('admin'), async (req: AuthRequest, res: Response) => {
   try {
     await syncAllRestaurantsMenu();
+    
+    // Инвалидируем весь кэш меню и страниц меню
+    await invalidateAllMenuCache();
+    await invalidateAllMenuPageCache();
+    
     res.json({ 
       success: true, 
       message: 'Синхронизация всех ресторанов завершена'
@@ -301,6 +343,179 @@ router.post('/restaurants/sync-all', requireRole('admin'), async (req: AuthReque
       success: false, 
       message: error instanceof Error ? error.message : 'Failed to sync all restaurants' 
     });
+  }
+});
+
+// ✅ Эндпоинт для просмотра метрик производительности (только для админов)
+router.get('/metrics', requireRole('admin'), async (req: AuthRequest, res: Response) => {
+  try {
+    const metrics = getMetrics();
+    res.json({
+      success: true,
+      data: metrics,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error('Error getting metrics:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get metrics',
+    });
+  }
+});
+
+// ✅ Эндпоинт для сброса метрик (только для админов)
+router.post('/metrics/reset', requireRole('admin'), async (req: AuthRequest, res: Response) => {
+  try {
+    resetMetrics();
+    res.json({
+      success: true,
+      message: 'Metrics reset',
+    });
+  } catch (error) {
+    console.error('Error resetting metrics:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to reset metrics',
+    });
+  }
+});
+
+// ========== Управление общим меню (без привязки к ресторанам, без цен) ==========
+
+// Получить все элементы общего меню
+router.get('/general-menu', requireRole('admin', 'manager'), async (req: AuthRequest, res: Response) => {
+  try {
+    const generalMenuItemRepository = AppDataSource.getRepository(GeneralMenuItem);
+    const menuItems = await generalMenuItemRepository.find({
+      order: { category: 'ASC', name: 'ASC' },
+    });
+    
+    res.json({ success: true, data: menuItems });
+  } catch (error) {
+    console.error('Error fetching general menu:', error);
+    res.status(500).json({ success: false, message: 'Failed to fetch general menu' });
+  }
+});
+
+// Создать элемент общего меню
+router.post('/general-menu', requireRole('admin', 'manager'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { name, description, category, imageUrl, dishImageId, calories, ingredients, internalDishId, isAvailable } = req.body;
+    
+    if (!name || !description || !category) {
+      res.status(400).json({ success: false, message: 'Missing required fields: name, description, category' });
+      return;
+    }
+    
+    const generalMenuItemRepository = AppDataSource.getRepository(GeneralMenuItem);
+    
+    // Проверяем существование dishImageId, если указан
+    if (dishImageId) {
+      const dishImageRepository = AppDataSource.getRepository(DishImage);
+      const dishImage = await dishImageRepository.findOne({ where: { id: dishImageId } });
+      if (!dishImage) {
+        res.status(404).json({ success: false, message: 'DishImage not found' });
+        return;
+      }
+    }
+    
+    const menuItem = generalMenuItemRepository.create({
+      name,
+      description,
+      category,
+      imageUrl: imageUrl || undefined,
+      dishImageId: dishImageId || undefined,
+      calories: calories ? Number(calories) : undefined,
+      ingredients: ingredients || undefined,
+      internalDishId: internalDishId || undefined,
+      isAvailable: isAvailable !== undefined ? Boolean(isAvailable) : true,
+    });
+    
+    const savedMenuItem = await generalMenuItemRepository.save(menuItem);
+    
+    // Инвалидируем кэш общего меню и главной страницы
+    await invalidateGeneralMenuCache();
+    await invalidateHomePageCache();
+    
+    res.json({ success: true, data: savedMenuItem });
+  } catch (error) {
+    console.error('Error creating general menu item:', error);
+    res.status(500).json({ success: false, message: 'Failed to create general menu item' });
+  }
+});
+
+// Обновить элемент общего меню
+router.put('/general-menu/:id', requireRole('admin', 'manager'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { name, description, category, imageUrl, dishImageId, calories, ingredients, internalDishId, isAvailable } = req.body;
+    
+    const generalMenuItemRepository = AppDataSource.getRepository(GeneralMenuItem);
+    const menuItem = await generalMenuItemRepository.findOne({
+      where: { id: req.params.id },
+    });
+    
+    if (!menuItem) {
+      res.status(404).json({ success: false, message: 'General menu item not found' });
+      return;
+    }
+    
+    // Проверяем существование dishImageId, если указан
+    if (dishImageId) {
+      const dishImageRepository = AppDataSource.getRepository(DishImage);
+      const dishImage = await dishImageRepository.findOne({ where: { id: dishImageId } });
+      if (!dishImage) {
+        res.status(404).json({ success: false, message: 'DishImage not found' });
+        return;
+      }
+    }
+    
+    if (name) menuItem.name = name;
+    if (description) menuItem.description = description;
+    if (category) menuItem.category = category;
+    if (imageUrl !== undefined) menuItem.imageUrl = imageUrl || undefined;
+    if (dishImageId !== undefined) menuItem.dishImageId = dishImageId || undefined;
+    if (calories !== undefined) menuItem.calories = calories ? Number(calories) : undefined;
+    if (ingredients !== undefined) menuItem.ingredients = ingredients || undefined;
+    if (internalDishId !== undefined) menuItem.internalDishId = internalDishId || undefined;
+    if (typeof isAvailable === 'boolean') menuItem.isAvailable = isAvailable;
+    
+    const updatedMenuItem = await generalMenuItemRepository.save(menuItem);
+    
+    // Инвалидируем кэш общего меню и главной страницы
+    await invalidateGeneralMenuCache();
+    await invalidateHomePageCache();
+    
+    res.json({ success: true, data: updatedMenuItem });
+  } catch (error) {
+    console.error('Error updating general menu item:', error);
+    res.status(500).json({ success: false, message: 'Failed to update general menu item' });
+  }
+});
+
+// Удалить элемент общего меню
+router.delete('/general-menu/:id', requireRole('admin', 'manager'), async (req: AuthRequest, res: Response) => {
+  try {
+    const generalMenuItemRepository = AppDataSource.getRepository(GeneralMenuItem);
+    const menuItem = await generalMenuItemRepository.findOne({
+      where: { id: req.params.id },
+    });
+    
+    if (!menuItem) {
+      res.status(404).json({ success: false, message: 'General menu item not found' });
+      return;
+    }
+    
+    await generalMenuItemRepository.remove(menuItem);
+    
+    // Инвалидируем кэш общего меню и главной страницы
+    await invalidateGeneralMenuCache();
+    await invalidateHomePageCache();
+    
+    res.json({ success: true, message: 'General menu item deleted' });
+  } catch (error) {
+    console.error('Error deleting general menu item:', error);
+    res.status(500).json({ success: false, message: 'Failed to delete general menu item' });
   }
 });
 

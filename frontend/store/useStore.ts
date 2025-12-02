@@ -1,5 +1,7 @@
 import { create } from 'zustand';
 import api from '@/lib/api';
+import { deviceStorage, secureStorage, STORAGE_KEYS } from '@/lib/storage';
+import { MenuItem } from '@/types/menu';
 
 interface User {
   id: string;
@@ -32,6 +34,8 @@ interface Restaurant {
   city: string;
   address: string;
   phoneNumber: string;
+  latitude?: number;
+  longitude?: number;
   deliveryAggregators?: DeliveryAggregator[];
   yandexMapsUrl?: string;
   twoGisUrl?: string;
@@ -45,6 +49,9 @@ interface Banner {
   linkUrl?: string;
 }
 
+// Используем общий тип MenuItem из types/menu.ts
+// Примечание: price обязателен в типе, но может быть undefined в данных из API
+
 interface Store {
   user: User | null;
   restaurants: Restaurant[];
@@ -52,253 +59,446 @@ interface Store {
   favoriteRestaurant: Restaurant | null;
   banners: Banner[];
   bannersByRestaurant: Record<string, Banner[]>;
+  menuItems: MenuItem[];
+  menuItemsByRestaurant: Record<string, MenuItem[]>;
   token: string | null;
   isLoading: boolean;
   error: string | null;
+  // Флаги для предотвращения повторных запросов
+  isLoadingRestaurants: boolean;
+  isLoadingProfile: boolean;
+  isLoadingFavoriteRestaurant: boolean;
+  loadingBanners: Set<string>;
   setToken: (token: string | null) => void;
   setUser: (user: User | null) => void;
+  setRestaurants: (restaurants: Restaurant[]) => void;
   fetchRestaurants: () => Promise<void>;
   setSelectedRestaurant: (restaurant: Restaurant | null) => void;
   fetchProfile: () => Promise<void>;
   updateProfile: (data: Partial<User>) => Promise<void>;
+  setFavoriteRestaurant: (restaurant: Restaurant | null) => Promise<void>;
   fetchFavoriteRestaurant: () => Promise<void>;
-  setFavoriteRestaurant: (restaurantId: string) => Promise<void>;
+  setFavoriteRestaurantById: (restaurantId: string) => Promise<void>;
   fetchBanners: (restaurantId?: string) => Promise<void>;
   prefetchBanners: (restaurantId?: string) => Promise<void>;
   setBannersForRestaurant: (restaurantId: string | null, banners: Banner[]) => void;
+  setMenuItems: (menuItems: MenuItem[], restaurantId?: string) => void;
 }
 
-export const useStore = create<Store>((set, get) => ({
-  user: null,
-  restaurants: [],
-  selectedRestaurant: null,
-  favoriteRestaurant: null,
-  banners: [],
-  bannersByRestaurant: {},
-  token: typeof window !== 'undefined' ? localStorage.getItem('token') : null,
-  isLoading: false,
-  error: null,
+// Инициализация токена из SecureStorage
+const initializeToken = async (): Promise<string | null> => {
+  if (typeof window === 'undefined') return null;
+  try {
+    const { secureStorage, STORAGE_KEYS } = await import('@/lib/storage');
+    return await secureStorage.getItem(STORAGE_KEYS.TOKEN);
+  } catch (error) {
+    console.error('Failed to initialize token from SecureStorage:', error);
+    // Fallback на localStorage для обратной совместимости
+    return localStorage.getItem('token');
+  }
+};
 
-  setToken: (token) => {
-    if (typeof window !== 'undefined') {
-      if (token) {
-        localStorage.setItem('token', token);
-      } else {
-        localStorage.removeItem('token');
-      }
-    }
-    set({ token });
-  },
-
-  setUser: (user) => set({ user }),
-
-  fetchRestaurants: async () => {
-    // Пропускаем запрос на сервере
-    if (typeof window === 'undefined') return;
-    
-    set({ isLoading: true, error: null });
+export const useStore = create<Store>((set, get) => {
+  // Инициализируем токен синхронно для первого рендера
+  let initialToken: string | null = null;
+  if (typeof window !== 'undefined') {
+    // Пробуем загрузить из SecureStorage синхронно (если возможно)
     try {
-      const response = await api.get('/restaurants');
-      console.log('Restaurants API response:', response.data);
-      
-      // Проверяем структуру ответа
-      const restaurantsData = response.data?.data || response.data || [];
-      if (!Array.isArray(restaurantsData)) {
-        console.error('Invalid restaurants data format:', restaurantsData);
-        set({ 
-          restaurants: [], 
-          isLoading: false,
-          error: 'Неверный формат данных ресторанов'
-        });
-        return;
+      const WebApp = (window as any).Telegram?.WebApp;
+      if (WebApp?.SecureStorage) {
+        // Не можем вызвать асинхронно здесь, поэтому используем fallback
+        initialToken = localStorage.getItem('token');
+      } else {
+        initialToken = localStorage.getItem('token');
       }
-      
-      const restaurants = restaurantsData
-        .map((r: any) => ({
-          ...r,
-          id: r.id || r._id,
-        }))
-        .filter((r: any): r is Restaurant => typeof r.id === 'string' && r.id.length > 0);
-      
-      console.log('Processed restaurants:', restaurants);
-      set({ restaurants, isLoading: false });
-      
-      // Автоматически выбираем любимый ресторан или первый ресторан, если не выбран
+    } catch (e) {
+      initialToken = localStorage.getItem('token');
+    }
+  }
+
+  return {
+    user: null,
+    restaurants: [],
+    selectedRestaurant: null,
+    favoriteRestaurant: null,
+    banners: [],
+    bannersByRestaurant: {},
+    menuItems: [],
+    menuItemsByRestaurant: {},
+    token: initialToken,
+    isLoading: false,
+    error: null,
+    isLoadingRestaurants: false,
+    isLoadingProfile: false,
+    isLoadingFavoriteRestaurant: false,
+    loadingBanners: new Set<string>(),
+
+    setToken: async (token) => {
+      if (token) {
+        await secureStorage.setItem(STORAGE_KEYS.TOKEN, token);
+      } else {
+        await secureStorage.removeItem(STORAGE_KEYS.TOKEN);
+      }
+      set({ token });
+    },
+
+    setUser: (user) => set({ user }),
+
+    setRestaurants: (restaurants) => {
+      set({ restaurants });
+      // Автоматически выбираем ресторан
+      // Приоритет всегда у избранного ресторана
       const currentSelected = get().selectedRestaurant;
       const favoriteRestaurant = get().favoriteRestaurant;
       
-      if (!currentSelected && restaurants.length > 0) {
+      if (restaurants.length > 0) {
+        // Если есть избранный ресторан, всегда выбираем его (даже если уже есть выбранный)
         if (favoriteRestaurant) {
-          // Проверяем, что любимый ресторан все еще существует в списке
           const favoriteInList = restaurants.find(r => r.id === favoriteRestaurant.id);
           if (favoriteInList) {
-            set({ selectedRestaurant: favoriteInList });
-          } else {
-            set({ selectedRestaurant: restaurants[0] });
+            // Выбираем избранный, если его еще нет или если текущий выбранный не избранный
+            if (!currentSelected || currentSelected.id !== favoriteInList.id) {
+              set({ selectedRestaurant: favoriteInList });
+              deviceStorage.setItem(STORAGE_KEYS.SELECTED_RESTAURANT_ID, favoriteInList.id).catch(console.error);
+            }
+            return;
           }
-        } else {
-          set({ selectedRestaurant: restaurants[0] });
         }
+        
+        // НЕ выбираем ресторан автоматически, если нет избранного
+        // Пользователь выберет ресторан через popup
       }
-    } catch (error: any) {
-      console.error('Failed to fetch restaurants:', error);
-      set({ 
-        restaurants: [],
-        error: error?.response?.data?.message || 'Не удалось загрузить рестораны',
-        isLoading: false 
-      });
-    }
-  },
+    },
 
-  setSelectedRestaurant: (restaurant) => set({ selectedRestaurant: restaurant }),
-
-  fetchProfile: async () => {
-    if (typeof window === 'undefined') return;
-    
-    try {
-      const response = await api.get('/profile');
-      set({ user: response.data.data });
-    } catch (error: any) {
-      console.error('Failed to fetch profile:', error);
-      set({ error: error?.response?.data?.message || 'Не удалось загрузить профиль' });
-    }
-  },
-
-  updateProfile: async (data) => {
-    try {
-      const response = await api.put('/profile', data);
-      set({ user: response.data.data });
-    } catch (error: any) {
-      console.error('Failed to update profile:', error);
-      throw error;
-    }
-  },
-
-  fetchFavoriteRestaurant: async () => {
-    if (typeof window === 'undefined') return;
-    
-    try {
-      const response = await api.get('/profile/favorite-restaurant');
-      const restaurant = response.data.data;
-      set({ favoriteRestaurant: restaurant });
+    fetchRestaurants: async () => {
+      // Пропускаем запрос на сервере
+      if (typeof window === 'undefined') return;
       
-      // Если есть любимый ресторан, выбираем его (если он есть в списке ресторанов)
-      if (restaurant) {
-        const restaurants = get().restaurants;
+      // Предотвращаем повторные запросы
+      const state = get();
+      if (state.isLoadingRestaurants || (state.restaurants.length > 0 && !state.error)) {
+        return;
+      }
+      
+      set({ isLoading: true, isLoadingRestaurants: true, error: null });
+      
+      try {
+        const response = await api.get('/restaurants');
+        console.log('Restaurants API response:', response.data);
+        
+        // Проверяем структуру ответа
+        const restaurantsData = response.data?.data || response.data || [];
+        if (!Array.isArray(restaurantsData)) {
+          console.error('Invalid restaurants data format:', restaurantsData);
+          set({ 
+            restaurants: [], 
+            isLoading: false,
+            error: 'Неверный формат данных ресторанов'
+          });
+          return;
+        }
+        
+        const restaurants = restaurantsData
+          .map((r: any) => ({
+            ...r,
+            id: r.id || r._id,
+          }))
+          .filter((r: any): r is Restaurant => typeof r.id === 'string' && r.id.length > 0);
+        
+        console.log('Processed restaurants:', restaurants);
+        
+        set({ restaurants, isLoading: false, isLoadingRestaurants: false });
+        
+        // Автоматически выбираем ресторан
+        // Приоритет: избранный ресторан > первый в списке
         const currentSelected = get().selectedRestaurant;
+        const favoriteRestaurant = get().favoriteRestaurant;
         
         if (restaurants.length > 0) {
-          const favoriteInList = restaurants.find(r => r.id === restaurant.id);
-          // Выбираем любимый ресторан только если еще ничего не выбрано
-          // Это происходит при первой загрузке приложения или после авторизации
-          if (favoriteInList && !currentSelected) {
-            set({ selectedRestaurant: favoriteInList });
+          // Если есть избранный ресторан, всегда выбираем его (даже если уже есть выбранный)
+          if (favoriteRestaurant) {
+            // Проверяем, что любимый ресторан все еще существует в списке
+            const favoriteInList = restaurants.find(r => r.id === favoriteRestaurant.id);
+            if (favoriteInList) {
+              // Выбираем избранный, если его еще нет или если текущий выбранный не избранный
+              if (!currentSelected || currentSelected.id !== favoriteInList.id) {
+                set({ selectedRestaurant: favoriteInList });
+                await deviceStorage.setItem(STORAGE_KEYS.SELECTED_RESTAURANT_ID, favoriteInList.id);
+              }
+              return;
+            }
           }
+          
+          // НЕ выбираем ресторан автоматически, если нет избранного
+          // Пользователь выберет ресторан через popup
         }
-        // Если рестораны еще не загружены, просто сохраняем любимый ресторан
-        // Он будет выбран автоматически после загрузки ресторанов в fetchRestaurants
+      } catch (error: any) {
+        console.error('Failed to fetch restaurants:', error);
+        set({ 
+          restaurants: [],
+          error: error?.response?.data?.message || 'Не удалось загрузить рестораны',
+          isLoading: false,
+          isLoadingRestaurants: false
+        });
       }
-    } catch (error: any) {
-      console.error('Failed to fetch favorite restaurant:', error);
-      // Не критичная ошибка, просто не устанавливаем любимый ресторан
-    }
-  },
+    },
 
-  setFavoriteRestaurant: async (restaurantId) => {
-    try {
-      const currentFavorite = get().favoriteRestaurant;
-      const isRemoving = currentFavorite?.id === restaurantId;
-      
-      const response = await api.put('/profile/favorite-restaurant', { 
-        restaurantId: isRemoving ? null : restaurantId 
-      });
-      const restaurant = response.data.data;
-      set({ favoriteRestaurant: restaurant });
-      
-      // Если устанавливаем новый любимый ресторан, автоматически выбираем его
+    setSelectedRestaurant: async (restaurant) => {
+      set({ selectedRestaurant: restaurant });
       if (restaurant) {
-        set({ selectedRestaurant: restaurant });
+        await deviceStorage.setItem(STORAGE_KEYS.SELECTED_RESTAURANT_ID, restaurant.id);
+      } else {
+        await deviceStorage.removeItem(STORAGE_KEYS.SELECTED_RESTAURANT_ID);
       }
-      // Если убираем из избранного, не меняем выбранный ресторан
-    } catch (error: any) {
-      console.error('Failed to set favorite restaurant:', error);
-      throw error;
-    }
-  },
+    },
 
-  fetchBanners: async (restaurantId?: string) => {
-    // Пропускаем запрос на сервере
-    if (typeof window === 'undefined') return;
-    
-    const key = restaurantId || 'default';
-    const cachedBanners = get().bannersByRestaurant[key];
-    
-    // Если баннеры уже загружены, не делаем повторный запрос
-    if (cachedBanners && cachedBanners.length > 0) {
-      set({ banners: cachedBanners });
-      return;
-    }
-
-    try {
-      const response = await api.get('/banners', {
-        params: restaurantId ? { restaurantId } : {},
-      });
-      const banners = response.data.data || [];
+    fetchProfile: async () => {
+      if (typeof window === 'undefined') return;
       
-      // Сохраняем в кэш
+      // Предотвращаем повторные запросы
+      const state = get();
+      if (state.isLoadingProfile) {
+        return;
+      }
+      
+      set({ isLoadingProfile: true });
+      
+      try {
+        const response = await api.get('/profile');
+        const userData = response.data.data;
+        
+        set({ user: userData, isLoadingProfile: false });
+      } catch (error: any) {
+        console.error('Failed to fetch profile:', error);
+        set({ 
+          error: error?.response?.data?.message || 'Не удалось загрузить профиль',
+          isLoadingProfile: false
+        });
+      }
+    },
+
+    updateProfile: async (data) => {
+      try {
+        const response = await api.put('/profile', data);
+        const userData = response.data.data;
+        
+        set({ user: userData });
+      } catch (error: any) {
+        console.error('Failed to update profile:', error);
+        throw error;
+      }
+    },
+
+    setFavoriteRestaurant: async (restaurant) => {
+      set({ favoriteRestaurant: restaurant });
+      // Обновляем локальное хранилище
+      if (restaurant) {
+        await deviceStorage.setItem(STORAGE_KEYS.FAVORITE_RESTAURANT_ID, restaurant.id);
+      } else {
+        await deviceStorage.removeItem(STORAGE_KEYS.FAVORITE_RESTAURANT_ID);
+      }
+    },
+
+    fetchFavoriteRestaurant: async () => {
+      if (typeof window === 'undefined') return;
+      
+      // Предотвращаем повторные запросы
+      const state = get();
+      if (state.isLoadingFavoriteRestaurant) {
+        return;
+      }
+      
+      set({ isLoadingFavoriteRestaurant: true });
+      
+      try {
+        const response = await api.get('/profile/favorite-restaurant');
+        const restaurant = response.data.data;
+        
+        set({ favoriteRestaurant: restaurant, isLoadingFavoriteRestaurant: false });
+        
+        // Обновляем локальное хранилище: сохраняем или удаляем в зависимости от значения
+        if (restaurant) {
+          await deviceStorage.setItem(STORAGE_KEYS.FAVORITE_RESTAURANT_ID, restaurant.id);
+          
+          // Если есть любимый ресторан, всегда выбираем его (приоритет избранному)
+          const restaurants = get().restaurants;
+          const currentSelected = get().selectedRestaurant;
+          
+          if (restaurants.length > 0) {
+            const favoriteInList = restaurants.find(r => r.id === restaurant.id);
+            // Выбираем любимый ресторан всегда, если он отличается от текущего выбранного
+            if (favoriteInList && (!currentSelected || currentSelected.id !== favoriteInList.id)) {
+              set({ selectedRestaurant: favoriteInList });
+              await deviceStorage.setItem(STORAGE_KEYS.SELECTED_RESTAURANT_ID, favoriteInList.id);
+            }
+          }
+          // Если рестораны еще не загружены, просто сохраняем любимый ресторан
+          // Он будет выбран автоматически после загрузки ресторанов в fetchRestaurants
+        } else {
+          // Если сервер вернул null, очищаем локальное хранилище
+          await deviceStorage.removeItem(STORAGE_KEYS.FAVORITE_RESTAURANT_ID);
+        }
+      } catch (error: any) {
+        console.error('Failed to fetch favorite restaurant:', error);
+        set({ isLoadingFavoriteRestaurant: false });
+      }
+    },
+
+    setFavoriteRestaurantById: async (restaurantId) => {
+      try {
+        const currentFavorite = get().favoriteRestaurant;
+        const isRemoving = currentFavorite?.id === restaurantId;
+        
+        const response = await api.put('/profile/favorite-restaurant', { 
+          restaurantId: isRemoving ? null : restaurantId 
+        });
+        const restaurant = response.data.data;
+        
+        set({ favoriteRestaurant: restaurant });
+        
+        // Обновляем локальное хранилище
+        if (restaurant) {
+          await deviceStorage.setItem(STORAGE_KEYS.FAVORITE_RESTAURANT_ID, restaurant.id);
+        } else {
+          await deviceStorage.removeItem(STORAGE_KEYS.FAVORITE_RESTAURANT_ID);
+        }
+        
+        // Если устанавливаем новый любимый ресторан, автоматически выбираем его
+        if (restaurant) {
+          set({ selectedRestaurant: restaurant });
+          await deviceStorage.setItem(STORAGE_KEYS.SELECTED_RESTAURANT_ID, restaurant.id);
+        }
+        // Если убираем из избранного, не меняем выбранный ресторан
+      } catch (error: any) {
+        console.error('Failed to set favorite restaurant:', error);
+        throw error;
+      }
+    },
+
+    setMenuItems: (menuItems, restaurantId) => {
+      if (restaurantId) {
+        set((state) => {
+          const MAX_CACHED_RESTAURANTS = 10; // Максимальное количество ресторанов в кэше
+          const restaurantIds = Object.keys(state.menuItemsByRestaurant);
+          
+          // Ограничиваем размер кэша: удаляем старые рестораны, если превышен лимит
+          let updatedCache = { ...state.menuItemsByRestaurant };
+          if (restaurantIds.length >= MAX_CACHED_RESTAURANTS && !updatedCache[restaurantId]) {
+            // Удаляем самый старый ресторан (первый в списке), если добавляем новый
+            const oldestRestaurantId = restaurantIds[0];
+            delete updatedCache[oldestRestaurantId];
+          }
+          
+          // Добавляем/обновляем меню для текущего ресторана
+          updatedCache[restaurantId] = menuItems;
+          
+          return {
+            menuItemsByRestaurant: updatedCache,
+            // Если это меню для текущего ресторана, обновляем и текущее меню
+            menuItems: menuItems,
+          };
+        });
+      } else {
+        set({ menuItems });
+      }
+    },
+
+    fetchBanners: async (restaurantId?: string) => {
+      // Пропускаем запрос на сервере
+      if (typeof window === 'undefined') return;
+      
+      const key = restaurantId || 'default';
+      
+      // Проверяем, есть ли баннеры в памяти
+      const memoryBanners = get().bannersByRestaurant[key];
+      if (memoryBanners && memoryBanners.length > 0) {
+        set({ banners: memoryBanners });
+        return;
+      }
+
+      try {
+        const response = await api.get('/banners', {
+          params: restaurantId ? { restaurantId } : {},
+        });
+        const banners = response.data.data || [];
+        
+        // Сохраняем в память
+        set((state) => ({
+          banners,
+          bannersByRestaurant: {
+            ...state.bannersByRestaurant,
+            [key]: banners,
+          },
+        }));
+      } catch (error: any) {
+        console.error('Failed to fetch banners:', error);
+      }
+    },
+
+    prefetchBanners: async (restaurantId?: string) => {
+      // Пропускаем запрос на сервере
+      if (typeof window === 'undefined') return;
+      
+      // Используем тот же формат ключа, что и компонент Banners
+      const key = restaurantId ? `horizontal_${restaurantId}` : 'horizontal_default';
+      const state = get();
+      const memoryBanners = state.bannersByRestaurant[key];
+      
+      // Если баннеры уже загружены в памяти, не делаем повторный запрос
+      if (memoryBanners && memoryBanners.length > 0) {
+        return;
+      }
+      
+      // Если запрос уже выполняется для этого ключа, не делаем повторный запрос
+      if (state.loadingBanners.has(key)) {
+        return;
+      }
+
+      // Добавляем ключ в набор загружаемых баннеров
       set((state) => ({
-        banners,
+        loadingBanners: new Set(state.loadingBanners).add(key),
+      }));
+
+      try {
+        const response = await api.get('/banners', {
+          params: restaurantId ? { restaurantId } : {},
+        });
+        const banners = response.data.data || [];
+        
+        // Сохраняем в память без обновления текущих баннеров
+        set((state) => {
+          const newLoadingBanners = new Set(state.loadingBanners);
+          newLoadingBanners.delete(key);
+          return {
+            bannersByRestaurant: {
+              ...state.bannersByRestaurant,
+              [key]: banners,
+            },
+            loadingBanners: newLoadingBanners,
+          };
+        });
+      } catch (error: any) {
+        // Тихая ошибка при предзагрузке
+        console.debug('Failed to prefetch banners:', error);
+        // Удаляем ключ из набора загружаемых баннеров при ошибке
+        set((state) => {
+          const newLoadingBanners = new Set(state.loadingBanners);
+          newLoadingBanners.delete(key);
+          return { loadingBanners: newLoadingBanners };
+        });
+      }
+    },
+
+    setBannersForRestaurant: (restaurantId, banners) => {
+      const key = restaurantId || 'default';
+      set((state) => ({
         bannersByRestaurant: {
           ...state.bannersByRestaurant,
           [key]: banners,
         },
+        // Если это баннеры для текущего ресторана, обновляем и текущие баннеры
+        banners: banners,
       }));
-    } catch (error: any) {
-      console.error('Failed to fetch banners:', error);
-      // Не показываем ошибку пользователю, просто не обновляем баннеры
-    }
-  },
-
-  prefetchBanners: async (restaurantId?: string) => {
-    // Пропускаем запрос на сервере
-    if (typeof window === 'undefined') return;
-    
-    const key = restaurantId || 'default';
-    const cachedBanners = get().bannersByRestaurant[key];
-    
-    // Если баннеры уже загружены, не делаем повторный запрос
-    if (cachedBanners && cachedBanners.length > 0) {
-      return;
-    }
-
-    try {
-      const response = await api.get('/banners', {
-        params: restaurantId ? { restaurantId } : {},
-      });
-      const banners = response.data.data || [];
-      
-      // Сохраняем в кэш без обновления текущих баннеров
-      set((state) => ({
-        bannersByRestaurant: {
-          ...state.bannersByRestaurant,
-          [key]: banners,
-        },
-      }));
-    } catch (error: any) {
-      // Тихая ошибка при предзагрузке
-      console.debug('Failed to prefetch banners:', error);
-    }
-  },
-
-  setBannersForRestaurant: (restaurantId, banners) => {
-    const key = restaurantId || 'default';
-    set((state) => ({
-      bannersByRestaurant: {
-        ...state.bannersByRestaurant,
-        [key]: banners,
-      },
-      // Если это баннеры для текущего ресторана, обновляем и текущие баннеры
-      banners: banners,
-    }));
-  },
-}));
+    },
+  };
+});

@@ -15,6 +15,7 @@ export default function ActionButtons() {
     </svg>
   );
 
+
   const handleDeliveryClick = () => {
     router.push('/delivery');
   };
@@ -27,8 +28,12 @@ export default function ActionButtons() {
     }
   };
 
+  const handleBookingClick = () => {
+    router.push('/booking');
+  };
+
   const actions = [
-    { label: 'Бронь столика', icon: <Image src="/image/iconBittom/Frame-2.svg" alt="Бронь столика" width={28} height={28} />, action: () => alert('Бронь столика') },
+    { label: 'Бронь столика', icon: <Image src="/image/iconBittom/Frame-2.svg" alt="Бронь столика" width={28} height={28} />, action: handleBookingClick },
     { label: 'Заказать доставку', icon: <Image src="/image/iconBittom/Frame-1.svg" alt="Заказать доставку" width={28} height={28} />, action: handleDeliveryClick },
     { label: 'Оставить отзыв', icon: <Image src="/image/iconBittom/Frame.svg" alt="Оставить отзыв" width={28} height={28} />, action: () => alert('Оставить отзыв') },
     { label: 'Как нас найти', icon: <MapPinIcon />, action: handleLocationClick },
@@ -37,12 +42,24 @@ export default function ActionButtons() {
   return (
     <>
       <div className="bg-white px-4 py-4 md:px-0 md:py-0 md:bg-transparent">
-        {/* Мобильная версия - 4 колонки */}
-        <div className="grid grid-cols-4 gap-2 md:hidden">
+        {/* Мобильная версия - адаптивная сетка */}
+        <div className={`grid gap-2 md:hidden grid-cols-4`}>
           {actions.map((action, index) => (
             <div key={index} className="flex flex-col items-center">
               <button
                 onClick={action.action}
+                onMouseEnter={() => {
+                  // Предзагружаем страницы при наведении
+                  if (action.label === 'Заказать доставку') {
+                    router.prefetch('/delivery').catch((error) => {
+                      console.debug('Failed to prefetch /delivery:', error);
+                    });
+                  } else if (action.label === 'Бронь столика') {
+                    router.prefetch('/booking').catch((error) => {
+                      console.debug('Failed to prefetch /booking:', error);
+                    });
+                  }
+                }}
                 className="bg-[#F7F7F7] rounded-[10px] p-3 flex items-center justify-center hover:opacity-90 transition-opacity aspect-square w-full"
               >
                 <div className="flex items-center justify-center">
@@ -56,12 +73,24 @@ export default function ActionButtons() {
           ))}
         </div>
 
-        {/* Десктопная версия - сетка 2x2, меньший размер */}
-        <div className="hidden md:grid md:grid-cols-2 md:gap-3 md:mb-6 md:max-w-xs">
+        {/* Десктопная версия - адаптивная сетка */}
+        <div className={`hidden md:grid md:gap-3 md:mb-6 md:max-w-xs md:grid-cols-2`}>
           {actions.map((action, index) => (
             <div key={index} className="flex flex-col items-center">
               <button
                 onClick={action.action}
+                onMouseEnter={() => {
+                  // Предзагружаем страницы при наведении
+                  if (action.label === 'Заказать доставку') {
+                    router.prefetch('/delivery').catch((error) => {
+                      console.debug('Failed to prefetch /delivery:', error);
+                    });
+                  } else if (action.label === 'Бронь столика') {
+                    router.prefetch('/booking').catch((error) => {
+                      console.debug('Failed to prefetch /booking:', error);
+                    });
+                  }
+                }}
                 className="bg-[#F7F7F7] rounded-[10px] p-3 flex items-center justify-center hover:opacity-90 transition-opacity aspect-square w-full"
               >
                 <div className="flex items-center justify-center">

@@ -6,26 +6,36 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
-import { connectDatabase } from './config/database';
+import { connectDatabase, closeDatabase } from './config/database';
+import { getRedisClient } from './config/redis';
 import { errorHandler } from './middleware/errorHandler';
+import { apiLimiter, authLimiter, writeLimiter } from './middleware/rateLimiter';
+import { performanceMonitor, getMetrics, resetMetrics } from './middleware/performanceMonitor';
 import authRoutes from './routes/auth';
 import restaurantRoutes from './routes/restaurants';
 import menuRoutes from './routes/menu';
+import generalMenuRoutes from './routes/generalMenu';
 import bannerRoutes from './routes/banners';
 import profileRoutes from './routes/profile';
 import adminRoutes from './routes/admin';
 import bookingRoutes from './routes/booking';
 import dishImageRoutes from './routes/dishImages';
+import pagesRoutes from './routes/pages';
 import * as cron from 'node-cron';
 import { syncAllRestaurantsMenu } from './services/syncService';
+import { initializeBot, stopBot } from './services/telegramBot';
+import { autoGeocodeRestaurants } from './services/autoGeocodeService';
 
 const app = express();
 const PORT: number = Number(process.env.PORT) || 5000;
 
-// Middleware
-app.use(helmet());
+// ✅ Настройка trust proxy для работы за прокси-сервером (Railway, nginx и т.д.)
+// Это необходимо для правильного определения IP-адреса клиента через X-Forwarded-For
+// Используем число вместо true для безопасности: доверяем только первому прокси
+// Для Railway/Vercel обычно достаточно 1 прокси
+app.set('trust proxy', 1);
 
-// CORS настройки
+// CORS настройки (должны быть ДО helmet для правильной обработки preflight)
 const allowedOrigins = [
   process.env.FRONTEND_URL,
   'http://localhost:3000',
@@ -34,39 +44,180 @@ const allowedOrigins = [
 ].filter(Boolean) as string[];
 
 // Паттерны для разрешенных доменов (например, все домены Vercel)
+// Улучшенные паттерны для Vercel доменов (с учетом query параметров и хэшей)
 const allowedOriginPatterns = [
-  /^https:\/\/.*\.vercel\.app$/,
-  /^https:\/\/.*\.vercel\.app\/.*$/,
+  /^https:\/\/[^\/]+\.vercel\.app$/,
+  /^https:\/\/[^\/]+\.vercel\.app\/.*$/,
 ];
 
+// Функция для извлечения базового origin из URL (убирает query параметры и хэш)
+const getBaseOrigin = (origin: string): string => {
+  try {
+    // Убираем хэш и query параметры из origin
+    const cleanOrigin = origin.split('#')[0].split('?')[0];
+    const url = new URL(cleanOrigin);
+    return `${url.protocol}//${url.host}`;
+  } catch {
+    // Если не удалось распарсить, возвращаем как есть (но без хэша)
+    return origin.split('#')[0].split('?')[0];
+  }
+};
+
+// Функция проверки origin
+const isOriginAllowed = (origin: string | undefined): boolean => {
+  // Разрешаем запросы без origin (например, мобильные приложения, Postman, curl)
+  if (!origin) {
+    console.log('✅ CORS: Allowed request without origin');
+    return true;
+  }
+
+  // Извлекаем базовый origin (без query параметров и хэша)
+  const baseOrigin = getBaseOrigin(origin);
+
+  // Проверяем точное совпадение с разрешенными origins (сначала по базовому origin)
+  if (allowedOrigins.includes(baseOrigin)) {
+    console.log(`✅ CORS: Allowed origin (exact match): ${origin} -> ${baseOrigin}`);
+    return true;
+  }
+  
+  // Проверяем точное совпадение с полным origin (на случай если он уже в списке)
+  if (allowedOrigins.includes(origin)) {
+    console.log(`✅ CORS: Allowed origin (exact match): ${origin}`);
+    return true;
+  }
+
+  // Проверяем паттерны (например, для Vercel доменов)
+  const matchesPattern = allowedOriginPatterns.some(pattern => 
+    pattern.test(baseOrigin)
+  );
+  if (matchesPattern) {
+    console.log(`✅ CORS: Allowed origin (pattern match): ${origin} -> ${baseOrigin}`);
+    return true;
+  }
+
+  // Если не прошло проверку - блокируем
+  console.warn(`❌ CORS: Blocked origin ${origin} (base: ${baseOrigin})`);
+  console.warn(`   Allowed origins: ${allowedOrigins.join(', ')}`);
+  console.warn(`   Patterns: ${allowedOriginPatterns.map(p => p.toString()).join(', ')}`);
+  return false;
+};
+
+// Настройка CORS с улучшенной обработкой preflight
 app.use(cors({
   origin: (origin, callback) => {
-    // Разрешаем запросы без origin (например, мобильные приложения, Postman, curl)
-    if (!origin) {
+    if (isOriginAllowed(origin)) {
       callback(null, true);
-      return;
+    } else {
+      callback(new Error('Not allowed by CORS'));
     }
-
-    // Проверяем точное совпадение с разрешенными origins
-    if (allowedOrigins.includes(origin)) {
-      callback(null, true);
-      return;
-    }
-
-    // Проверяем паттерны (например, для Vercel доменов)
-    const matchesPattern = allowedOriginPatterns.some(pattern => pattern.test(origin));
-    if (matchesPattern) {
-      callback(null, true);
-      return;
-    }
-
-    // Если не прошло проверку - блокируем
-    console.warn(`CORS: Blocked origin ${origin}`);
-    callback(new Error('Not allowed by CORS'));
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  allowedHeaders: [
+    'Content-Type', 
+    'Authorization', 
+    'X-Requested-With',
+    'Accept',
+    'Origin',
+    'Access-Control-Request-Method',
+    'Access-Control-Request-Headers',
+    'X-Telegram-Bot-Api-Secret-Token'
+  ],
+  exposedHeaders: ['Content-Length', 'X-Foo', 'X-Bar'],
+  preflightContinue: false,
+  optionsSuccessStatus: 204,
+  maxAge: 86400, // 24 часа кэширования preflight запросов
+}));
+
+// Явная обработка OPTIONS запросов для всех маршрутов (на случай если CORS не сработал)
+// Этот обработчик должен быть ДО логирования middleware, чтобы он мог обработать запрос первым
+app.options('*', (req, res) => {
+  const origin = req.headers.origin;
+  const requestMethod = req.headers['access-control-request-method'];
+  const requestHeaders = req.headers['access-control-request-headers'];
+  
+  console.log(`🔍 [OPTIONS] Preflight request for: ${req.path}`);
+  console.log(`   Origin: ${origin || 'none'}`);
+  console.log(`   Request Method: ${requestMethod || 'none'}`);
+  console.log(`   Request Headers: ${requestHeaders || 'none'}`);
+  
+  if (isOriginAllowed(origin)) {
+    // Устанавливаем все необходимые CORS заголовки
+    if (origin) {
+      res.setHeader('Access-Control-Allow-Origin', origin);
+    }
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin, Access-Control-Request-Method, Access-Control-Request-Headers, X-Telegram-Bot-Api-Secret-Token');
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.setHeader('Access-Control-Max-Age', '86400');
+    
+    console.log(`   ✅ CORS headers set for origin: ${origin}`);
+    res.status(204).end();
+  } else {
+    console.log(`   ❌ CORS blocked for origin: ${origin}`);
+    res.status(403).json({ error: 'CORS not allowed' });
+  }
+});
+
+// Дополнительное логирование для отладки CORS (особенно preflight запросов)
+app.use((req, res, next) => {
+  // Логируем ВСЕ входящие запросы для диагностики
+  const timestamp = new Date().toISOString();
+  console.log(`[${timestamp}] 📥 Входящий запрос: ${req.method} ${req.path}`);
+  console.log(`   Origin: ${req.headers.origin || 'none'}`);
+  console.log(`   User-Agent: ${req.headers['user-agent'] || 'none'}`);
+  console.log(`   Referer: ${req.headers.referer || 'none'}`);
+  console.log(`   IP: ${req.ip || req.socket.remoteAddress || 'unknown'}`);
+  
+  if (req.method === 'OPTIONS') {
+    console.log(`   🔍 Preflight request detected`);
+    console.log(`   Access-Control-Request-Method: ${req.headers['access-control-request-method'] || 'none'}`);
+    console.log(`   Access-Control-Request-Headers: ${req.headers['access-control-request-headers'] || 'none'}`);
+  }
+  
+  // Логируем query параметры
+  if (Object.keys(req.query).length > 0) {
+    console.log(`   Query params:`, req.query);
+  }
+  
+  // Логируем установку CORS заголовков (через перехват setHeader)
+  const originalSetHeader = res.setHeader;
+  (res as any).setHeader = function(name: string, value: string | number | string[]) {
+    if (typeof name === 'string' && name.toLowerCase().startsWith('access-control-')) {
+      console.log(`   🔵 CORS Header set: ${name} = ${value}`);
+    }
+    return originalSetHeader.call(this, name, value);
+  };
+  
+  // Логируем завершение запроса
+  res.on('finish', () => {
+    const corsHeaders: string[] = [];
+    Object.keys(res.getHeaders()).forEach(key => {
+      if (key.toLowerCase().startsWith('access-control-')) {
+        corsHeaders.push(`${key}: ${res.getHeader(key)}`);
+      }
+    });
+    
+    console.log(`[${new Date().toISOString()}] ✅ Запрос завершен: ${req.method} ${req.path} - ${res.statusCode}`);
+    if (corsHeaders.length > 0) {
+      console.log(`   📋 CORS Headers in response:`, corsHeaders.join(', '));
+    } else if (req.method === 'OPTIONS' || req.headers.origin) {
+      console.log(`   ⚠️  WARNING: No CORS headers in response for ${req.method} request with origin!`);
+    }
+  });
+  
+  next();
+});
+
+// Middleware
+// Настраиваем Helmet так, чтобы он не блокировал CORS заголовки
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" },
+  crossOriginEmbedderPolicy: false,
+  // Отключаем contentSecurityPolicy для CORS, если нужно
+  contentSecurityPolicy: false,
+  // Разрешаем все источники для ресурсов
+  crossOriginOpenerPolicy: false,
 }));
 // Логирование запросов
 if (process.env.NODE_ENV === 'production') {
@@ -74,45 +225,153 @@ if (process.env.NODE_ENV === 'production') {
 } else {
   app.use(morgan('dev'));
 }
+
+// ✅ Применяем мониторинг производительности ко всем запросам
+app.use(performanceMonitor);
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Health check с проверкой подключения к БД
+// ✅ Применяем общий rate limiter ко всем API запросам
+// Health check автоматически пропускается (настроено в rateLimiter.ts)
+app.use('/api', apiLimiter);
+
+// Health check с проверкой подключения к БД и Redis
 app.get('/health', async (req, res) => {
+  const healthCheckStart = Date.now();
+  
   try {
     const { AppDataSource } = await import('./config/database');
-    const isDbConnected = AppDataSource.isInitialized;
+    const { isRedisAvailable } = await import('./config/redis');
     
+    const isDbConnected = AppDataSource.isInitialized;
+    let dbDetails: any = {};
+    
+    // Дополнительная проверка БД
     if (isDbConnected) {
-      res.json({ 
-        status: 'ok', 
-        timestamp: new Date().toISOString(),
-        database: 'connected'
-      });
+      try {
+        // Пробуем выполнить простой запрос для проверки работоспособности
+        const queryRunner = AppDataSource.createQueryRunner();
+        await queryRunner.query('SELECT 1');
+        await queryRunner.release();
+        dbDetails.status = 'connected';
+        // Безопасный доступ к пулу соединений PostgreSQL
+        const driver = AppDataSource.driver as any;
+        if (driver.master && driver.master.pool) {
+          dbDetails.activeConnections = driver.master.pool.totalCount || 0;
+          dbDetails.idleConnections = driver.master.pool.idleCount || 0;
+        } else {
+          dbDetails.activeConnections = 0;
+          dbDetails.idleConnections = 0;
+        }
+      } catch (dbError) {
+        dbDetails.status = 'error';
+        dbDetails.error = dbError instanceof Error ? dbError.message : String(dbError);
+      }
     } else {
-      res.status(503).json({ 
-        status: 'unhealthy', 
-        timestamp: new Date().toISOString(),
-        database: 'disconnected'
-      });
+      dbDetails.status = 'disconnected';
     }
+    
+    const isRedisConnected = isRedisAvailable();
+    const healthCheckTime = Date.now() - healthCheckStart;
+    
+    const health = {
+      status: isDbConnected ? 'ok' : 'unhealthy',
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+      responseTime: `${healthCheckTime}ms`,
+      database: {
+        status: dbDetails.status,
+        ...(dbDetails.activeConnections !== undefined && {
+          activeConnections: dbDetails.activeConnections,
+          idleConnections: dbDetails.idleConnections
+        }),
+        ...(dbDetails.error && { error: dbDetails.error })
+      },
+      redis: process.env.REDIS_URL ? {
+        status: isRedisConnected ? 'connected' : 'disconnected'
+      } : {
+        status: 'not configured'
+      },
+      memory: {
+        used: Math.round(process.memoryUsage().heapUsed / 1024 / 1024) + 'MB',
+        total: Math.round(process.memoryUsage().heapTotal / 1024 / 1024) + 'MB',
+        rss: Math.round(process.memoryUsage().rss / 1024 / 1024) + 'MB'
+      },
+      environment: process.env.NODE_ENV || 'development'
+    };
+    
+    if (!isDbConnected) {
+      return res.status(503).json(health);
+    }
+    
+    res.json(health);
   } catch (error) {
+    const healthCheckTime = Date.now() - healthCheckStart;
     res.status(503).json({ 
       status: 'error', 
       timestamp: new Date().toISOString(),
-      error: error instanceof Error ? error.message : 'Unknown error'
+      responseTime: `${healthCheckTime}ms`,
+      error: error instanceof Error ? error.message : 'Unknown error',
+      stack: process.env.NODE_ENV === 'development' && error instanceof Error ? error.stack : undefined
     });
   }
 });
 
+// Middleware для блокировки новых запросов во время shutdown
+app.use((req, res, next) => {
+  if (isShuttingDown) {
+    return res.status(503).json({
+      success: false,
+      message: 'Server is shutting down',
+      code: 'SHUTTING_DOWN',
+      timestamp: new Date().toISOString()
+    });
+  }
+  next();
+});
+
+// Middleware для обработки таймаутов запросов
+app.use((req, res, next) => {
+  // Устанавливаем таймаут для запросов (Railway имеет таймаут ~30 секунд)
+  const REQUEST_TIMEOUT = 25000; // 25 секунд (меньше чем Railway таймаут)
+  
+  const timeout = setTimeout(() => {
+    if (!res.headersSent) {
+      console.error(`[TIMEOUT] Запрос превысил таймаут: ${req.method} ${req.path}`);
+      res.status(504).json({
+        success: false,
+        message: 'Request timeout',
+        code: 'REQUEST_TIMEOUT',
+        timestamp: new Date().toISOString()
+      });
+    }
+  }, REQUEST_TIMEOUT);
+
+  // Очищаем таймаут при завершении запроса
+  res.on('finish', () => {
+    clearTimeout(timeout);
+  });
+
+  res.on('close', () => {
+    clearTimeout(timeout);
+  });
+
+  next();
+});
+
 // Routes
-app.use('/api/auth', authRoutes);
+// ✅ Строгий лимит для аутентификации (5 попыток за 15 минут)
+app.use('/api/auth', authLimiter, authRoutes);
 app.use('/api/restaurants', restaurantRoutes);
 app.use('/api/menu', menuRoutes);
+app.use('/api/general-menu', generalMenuRoutes);
 app.use('/api/banners', bannerRoutes);
 app.use('/api/profile', profileRoutes);
-app.use('/api/admin', adminRoutes);
-app.use('/api/booking', bookingRoutes);
+app.use('/api/pages', pagesRoutes);
+// ✅ Лимит для админских операций и бронирований (20 запросов в минуту)
+app.use('/api/admin', writeLimiter, adminRoutes);
+app.use('/api/booking', writeLimiter, bookingRoutes);
 app.use('/api/dish-images', dishImageRoutes);
 
 // 404 handler для неизвестных маршрутов
@@ -131,21 +390,105 @@ app.use(errorHandler);
 
 // Start server
 let server: any = null;
+let isShuttingDown = false;
 
 const startServer = async () => {
+  const startTime = Date.now();
+  console.log('\n' + '='.repeat(60));
+  console.log('🚀 ЗАПУСК СЕРВЕРА');
+  console.log('='.repeat(60));
+  console.log(`⏰ Время запуска: ${new Date().toISOString()}`);
+  console.log(`📋 Node.js версия: ${process.version}`);
+  console.log(`🌍 Окружение: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`🔌 Порт: ${PORT}`);
+  
+  // Логируем важные переменные окружения (без секретов)
+  console.log('\n📝 Конфигурация:');
+  console.log(`   - DATABASE_URL: ${process.env.DATABASE_URL ? '✅ установлен' : '❌ не установлен'}`);
+  console.log(`   - REDIS_URL: ${process.env.REDIS_URL ? '✅ установлен' : '❌ не установлен'}`);
+  console.log(`   - JWT_SECRET: ${process.env.JWT_SECRET ? '✅ установлен' : '❌ не установлен'}`);
+  console.log(`   - FRONTEND_URL: ${process.env.FRONTEND_URL || 'не установлен'}`);
+  console.log(`   - TELEGRAM_BOT_TOKEN: ${process.env.TELEGRAM_BOT_TOKEN ? '✅ установлен' : '❌ не установлен'}`);
+  
   try {
-    await connectDatabase();
+    // Шаг 1: Подключение к БД
+    console.log('\n📊 ШАГ 1: Подключение к базе данных...');
+    const dbStartTime = Date.now();
+    try {
+      await connectDatabase();
+      const dbTime = Date.now() - dbStartTime;
+      console.log(`✅ База данных подключена за ${dbTime}ms`);
+    } catch (dbError) {
+      const dbTime = Date.now() - dbStartTime;
+      console.error(`❌ ОШИБКА подключения к БД после ${dbTime}ms:`);
+      console.error('   Детали ошибки:', dbError instanceof Error ? dbError.message : String(dbError));
+      if (dbError instanceof Error && dbError.stack) {
+        console.error('   Stack trace:', dbError.stack);
+      }
+      throw dbError; // Прерываем запуск, если БД не подключена
+    }
+    
+    // Шаг 2: Инициализация Redis
+    console.log('\n🔄 ШАГ 2: Инициализация Redis...');
+    const redisStartTime = Date.now();
+    try {
+      const redis = getRedisClient();
+      const redisTime = Date.now() - redisStartTime;
+      if (redis) {
+        console.log(`✅ Redis инициализирован за ${redisTime}ms`);
+      } else {
+        console.log(`⚠️  Redis не настроен (REDIS_URL не указан). Кэширование отключено.`);
+      }
+    } catch (redisError) {
+      console.error('⚠️  Ошибка при инициализации Redis (не критично):', redisError);
+      // Не прерываем запуск, если Redis недоступен
+    }
+    
+    // Шаг 3: Запуск HTTP сервера (КРИТИЧНО: запускаем ДО инициализации бота!)
+    // Это необходимо, чтобы Railway мог сразу проверить health check и не останавливал контейнер
+    console.log('\n🌐 ШАГ 3: Запуск HTTP сервера...');
+    const serverStartTime = Date.now();
+    
     server = app.listen(PORT, '0.0.0.0', () => {
+      const serverTime = Date.now() - serverStartTime;
+      const totalTime = Date.now() - startTime;
+      
+      console.log('\n' + '='.repeat(60));
+      console.log('✅ СЕРВЕР УСПЕШНО ЗАПУЩЕН');
+      console.log('='.repeat(60));
+      console.log(`⏱️  Время запуска HTTP сервера: ${serverTime}ms`);
+      console.log(`⏱️  Общее время запуска: ${totalTime}ms`);
       console.log(`🚀 Server running on port ${PORT}`);
-      console.log(`📡 Health check available at http://localhost:${PORT}/health`);
-      console.log(`🌐 API endpoints available at http://localhost:${PORT}/api`);
+      console.log(`📡 Health check: http://0.0.0.0:${PORT}/health`);
+      console.log(`🌐 API endpoints: http://0.0.0.0:${PORT}/api`);
       console.log(`📋 Environment: ${process.env.NODE_ENV || 'development'}`);
       console.log(`🔗 Frontend URL: ${process.env.FRONTEND_URL || 'http://localhost:3000'}`);
+      console.log('='.repeat(60) + '\n');
+    });
+    
+    // Обработка ошибок сервера
+    server.on('error', (error: NodeJS.ErrnoException) => {
+      console.error('❌ ОШИБКА HTTP СЕРВЕРА:');
+      console.error('   Тип ошибки:', error.code);
+      console.error('   Сообщение:', error.message);
+      if (error.code === 'EADDRINUSE') {
+        console.error('   ⚠️  Порт уже занят! Проверьте, не запущен ли другой процесс на порту', PORT);
+      }
+      process.exit(1);
     });
 
-    // Настройка ежедневной синхронизации меню из Google Sheets
-    // Запускается каждый день в 3:00 утра по UTC
-    // Можно изменить расписание через переменную окружения SYNC_CRON_SCHEDULE
+    // Шаг 4: Инициализация Telegram бота (асинхронно в фоне, не блокируя запуск)
+    // Важно: запускаем ПОСЛЕ HTTP сервера, чтобы Railway мог сразу проверить health check
+    console.log('\n🤖 ШАГ 4: Инициализация Telegram бота (асинхронно)...');
+    initializeBot().then(() => {
+      console.log('✅ Telegram бот инициализирован');
+    }).catch((botError) => {
+      console.error('⚠️  Ошибка при инициализации Telegram бота (не критично):', botError);
+      // Не прерываем запуск, если бот не инициализирован
+    });
+
+    // Шаг 5: Настройка синхронизации меню
+    console.log('\n📅 ШАГ 5: Настройка синхронизации меню...');
     const syncSchedule = process.env.SYNC_CRON_SCHEDULE || '0 3 * * *';
     
     if (process.env.GOOGLE_SHEETS_ID && process.env.GOOGLE_SHEETS_CREDENTIALS) {
@@ -157,44 +500,169 @@ const startServer = async () => {
           console.error('Ошибка при запланированной синхронизации:', error);
         }
       });
-      console.log(`📅 Ежедневная синхронизация меню настроена на расписание: ${syncSchedule}`);
+      console.log(`✅ Ежедневная синхронизация меню настроена на расписание: ${syncSchedule}`);
     } else {
       console.log('⚠️  Google Sheets не настроены. Синхронизация отключена.');
     }
+    
+    // Шаг 6: Автоматическое геокодирование (в фоне)
+    console.log('\n📍 ШАГ 6: Запуск автоматического геокодирования (фоновая задача)...');
+    autoGeocodeRestaurants().catch((error) => {
+      console.error('⚠️  Ошибка при автоматическом геокодировании (не критично):', error);
+      // Не прерываем запуск приложения при ошибке геокодирования
+    });
+    
   } catch (error) {
-    console.error('Failed to start server:', error);
+    const totalTime = Date.now() - startTime;
+    console.error('\n' + '='.repeat(60));
+    console.error('❌ КРИТИЧЕСКАЯ ОШИБКА ПРИ ЗАПУСКЕ СЕРВЕРА');
+    console.error('='.repeat(60));
+    console.error(`⏱️  Время до ошибки: ${totalTime}ms`);
+    console.error('📋 Тип ошибки:', error instanceof Error ? error.constructor.name : typeof error);
+    console.error('💬 Сообщение:', error instanceof Error ? error.message : String(error));
+    
+    if (error instanceof Error && error.stack) {
+      console.error('\n📚 Stack trace:');
+      console.error(error.stack);
+    }
+    
+    // Дополнительная диагностика
+    if (error instanceof Error) {
+      if (error.message.includes('timeout') || error.message.includes('TIMEOUT')) {
+        console.error('\n⚠️  ДИАГНОСТИКА: Похоже на проблему с таймаутом подключения');
+        console.error('   Проверьте:');
+        console.error('   - Доступность базы данных');
+        console.error('   - Правильность DATABASE_URL');
+        console.error('   - Сетевые настройки Railway');
+      }
+      if (error.message.includes('ECONNREFUSED') || error.message.includes('connection refused')) {
+        console.error('\n⚠️  ДИАГНОСТИКА: База данных недоступна');
+        console.error('   Проверьте:');
+        console.error('   - Запущена ли база данных PostgreSQL');
+        console.error('   - Правильность хоста и порта в DATABASE_URL');
+      }
+      if (error.message.includes('password') || error.message.includes('authentication')) {
+        console.error('\n⚠️  ДИАГНОСТИКА: Проблема с аутентификацией');
+        console.error('   Проверьте:');
+        console.error('   - Правильность пароля в DATABASE_URL');
+        console.error('   - Права доступа пользователя БД');
+      }
+    }
+    
+    console.error('='.repeat(60) + '\n');
     process.exit(1);
   }
 };
 
 // Graceful shutdown - обработка сигналов завершения
 const gracefulShutdown = async (signal: string) => {
-  console.log(`\n${signal} received. Starting graceful shutdown...`);
+  // Предотвращаем множественные вызовы shutdown
+  if (isShuttingDown) {
+    console.log('⚠️  Shutdown уже выполняется, игнорируем повторный сигнал');
+    return;
+  }
   
+  isShuttingDown = true;
+  const shutdownStart = Date.now();
+  console.log('\n' + '='.repeat(60));
+  console.log(`🛑 ${signal} получен. Начало graceful shutdown...`);
+  console.log('='.repeat(60));
+  console.log(`⏰ Время получения сигнала: ${new Date().toISOString()}`);
+  console.log(`⏱️  Uptime до shutdown: ${Math.round(process.uptime())} секунд`);
+  
+  const shutdownSteps: Array<{ name: string; fn: () => Promise<void> }> = [];
+  
+  // Шаг 1: Закрытие HTTP сервера
   if (server) {
-    server.close(() => {
-      console.log('✅ HTTP server closed');
+    shutdownSteps.push({
+      name: 'HTTP Server',
+      fn: () => new Promise<void>((resolve) => {
+        console.log('🔄 Закрытие HTTP сервера...');
+        
+        // Закрываем все активные соединения
+        server.close(() => {
+          const time = Date.now() - shutdownStart;
+          console.log(`✅ HTTP сервер закрыт за ${time}ms`);
+          resolve();
+        });
+        
+        // Закрываем все активные соединения принудительно
+        server.closeAllConnections?.();
+        
+        // Таймаут для закрытия сервера (10 секунд)
+        setTimeout(() => {
+          console.log('⚠️  Таймаут закрытия HTTP сервера, принудительное закрытие');
+          server.closeAllConnections?.();
+          resolve();
+        }, 10000);
+      })
     });
   }
   
-  // Закрываем подключение к БД
-  try {
-    const { AppDataSource } = await import('./config/database');
-    if (AppDataSource.isInitialized) {
-      await AppDataSource.destroy();
-      console.log('✅ Database connection closed');
+  // Шаг 2: Остановка Telegram бота
+  shutdownSteps.push({
+    name: 'Telegram Bot',
+    fn: async () => {
+      try {
+        console.log('🔄 Остановка Telegram бота...');
+        await stopBot();
+        console.log('✅ Telegram бот остановлен');
+      } catch (error) {
+        console.error('⚠️  Ошибка при остановке Telegram бота:', error);
+      }
     }
-  } catch (error) {
-    console.error('Error closing database:', error);
+  });
+  
+  // Шаг 3: Закрытие Redis
+  shutdownSteps.push({
+    name: 'Redis',
+    fn: async () => {
+      try {
+        console.log('🔄 Закрытие подключения к Redis...');
+        const { closeRedis } = await import('./config/redis');
+        await closeRedis();
+        console.log('✅ Подключение к Redis закрыто');
+      } catch (error) {
+        console.error('⚠️  Ошибка при закрытии Redis:', error);
+      }
+    }
+  });
+  
+  // Шаг 4: Закрытие БД
+  shutdownSteps.push({
+    name: 'Database',
+    fn: async () => {
+      try {
+        console.log('🔄 Закрытие подключения к базе данных...');
+        await closeDatabase();
+      } catch (error) {
+        console.error('⚠️  Ошибка при закрытии базы данных:', error);
+      }
+    }
+  });
+  
+  // Выполняем все шаги последовательно
+  for (const step of shutdownSteps) {
+    const stepStart = Date.now();
+    try {
+      await step.fn();
+      const stepTime = Date.now() - stepStart;
+      console.log(`   ⏱️  ${step.name}: ${stepTime}ms`);
+    } catch (error) {
+      console.error(`   ❌ Ошибка в шаге ${step.name}:`, error);
+    }
   }
   
-  // Даем время на завершение операций (максимум 10 секунд)
-  setTimeout(() => {
-    console.log('⚠️  Forced shutdown after timeout');
-    process.exit(0);
-  }, 10000);
+  const totalShutdownTime = Date.now() - shutdownStart;
+  console.log('\n' + '='.repeat(60));
+  console.log(`✅ Graceful shutdown завершен за ${totalShutdownTime}ms`);
+  console.log('='.repeat(60) + '\n');
   
-  process.exit(0);
+  // Завершаем процесс после успешного shutdown
+  // Используем небольшую задержку, чтобы убедиться, что все логи записаны
+  setTimeout(() => {
+    process.exit(0);
+  }, 100);
 };
 
 // Обработка сигналов завершения
@@ -203,13 +671,41 @@ process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
 // Обработка необработанных ошибок
 process.on('unhandledRejection', (reason, promise) => {
-  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+  console.error('\n' + '='.repeat(60));
+  console.error('❌ UNHANDLED REJECTION');
+  console.error('='.repeat(60));
+  console.error('⏰ Время:', new Date().toISOString());
+  console.error('📋 Promise:', promise);
+  console.error('💬 Причина:', reason);
+  if (reason instanceof Error && reason.stack) {
+    console.error('📚 Stack trace:', reason.stack);
+  }
+  console.error('='.repeat(60) + '\n');
 });
 
 process.on('uncaughtException', (error) => {
-  console.error('Uncaught Exception:', error);
+  console.error('\n' + '='.repeat(60));
+  console.error('❌ UNCAUGHT EXCEPTION');
+  console.error('='.repeat(60));
+  console.error('⏰ Время:', new Date().toISOString());
+  console.error('📋 Тип ошибки:', error.constructor.name);
+  console.error('💬 Сообщение:', error.message);
+  if (error.stack) {
+    console.error('📚 Stack trace:', error.stack);
+  }
+  console.error('='.repeat(60) + '\n');
   gracefulShutdown('uncaughtException');
 });
+
+// Логируем начало запуска приложения
+console.log('\n' + '='.repeat(60));
+console.log('🚀 ИНИЦИАЛИЗАЦИЯ ПРИЛОЖЕНИЯ');
+console.log('='.repeat(60));
+console.log(`⏰ Время: ${new Date().toISOString()}`);
+console.log(`📋 Node.js: ${process.version}`);
+console.log(`🌍 Платформа: ${process.platform} ${process.arch}`);
+console.log(`💾 Память: ${Math.round(process.memoryUsage().rss / 1024 / 1024)}MB RSS`);
+console.log('='.repeat(60) + '\n');
 
 startServer();
 

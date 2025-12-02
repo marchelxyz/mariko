@@ -4,6 +4,7 @@ import {
   Column,
   CreateDateColumn,
   UpdateDateColumn,
+  Index,
 } from 'typeorm';
 
 @Entity('restaurants')
@@ -20,10 +21,17 @@ export class Restaurant {
   @Column()
   address!: string;
 
+  @Column({ type: 'decimal', precision: 10, scale: 7, nullable: true })
+  latitude?: number;
+
+  @Column({ type: 'decimal', precision: 10, scale: 7, nullable: true })
+  longitude?: number;
+
   @Column()
   phoneNumber!: string;
 
   @Column({ default: true })
+  @Index() // ✅ Индекс для быстрого поиска активных ресторанов
   isActive!: boolean;
 
   @Column({ nullable: true })
@@ -59,6 +67,10 @@ export class Restaurant {
     name: string;
     url: string;
   }>;
+
+  // ReMarked API: ID заведения в системе ReMarked для бронирования столиков
+  @Column({ nullable: true })
+  remarkedPointId?: number;
 
   @CreateDateColumn()
   createdAt!: Date;

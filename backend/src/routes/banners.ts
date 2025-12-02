@@ -2,12 +2,29 @@ import { Router, Request, Response } from 'express';
 import { AppDataSource } from '../config/database';
 import { Banner } from '../models/Banner';
 import { authenticate, AuthRequest, requireRole } from '../middleware/auth';
+import { 
+  getBannersFromCache, 
+  setBannersToCache, 
+  invalidateBannersCache,
+  invalidateHomePageCache 
+} from '../services/cacheService';
 
 const router = Router();
 
 router.get('/', async (req: Request, res: Response) => {
   try {
     const { restaurantId, type } = req.query;
+    
+    // Пытаемся получить из кэша
+    const cached = await getBannersFromCache(
+      restaurantId as string | undefined,
+      type as string | undefined
+    );
+    if (cached) {
+      console.log('✅ Баннеры получены из кэша');
+      return res.json({ success: true, data: cached, cached: true });
+    }
+
     const bannerRepository = AppDataSource.getRepository(Banner);
     
     // Используем QueryBuilder для гибких условий
@@ -37,7 +54,14 @@ router.get('/', async (req: Request, res: Response) => {
 
     const banners = await queryBuilder.getMany();
     
-    res.json({ success: true, data: banners });
+    // Сохраняем в кэш
+    await setBannersToCache(
+      restaurantId as string | undefined,
+      type as string | undefined,
+      banners
+    );
+    
+    res.json({ success: true, data: banners, cached: false });
   } catch (error) {
     console.error('Error fetching banners:', error);
     res.status(500).json({ success: false, message: 'Failed to fetch banners' });
@@ -49,6 +73,11 @@ router.post('/', authenticate, requireRole('admin'), async (req: AuthRequest, re
     const bannerRepository = AppDataSource.getRepository(Banner);
     const banner = bannerRepository.create(req.body);
     await bannerRepository.save(banner);
+    
+    // Инвалидируем кэш баннеров и главной страницы
+    await invalidateBannersCache();
+    await invalidateHomePageCache();
+    
     res.status(201).json({ success: true, data: banner });
   } catch (error) {
     console.error('Error creating banner:', error);
@@ -70,6 +99,11 @@ router.put('/:id', authenticate, requireRole('admin'), async (req: AuthRequest, 
     
     Object.assign(banner, req.body);
     await bannerRepository.save(banner);
+    
+    // Инвалидируем кэш баннеров и главной страницы
+    await invalidateBannersCache();
+    await invalidateHomePageCache();
+    
     res.json({ success: true, data: banner });
   } catch (error) {
     console.error('Error updating banner:', error);
@@ -81,6 +115,11 @@ router.delete('/:id', authenticate, requireRole('admin'), async (req: AuthReques
   try {
     const bannerRepository = AppDataSource.getRepository(Banner);
     await bannerRepository.delete(req.params.id);
+    
+    // Инвалидируем кэш баннеров и главной страницы
+    await invalidateBannersCache();
+    await invalidateHomePageCache();
+    
     res.json({ success: true, message: 'Banner deleted' });
   } catch (error) {
     console.error('Error deleting banner:', error);
