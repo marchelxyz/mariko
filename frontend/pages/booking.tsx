@@ -3,6 +3,7 @@ import { useRouter } from 'next/router';
 import Layout from '@/components/Layout';
 import Header from '@/components/Header';
 import HallSchemeViewer from '@/components/HallSchemeViewer';
+import TableSchemeViewer from '@/components/TableSchemeViewer';
 import { useStore } from '@/store/useStore';
 import api from '@/lib/api';
 import { Slot, SlotsResponse, HallScheme, HallSchemesResponse } from '@/types/booking';
@@ -59,6 +60,7 @@ export default function Booking() {
     } else {
       setHallSchemes([]);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedRestaurant?.id]);
 
   // Загружаем слоты при изменении даты или количества гостей
@@ -71,6 +73,7 @@ export default function Booking() {
       setSelectedTableIds([]);
       setFormData(prev => ({ ...prev, time: '' }));
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formData.date, formData.guests_count, selectedRestaurant?.id]);
 
   // Загрузка схем залов
@@ -458,7 +461,37 @@ export default function Booking() {
                         </p>
                         
                         {/* Схема зала, если доступна */}
-                        {hallSchemes.length > 0 ? (
+                        {selectedRestaurant?.id && formData.date && formData.guests_count >= 1 ? (
+                          <div className="mt-4">
+                            <TableSchemeViewer
+                              restaurantId={selectedRestaurant.id}
+                              date={formData.date}
+                              guestsCount={formData.guests_count}
+                              selectedTimestamp={selectedSlot?.start_stamp}
+                              selectedTableIds={selectedTableIds}
+                              availableTableIds={selectedSlot.tables_ids}
+                              tableBundles={
+                                selectedSlot.table_bundles
+                                  ? selectedSlot.table_bundles.map((bundle) =>
+                                      Array.isArray(bundle) ? bundle : bundle.tables || []
+                                    )
+                                  : []
+                              }
+                              onTableSelect={handleTableToggle}
+                              onBundleSelect={handleBundleSelect}
+                            />
+                            {selectedTableIds.length > 0 && (
+                              <p className="text-xs text-gray-500 mt-3 text-center">
+                                Выбрано столов: {selectedTableIds.length}
+                                {selectedSlot.table_bundles && selectedSlot.table_bundles.length > 0 && (
+                                  <span className="block mt-1 text-blue-600">
+                                    💡 Можно выбрать готовую комбинацию столов из списка ниже
+                                  </span>
+                                )}
+                              </p>
+                            )}
+                          </div>
+                        ) : hallSchemes.length > 0 ? (
                           <div className="mt-4">
                             <HallSchemeViewer
                               hallSchemes={hallSchemes}
