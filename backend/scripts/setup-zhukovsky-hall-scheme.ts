@@ -8,10 +8,12 @@
  * 4. Применяет схему зала с фоновым изображением из виджета
  */
 
+// Импорт reflect-metadata должен быть самым первым!
 import 'reflect-metadata';
 import dotenv from 'dotenv';
 dotenv.config();
 
+// Импорты после reflect-metadata
 import { AppDataSource } from '../src/config/database';
 import { Restaurant } from '../src/models/Restaurant';
 import { remarkedService } from '../src/services/remarkedService';
