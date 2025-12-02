@@ -9,6 +9,128 @@ import { getRestaurantFromCache, setRestaurantToCache } from '../services/cacheS
 const router = Router();
 
 /**
+ * Получение доступных временных слотов со столами для бронирования
+ * 
+ * Query параметры:
+ * - restaurantId: string (UUID ресторана) - обязательный
+ * - date: string (Дата в формате YYYY-MM-DD) - обязательный
+ * - guests_count: number (Количество гостей) - обязательный
+ * - with_rooms: boolean (Получить информацию о залах и столах) - опционально, по умолчанию true
+ */
+router.get('/slots', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const { restaurantId, date, guests_count, with_rooms } = req.query;
+
+    // Валидация обязательных параметров
+    if (!restaurantId || !date || !guests_count) {
+      return res.status(400).json({
+        success: false,
+        message: 'Отсутствуют обязательные параметры: restaurantId, date, guests_count',
+      });
+    }
+
+    // Получаем ресторан из кеша или базы данных
+    let restaurant: Restaurant | null = null;
+    restaurant = await getRestaurantFromCache(restaurantId as string);
+
+    if (!restaurant) {
+      const restaurantRepository = AppDataSource.getRepository(Restaurant);
+      restaurant = await restaurantRepository.findOne({
+        where: { id: restaurantId as string },
+      });
+
+      if (restaurant) {
+        await setRestaurantToCache(restaurantId as string, restaurant);
+      }
+    }
+
+    if (!restaurant) {
+      return res.status(404).json({
+        success: false,
+        message: 'Ресторан не найден',
+      });
+    }
+
+    if (!restaurant.isActive) {
+      return res.status(400).json({
+        success: false,
+        message: 'Ресторан неактивен',
+      });
+    }
+
+    // Проверяем наличие ReMarked Point ID
+    if (!restaurant.remarkedPointId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Ресторан не настроен для бронирования. Обратитесь к администратору.',
+      });
+    }
+
+    // Получаем токен от ReMarked API (с кешированием)
+    let token: string;
+    try {
+      const tokenResponse = await remarkedService.getToken(restaurant.remarkedPointId);
+      token = tokenResponse.token;
+    } catch (error: any) {
+      console.error('Ошибка получения токена ReMarked:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'Не удалось подключиться к сервису бронирования. Попробуйте позже.',
+      });
+    }
+
+    // Формируем период (одна дата)
+    const dateStr = date as string;
+    const period = {
+      from: dateStr,
+      to: dateStr,
+    };
+
+    const guestsCount = Number(guests_count);
+    const withRooms = with_rooms === 'true' || with_rooms === undefined || with_rooms === '';
+
+    // Получаем слоты со столами
+    try {
+      const slotsResponse = await remarkedService.getSlots(
+        token,
+        period,
+        guestsCount,
+        { with_rooms: withRooms }
+      );
+
+      return res.json({
+        success: true,
+        data: {
+          slots: slotsResponse.slots,
+          date: dateStr,
+          guests_count: guestsCount,
+        },
+      });
+    } catch (error: any) {
+      console.error('Ошибка получения слотов ReMarked:', error);
+      
+      if (error.code === 400) {
+        return res.status(400).json({
+          success: false,
+          message: error.message || 'Неверные параметры запроса',
+        });
+      }
+
+      return res.status(500).json({
+        success: false,
+        message: error.message || 'Не удалось получить доступные слоты. Попробуйте позже.',
+      });
+    }
+  } catch (error: any) {
+    console.error('[booking/slots] Ошибка получения слотов:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Не удалось получить доступные слоты',
+    });
+  }
+});
+
+/**
  * Создание бронирования столика через ReMarked API
  * 
  * Тело запроса должно содержать:
