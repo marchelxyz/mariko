@@ -151,6 +151,11 @@ export default function Booking() {
     });
   };
 
+  // Выбор комбинации столов (bundle)
+  const handleBundleSelect = (tableIds: number[]) => {
+    setSelectedTableIds(tableIds);
+  };
+
   // Устанавливаем минимальную дату (сегодня)
   const getMinDate = () => {
     const today = new Date();
@@ -459,11 +464,18 @@ export default function Booking() {
                               hallSchemes={hallSchemes}
                               selectedTableIds={selectedTableIds}
                               availableTableIds={selectedSlot.tables_ids}
+                              tableBundles={selectedSlot.table_bundles}
                               onTableSelect={handleTableToggle}
+                              onBundleSelect={handleBundleSelect}
                             />
                             {selectedTableIds.length > 0 && (
                               <p className="text-xs text-gray-500 mt-3 text-center">
                                 Выбрано столов: {selectedTableIds.length}
+                                {selectedSlot.table_bundles && selectedSlot.table_bundles.length > 0 && (
+                                  <span className="block mt-1 text-blue-600">
+                                    💡 Можно выбрать готовую комбинацию столов из списка ниже
+                                  </span>
+                                )}
                               </p>
                             )}
                           </div>

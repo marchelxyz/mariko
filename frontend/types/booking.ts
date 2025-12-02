@@ -2,6 +2,23 @@
  * Типы для работы с бронированием
  */
 
+/**
+ * Комбинация столов (bundle) - группа столов, которые можно забронировать вместе
+ */
+export interface TableBundle {
+  tables: number[];           // Массив ID столов в bundle
+  total_capacity?: number;     // Общая вместимость bundle (опционально)
+}
+
+/**
+ * Информация о зале (room)
+ */
+export interface Room {
+  room_id: string | number;
+  room_name: string;
+  tables?: number[];
+}
+
 export interface Slot {
   start_stamp: number;
   end_stamp: number;
@@ -11,7 +28,8 @@ export interface Slot {
   is_free: boolean;
   tables_count?: number;
   tables_ids?: number[];
-  table_bundles?: any[];
+  table_bundles?: TableBundle[] | number[][]; // Может быть массивом массивов ID или объектов
+  rooms?: Room[];
 }
 
 export interface SlotsResponse {

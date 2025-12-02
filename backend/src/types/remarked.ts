@@ -122,6 +122,23 @@ export interface DayState {
 }
 
 /**
+ * Комбинация столов (bundle) - группа столов, которые можно забронировать вместе
+ */
+export interface TableBundle {
+  tables: number[];           // Массив ID столов в bundle (например, [330, 331])
+  total_capacity?: number;     // Общая вместимость bundle (опционально)
+}
+
+/**
+ * Информация о зале (room) - возвращается в GetSlots при with_rooms: true
+ */
+export interface Room {
+  room_id: string | number;    // ID зала
+  room_name: string;          // Название зала
+  tables?: number[];          // Массив ID столов в этом зале
+}
+
+/**
  * Временной слот
  */
 export interface Slot {
@@ -133,7 +150,8 @@ export interface Slot {
   is_free: boolean;           // Свободен ли слот
   tables_count?: number;      // Количество доступных столов
   tables_ids?: number[];      // Массив ID столов
-  table_bundles?: any[];      // Группы столов
+  table_bundles?: TableBundle[] | number[][]; // Группы столов (может быть массивом массивов ID или объектов)
+  rooms?: Room[];             // Информация о залах (если with_rooms: true и API поддерживает)
 }
 
 /**
