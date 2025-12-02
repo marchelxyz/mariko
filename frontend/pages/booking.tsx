@@ -4,6 +4,7 @@ import Layout from '@/components/Layout';
 import Header from '@/components/Header';
 import { useStore } from '@/store/useStore';
 import api from '@/lib/api';
+import { Slot, SlotsResponse } from '@/types/booking';
 
 export default function Booking() {
   const router = useRouter();
@@ -12,6 +13,12 @@ export default function Booking() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [formUrl, setFormUrl] = useState<string | null>(null);
+  
+  // Состояние для слотов и выбранного слота
+  const [slots, setSlots] = useState<Slot[]>([]);
+  const [loadingSlots, setLoadingSlots] = useState(false);
+  const [selectedSlot, setSelectedSlot] = useState<Slot | null>(null);
+  const [selectedTableIds, setSelectedTableIds] = useState<number[]>([]);
   
   const [formData, setFormData] = useState({
     name: '',
@@ -39,6 +46,75 @@ export default function Booking() {
       router.push('/');
     }
   }, [selectedRestaurant, router]);
+
+  // Загружаем слоты при изменении даты или количества гостей
+  useEffect(() => {
+    if (selectedRestaurant?.id && formData.date && formData.guests_count >= 1) {
+      loadSlots();
+    } else {
+      setSlots([]);
+      setSelectedSlot(null);
+      setSelectedTableIds([]);
+      setFormData(prev => ({ ...prev, time: '' }));
+    }
+  }, [formData.date, formData.guests_count, selectedRestaurant?.id]);
+
+  // Загрузка доступных слотов
+  const loadSlots = async () => {
+    if (!selectedRestaurant?.id || !formData.date || formData.guests_count < 1) {
+      return;
+    }
+
+    setLoadingSlots(true);
+    setError(null);
+    setSelectedSlot(null);
+    setSelectedTableIds([]);
+    setFormData(prev => ({ ...prev, time: '' }));
+
+    try {
+      const response = await api.get<SlotsResponse>('/booking/slots', {
+        params: {
+          restaurantId: selectedRestaurant.id,
+          date: formData.date,
+          guests_count: formData.guests_count,
+          with_rooms: true,
+        },
+      });
+
+      if (response.data.success) {
+        // Фильтруем только свободные слоты
+        const freeSlots = response.data.data.slots.filter(slot => slot.is_free);
+        setSlots(freeSlots);
+      }
+    } catch (error: any) {
+      console.error('Ошибка загрузки слотов:', error);
+      setSlots([]);
+      // Не показываем ошибку, просто очищаем слоты
+    } finally {
+      setLoadingSlots(false);
+    }
+  };
+
+  // Выбор слота
+  const handleSlotSelect = (slot: Slot) => {
+    setSelectedSlot(slot);
+    // Форматируем время для поля time (HH:mm)
+    const timeStr = slot.start_datetime.split(' ')[1]?.substring(0, 5) || '';
+    setFormData(prev => ({ ...prev, time: timeStr }));
+    // Сбрасываем выбранные столы при смене слота
+    setSelectedTableIds([]);
+  };
+
+  // Выбор/отмена выбора стола
+  const handleTableToggle = (tableId: number) => {
+    setSelectedTableIds(prev => {
+      if (prev.includes(tableId)) {
+        return prev.filter(id => id !== tableId);
+      } else {
+        return [...prev, tableId];
+      }
+    });
+  };
 
   // Устанавливаем минимальную дату (сегодня)
   const getMinDate = () => {
@@ -89,8 +165,8 @@ export default function Booking() {
       setError('Выберите дату');
       return false;
     }
-    if (!formData.time) {
-      setError('Выберите время');
+    if (!formData.time || !selectedSlot) {
+      setError('Выберите доступное время');
       return false;
     }
     if (formData.guests_count < 1 || formData.guests_count > 20) {
@@ -126,6 +202,8 @@ export default function Booking() {
         time: formData.time,
         guests_count: formData.guests_count,
         comment: formData.comment.trim() || undefined,
+        table_ids: selectedTableIds.length > 0 ? selectedTableIds : undefined,
+        duration: selectedSlot ? Math.round(selectedSlot.duration / 60) : undefined, // Длительность в минутах
       });
 
       if (response.data.success) {
@@ -143,6 +221,9 @@ export default function Booking() {
             guests_count: 2,
             comment: '',
           });
+          setSelectedSlot(null);
+          setSelectedTableIds([]);
+          setSlots([]);
           setSuccess(false);
           setFormUrl(null);
         }, 5000);
@@ -289,13 +370,77 @@ export default function Booking() {
                 <label className="block text-sm font-medium text-text-primary mb-1">
                   Время <span className="text-red-500">*</span>
                 </label>
-                <input
-                  type="time"
-                  value={formData.time}
-                  onChange={(e) => setFormData({ ...formData, time: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-                  required
-                />
+                {loadingSlots ? (
+                  <div className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 flex items-center justify-center">
+                    <span className="text-gray-500 text-sm">Загрузка доступного времени...</span>
+                  </div>
+                ) : slots.length === 0 && formData.date ? (
+                  <div className="w-full px-3 py-2 border border-red-300 rounded-md bg-red-50">
+                    <span className="text-red-600 text-sm">Нет доступного времени на эту дату</span>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 max-h-64 overflow-y-auto p-1">
+                      {slots.map((slot) => {
+                        const timeStr = slot.start_datetime.split(' ')[1]?.substring(0, 5) || '';
+                        const isSelected = selectedSlot?.start_stamp === slot.start_stamp;
+                        return (
+                          <button
+                            key={slot.start_stamp}
+                            type="button"
+                            onClick={() => handleSlotSelect(slot)}
+                            className={`px-3 py-2 text-sm rounded-md border transition-all ${
+                              isSelected
+                                ? 'bg-primary text-text-secondary border-primary shadow-md'
+                                : 'bg-white text-text-primary border-gray-300 hover:border-primary hover:bg-primary/5 hover:shadow-sm'
+                            }`}
+                          >
+                            <span className="font-medium">{timeStr}</span>
+                            {slot.tables_count !== undefined && slot.tables_count > 0 && (
+                              <span className={`block text-xs mt-1 ${isSelected ? 'opacity-90' : 'opacity-60'}`}>
+                                {slot.tables_count} {slot.tables_count === 1 ? 'стол' : slot.tables_count < 5 ? 'стола' : 'столов'}
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {selectedSlot && selectedSlot.tables_ids && selectedSlot.tables_ids.length > 0 && (
+                      <div className="mt-4 pt-4 border-t border-gray-200">
+                        <label className="block text-sm font-medium text-text-primary mb-2">
+                          Выберите столы (необязательно)
+                        </label>
+                        <p className="text-xs text-gray-500 mb-3">
+                          Если не выберете столы, система автоматически назначит подходящие
+                        </p>
+                        <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 max-h-48 overflow-y-auto">
+                          {selectedSlot.tables_ids.map((tableId) => {
+                            const isSelected = selectedTableIds.includes(tableId);
+                            return (
+                              <button
+                                key={tableId}
+                                type="button"
+                                onClick={() => handleTableToggle(tableId)}
+                                className={`px-3 py-2 text-sm rounded-md border transition-all ${
+                                  isSelected
+                                    ? 'bg-primary text-text-secondary border-primary shadow-md'
+                                    : 'bg-white text-text-primary border-gray-300 hover:border-primary hover:bg-primary/5 hover:shadow-sm'
+                                }`}
+                              >
+                                Стол {tableId}
+                              </button>
+                            );
+                          })}
+                        </div>
+                        {selectedTableIds.length > 0 && (
+                          <p className="text-xs text-gray-500 mt-2">
+                            Выбрано столов: {selectedTableIds.length}
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
 
