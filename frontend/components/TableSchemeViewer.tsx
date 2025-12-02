@@ -108,7 +108,11 @@ export default function TableSchemeViewer({
   const [error, setError] = useState<string | null>(null);
   const [selectedRoomId, setSelectedRoomId] = useState<number | null>(null);
   const [zoom, setZoom] = useState(1);
+  const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
+  const [isPanning, setIsPanning] = useState(false);
+  const [panStart, setPanStart] = useState({ x: 0, y: 0 });
   const mapRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   // Загружаем данные о столах
   useEffect(() => {
@@ -156,6 +160,60 @@ export default function TableSchemeViewer({
     const innerWidth = window.innerWidth;
     setZoom(innerWidth < 600 ? mobileZoom : desktopZoom);
   }, [mobileZoom, desktopZoom]);
+
+  // Обработчики для pan (перемещения)
+  const handleMouseDown = (e: React.MouseEvent) => {
+    // Игнорируем клики по столам
+    if ((e.target as HTMLElement).closest('.table-element')) {
+      return;
+    }
+    setIsPanning(true);
+    setPanStart({ x: e.clientX - panOffset.x, y: e.clientY - panOffset.y });
+    e.preventDefault();
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isPanning) return;
+    setPanOffset({
+      x: e.clientX - panStart.x,
+      y: e.clientY - panStart.y,
+    });
+  };
+
+  const handleMouseUp = () => {
+    setIsPanning(false);
+  };
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    // Игнорируем касания по столам
+    if ((e.target as HTMLElement).closest('.table-element')) {
+      return;
+    }
+    if (e.touches.length === 1) {
+      setIsPanning(true);
+      setPanStart({
+        x: e.touches[0].clientX - panOffset.x,
+        y: e.touches[0].clientY - panOffset.y,
+      });
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!isPanning || e.touches.length !== 1) return;
+    setPanOffset({
+      x: e.touches[0].clientX - panStart.x,
+      y: e.touches[0].clientY - panStart.y,
+    });
+  };
+
+  const handleTouchEnd = () => {
+    setIsPanning(false);
+  };
+
+  // Сброс pan при смене зала
+  useEffect(() => {
+    setPanOffset({ x: 0, y: 0 });
+  }, [selectedRoomId]);
 
   if (loading) {
     return (
@@ -336,7 +394,21 @@ export default function TableSchemeViewer({
       </div>
 
       {/* Схема зала */}
-      <div className="relative bg-gray-50 rounded-lg overflow-hidden border-2 border-gray-200">
+      <div 
+        ref={containerRef}
+        className="relative bg-gray-50 rounded-lg overflow-hidden border-2 border-gray-200"
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseUp}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        style={{
+          cursor: isPanning ? 'grabbing' : 'grab',
+          touchAction: 'none',
+        }}
+      >
         <div
           ref={mapRef}
           className="relative"
@@ -344,6 +416,8 @@ export default function TableSchemeViewer({
             zoom: zoom,
             minHeight: '400px',
             transformOrigin: 'top left',
+            transform: `translate(${panOffset.x}px, ${panOffset.y}px)`,
+            transition: isPanning ? 'none' : 'transform 0.1s ease-out',
           }}
         >
           {/* Элементы интерьера */}
@@ -352,7 +426,7 @@ export default function TableSchemeViewer({
             .map((interior) => (
               <div
                 key={interior.id}
-                className="absolute"
+                className="absolute table-element"
                 style={{
                   left: `${interior.left_offset}px`,
                   top: `${interior.top_offset}px`,
@@ -376,7 +450,7 @@ export default function TableSchemeViewer({
             return (
               <div
                 key={table.id}
-                className={`absolute ${statusClasses[status]}`}
+                className={`absolute table-element ${statusClasses[status]}`}
                 style={{
                   left: `${table.left}px`,
                   top: `${table.top}px`,
