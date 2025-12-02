@@ -2,9 +2,10 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Layout from '@/components/Layout';
 import Header from '@/components/Header';
+import HallSchemeViewer from '@/components/HallSchemeViewer';
 import { useStore } from '@/store/useStore';
 import api from '@/lib/api';
-import { Slot, SlotsResponse } from '@/types/booking';
+import { Slot, SlotsResponse, HallScheme, HallSchemesResponse } from '@/types/booking';
 
 export default function Booking() {
   const router = useRouter();
@@ -19,6 +20,10 @@ export default function Booking() {
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState<Slot | null>(null);
   const [selectedTableIds, setSelectedTableIds] = useState<number[]>([]);
+  
+  // Состояние для схем залов
+  const [hallSchemes, setHallSchemes] = useState<HallScheme[]>([]);
+  const [loadingHallSchemes, setLoadingHallSchemes] = useState(false);
   
   const [formData, setFormData] = useState({
     name: '',
@@ -47,6 +52,15 @@ export default function Booking() {
     }
   }, [selectedRestaurant, router]);
 
+  // Загружаем схемы залов при выборе ресторана
+  useEffect(() => {
+    if (selectedRestaurant?.id) {
+      loadHallSchemes();
+    } else {
+      setHallSchemes([]);
+    }
+  }, [selectedRestaurant?.id]);
+
   // Загружаем слоты при изменении даты или количества гостей
   useEffect(() => {
     if (selectedRestaurant?.id && formData.date && formData.guests_count >= 1) {
@@ -58,6 +72,27 @@ export default function Booking() {
       setFormData(prev => ({ ...prev, time: '' }));
     }
   }, [formData.date, formData.guests_count, selectedRestaurant?.id]);
+
+  // Загрузка схем залов
+  const loadHallSchemes = async () => {
+    if (!selectedRestaurant?.id) {
+      return;
+    }
+
+    setLoadingHallSchemes(true);
+    try {
+      const response = await api.get<HallSchemesResponse>(`/restaurants/${selectedRestaurant.id}/hall-schemes`);
+      if (response.data.success) {
+        setHallSchemes(response.data.data.hallSchemes);
+      }
+    } catch (error: any) {
+      console.error('Ошибка загрузки схем залов:', error);
+      setHallSchemes([]);
+      // Не показываем ошибку, просто очищаем схемы
+    } finally {
+      setLoadingHallSchemes(false);
+    }
+  };
 
   // Загрузка доступных слотов
   const loadSlots = async () => {
@@ -411,28 +446,51 @@ export default function Booking() {
                           Выберите столы (необязательно)
                         </label>
                         <p className="text-xs text-gray-500 mb-3">
-                          Если не выберете столы, система автоматически назначит подходящие
+                          {hallSchemes.length > 0 
+                            ? 'Выберите столы на схеме зала. Если не выберете столы, система автоматически назначит подходящие.'
+                            : 'Если не выберете столы, система автоматически назначит подходящие'
+                          }
                         </p>
-                        <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 max-h-48 overflow-y-auto">
-                          {selectedSlot.tables_ids.map((tableId) => {
-                            const isSelected = selectedTableIds.includes(tableId);
-                            return (
-                              <button
-                                key={tableId}
-                                type="button"
-                                onClick={() => handleTableToggle(tableId)}
-                                className={`px-3 py-2 text-sm rounded-md border transition-all ${
-                                  isSelected
-                                    ? 'bg-primary text-text-secondary border-primary shadow-md'
-                                    : 'bg-white text-text-primary border-gray-300 hover:border-primary hover:bg-primary/5 hover:shadow-sm'
-                                }`}
-                              >
-                                Стол {tableId}
-                              </button>
-                            );
-                          })}
-                        </div>
-                        {selectedTableIds.length > 0 && (
+                        
+                        {/* Схема зала, если доступна */}
+                        {hallSchemes.length > 0 ? (
+                          <div className="mt-4">
+                            <HallSchemeViewer
+                              hallSchemes={hallSchemes}
+                              selectedTableIds={selectedTableIds}
+                              availableTableIds={selectedSlot.tables_ids}
+                              onTableSelect={handleTableToggle}
+                            />
+                            {selectedTableIds.length > 0 && (
+                              <p className="text-xs text-gray-500 mt-3 text-center">
+                                Выбрано столов: {selectedTableIds.length}
+                              </p>
+                            )}
+                          </div>
+                        ) : (
+                          /* Старый способ выбора столов (список), если схемы нет */
+                          <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 max-h-48 overflow-y-auto">
+                            {selectedSlot.tables_ids.map((tableId) => {
+                              const isSelected = selectedTableIds.includes(tableId);
+                              return (
+                                <button
+                                  key={tableId}
+                                  type="button"
+                                  onClick={() => handleTableToggle(tableId)}
+                                  className={`px-3 py-2 text-sm rounded-md border transition-all ${
+                                    isSelected
+                                      ? 'bg-primary text-text-secondary border-primary shadow-md'
+                                      : 'bg-white text-text-primary border-gray-300 hover:border-primary hover:bg-primary/5 hover:shadow-sm'
+                                  }`}
+                                >
+                                  Стол {tableId}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
+                        
+                        {selectedTableIds.length > 0 && hallSchemes.length === 0 && (
                           <p className="text-xs text-gray-500 mt-2">
                             Выбрано столов: {selectedTableIds.length}
                           </p>

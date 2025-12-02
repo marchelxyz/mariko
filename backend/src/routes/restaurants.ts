@@ -83,4 +83,37 @@ router.get('/:id', async (req: Request, res: Response) => {
   }
 });
 
+/**
+ * Получение схем залов для ресторана
+ * GET /restaurants/:id/hall-schemes
+ */
+router.get('/:id/hall-schemes', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    
+    const restaurantRepository = AppDataSource.getRepository(Restaurant);
+    const restaurant = await restaurantRepository.findOne({
+      where: { id },
+      select: ['id', 'name', 'hallSchemes'], // Получаем только нужные поля
+    });
+    
+    if (!restaurant) {
+      res.status(404).json({ success: false, message: 'Restaurant not found' });
+      return;
+    }
+    
+    res.json({ 
+      success: true, 
+      data: {
+        restaurantId: restaurant.id,
+        restaurantName: restaurant.name,
+        hallSchemes: restaurant.hallSchemes || [],
+      },
+    });
+  } catch (error) {
+    console.error('Error fetching hall schemes:', error);
+    res.status(500).json({ success: false, message: 'Failed to fetch hall schemes' });
+  }
+});
+
 export default router;
