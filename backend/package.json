@@ -9,7 +9,8 @@
     "start:pm2": "pm2 start dist/index.js -i 4 --name mariko-backend",
     "lint": "eslint src --ext .ts",
     "add-restaurants": "tsx scripts/add-restaurants.ts",
-    "geocode-restaurants": "tsx scripts/geocode-restaurants.ts"
+    "geocode-restaurants": "tsx scripts/geocode-restaurants.ts",
+    "setup-zhukovsky-hall": "tsx scripts/setup-zhukovsky-hall-scheme.ts"
   },
   "dependencies": {
     "@types/node-cron": "^3.0.11",
