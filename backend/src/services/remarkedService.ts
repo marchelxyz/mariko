@@ -66,11 +66,14 @@ export class RemarkedService {
     data: any
   ): Promise<T> {
     const url = `${this.baseUrl}${endpoint}`;
+    const method = data.method || 'unknown';
+    const startTime = Date.now();
     
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), this.timeout);
 
     try {
+      const fetchStartTime = Date.now();
       const response = await fetch(url, {
         method: 'POST',
         headers: {
@@ -79,21 +82,45 @@ export class RemarkedService {
         body: JSON.stringify(data),
         signal: controller.signal,
       });
+      const fetchTime = Date.now() - fetchStartTime;
 
       clearTimeout(timeoutId);
 
       if (!response.ok) {
+        const parseStartTime = Date.now();
         const errorData = await response.json().catch(() => ({}));
+        const parseTime = Date.now() - parseStartTime;
+        const totalTime = Date.now() - startTime;
+        
+        if (totalTime > 1000) {
+          console.warn(`[ReMarked API] Медленный запрос ${method}: ${totalTime}ms (fetch: ${fetchTime}ms, parse: ${parseTime}ms, status: ${response.status})`);
+        }
+        
         throw this.createError(response.status, errorData);
       }
 
+      const parseStartTime = Date.now();
       const result = await response.json();
+      const parseTime = Date.now() - parseStartTime;
+      const totalTime = Date.now() - startTime;
+      
+      // Логируем медленные запросы (>1 секунды)
+      if (totalTime > 1000) {
+        console.warn(`[ReMarked API] Медленный запрос ${method}: ${totalTime}ms (fetch: ${fetchTime}ms, parse: ${parseTime}ms)`);
+      }
+      
       return result as T;
     } catch (error: any) {
       clearTimeout(timeoutId);
+      const totalTime = Date.now() - startTime;
       
       if (error.name === 'AbortError') {
+        console.error(`[ReMarked API] Timeout для ${method} после ${totalTime}ms (лимит: ${this.timeout}ms)`);
         throw new Error('Request timeout');
+      }
+      
+      if (totalTime > 1000) {
+        console.error(`[ReMarked API] Ошибка в медленном запросе ${method}: ${totalTime}ms`, error.message);
       }
       
       throw error;
