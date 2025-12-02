@@ -72,6 +72,27 @@ export class Restaurant {
   @Column({ nullable: true })
   remarkedPointId?: number;
 
+  // Схемы залов для бронирования
+  // Структура: массив залов, каждый содержит название, изображение и позиции столов
+  @Column({ type: 'jsonb', nullable: true })
+  hallSchemes?: Array<{
+    roomId: string;                    // ID зала в ReMarked (строка, т.к. может быть числом или строкой)
+    roomName: string;                  // Название зала
+    imageUrl?: string;                  // URL изображения схемы зала (опционально)
+    width?: number;                     // Ширина схемы в пикселях (для масштабирования)
+    height?: number;                    // Высота схемы в пикселях (для масштабирования)
+    tables: Array<{                    // Массив столов в зале
+      tableId: number;                  // ID стола в ReMarked
+      tableNumber: string;              // Номер стола (для отображения)
+      x: number;                        // Позиция X на схеме (в процентах или пикселях)
+      y: number;                        // Позиция Y на схеме (в процентах или пикселях)
+      capacity?: number;                // Вместимость стола (опционально)
+      shape?: 'circle' | 'rectangle';  // Форма стола (опционально)
+      width?: number;                   // Ширина стола (опционально)
+      height?: number;                  // Высота стола (опционально)
+    }>;
+  }>;
+
   @CreateDateColumn()
   createdAt!: Date;
 
