@@ -20,6 +20,9 @@ export default function VerticalBanners({ restaurantId, initialBanners }: Vertic
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const bannerRef = useRef<HTMLDivElement>(null);
+  const touchStartY = useRef<number | null>(null);
+  const touchEndY = useRef<number | null>(null);
+  const autoSlideIntervalRef = useRef<NodeJS.Timeout | null>(null);
   
   // Фиксированные размеры: высота двух кнопок (120px каждая) + gap (12px) = 252px
   const BANNER_HEIGHT = 252;
@@ -81,20 +84,86 @@ export default function VerticalBanners({ restaurantId, initialBanners }: Vertic
     loadBanners();
   }, [restaurantId, bannersByRestaurant, initialBanners, setBannersForRestaurant]);
 
+  // Функция для сброса и перезапуска автоматического переключения
+  const resetAutoSlide = () => {
+    if (autoSlideIntervalRef.current) {
+      clearInterval(autoSlideIntervalRef.current);
+    }
+    if (banners.length <= 1) return;
+    
+    autoSlideIntervalRef.current = setInterval(() => {
+      setCurrentIndex((prevIndex) => (prevIndex + 1) % banners.length);
+    }, 5000);
+  };
+
   // Автоматическое переключение слайдов
   useEffect(() => {
     if (banners.length <= 1) return;
-
-    const interval = setInterval(() => {
+    
+    if (autoSlideIntervalRef.current) {
+      clearInterval(autoSlideIntervalRef.current);
+    }
+    
+    autoSlideIntervalRef.current = setInterval(() => {
       setCurrentIndex((prevIndex) => (prevIndex + 1) % banners.length);
-    }, 5000); // Переключение каждые 5 секунд
+    }, 5000);
 
-    return () => clearInterval(interval);
+    return () => {
+      if (autoSlideIntervalRef.current) {
+        clearInterval(autoSlideIntervalRef.current);
+      }
+    };
   }, [banners.length]);
 
   // Обработка клика на индикатор
   const goToSlide = (index: number) => {
     setCurrentIndex(index);
+    resetAutoSlide(); // Сбрасываем таймер при ручном переключении
+  };
+
+  // Переход к следующему слайду
+  const nextSlide = () => {
+    setCurrentIndex((prevIndex) => (prevIndex + 1) % banners.length);
+    resetAutoSlide();
+  };
+
+  // Переход к предыдущему слайду
+  const prevSlide = () => {
+    setCurrentIndex((prevIndex) => (prevIndex - 1 + banners.length) % banners.length);
+    resetAutoSlide();
+  };
+
+  // Обработка начала касания
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartY.current = e.touches[0].clientY;
+  };
+
+  // Обработка окончания касания
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    touchEndY.current = e.changedTouches[0].clientY;
+    handleSwipe();
+  };
+
+  // Определение направления свайпа
+  const handleSwipe = () => {
+    if (!touchStartY.current || !touchEndY.current) return;
+    
+    const distance = touchStartY.current - touchEndY.current;
+    const minSwipeDistance = 50; // Минимальное расстояние для свайпа
+
+    if (Math.abs(distance) > minSwipeDistance) {
+      if (distance > 0) {
+        // Свайп вверх - следующий слайд
+        nextSlide();
+      } else {
+        // Свайп вниз - предыдущий слайд
+        prevSlide();
+      }
+    }
+
+    // Сбрасываем значения
+    touchStartY.current = null;
+    touchEndY.current = null;
   };
 
   if (isLoading || banners.length === 0) {
@@ -114,7 +183,34 @@ export default function VerticalBanners({ restaurantId, initialBanners }: Vertic
           minWidth: `${BANNER_WIDTH}px`,
           maxWidth: `${BANNER_WIDTH}px`
         }}
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
       >
+        {/* Кнопка "Вверх" */}
+        {banners.length > 1 && (
+          <button
+            onClick={prevSlide}
+            className="absolute top-2 left-1/2 -translate-x-1/2 z-20 bg-black/50 hover:bg-black/70 text-white rounded-full p-1.5 transition-all duration-200 flex items-center justify-center"
+            aria-label="Предыдущий слайд"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M18 15l-6-6-6 6" />
+            </svg>
+          </button>
+        )}
+
+        {/* Кнопка "Вниз" */}
+        {banners.length > 1 && (
+          <button
+            onClick={nextSlide}
+            className="absolute bottom-2 left-1/2 -translate-x-1/2 z-20 bg-black/50 hover:bg-black/70 text-white rounded-full p-1.5 transition-all duration-200 flex items-center justify-center"
+            aria-label="Следующий слайд"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M6 9l6 6 6-6" />
+            </svg>
+          </button>
+        )}
         <div
           className="flex transition-transform duration-500 ease-in-out h-full"
           style={{

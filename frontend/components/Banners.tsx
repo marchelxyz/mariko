@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import Image from 'next/image';
 import { useStore } from '@/store/useStore';
 import api from '@/lib/api';
@@ -19,6 +19,9 @@ export default function Banners({ restaurantId, initialBanners }: BannersProps) 
   const { bannersByRestaurant, setBannersForRestaurant } = useStore();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
+  const touchStartX = useRef<number | null>(null);
+  const touchEndX = useRef<number | null>(null);
+  const autoSlideIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // Получаем баннеры из кэша для конкретного ресторана
   // Используем ключ с префиксом для горизонтальных баннеров
@@ -72,20 +75,86 @@ export default function Banners({ restaurantId, initialBanners }: BannersProps) 
     loadBanners();
   }, [restaurantId, bannersByRestaurant, initialBanners, setBannersForRestaurant]);
 
+  // Функция для сброса и перезапуска автоматического переключения
+  const resetAutoSlide = () => {
+    if (autoSlideIntervalRef.current) {
+      clearInterval(autoSlideIntervalRef.current);
+    }
+    if (banners.length <= 1) return;
+    
+    autoSlideIntervalRef.current = setInterval(() => {
+      setCurrentIndex((prevIndex) => (prevIndex + 1) % banners.length);
+    }, 5000);
+  };
+
   // Автоматическое переключение слайдов
   useEffect(() => {
     if (banners.length <= 1) return;
-
-    const interval = setInterval(() => {
+    
+    if (autoSlideIntervalRef.current) {
+      clearInterval(autoSlideIntervalRef.current);
+    }
+    
+    autoSlideIntervalRef.current = setInterval(() => {
       setCurrentIndex((prevIndex) => (prevIndex + 1) % banners.length);
-    }, 5000); // Переключение каждые 5 секунд
+    }, 5000);
 
-    return () => clearInterval(interval);
+    return () => {
+      if (autoSlideIntervalRef.current) {
+        clearInterval(autoSlideIntervalRef.current);
+      }
+    };
   }, [banners.length]);
 
   // Обработка клика на индикатор
   const goToSlide = (index: number) => {
     setCurrentIndex(index);
+    resetAutoSlide(); // Сбрасываем таймер при ручном переключении
+  };
+
+  // Переход к следующему слайду
+  const nextSlide = () => {
+    setCurrentIndex((prevIndex) => (prevIndex + 1) % banners.length);
+    resetAutoSlide();
+  };
+
+  // Переход к предыдущему слайду
+  const prevSlide = () => {
+    setCurrentIndex((prevIndex) => (prevIndex - 1 + banners.length) % banners.length);
+    resetAutoSlide();
+  };
+
+  // Обработка начала касания
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX;
+  };
+
+  // Обработка окончания касания
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    touchEndX.current = e.changedTouches[0].clientX;
+    handleSwipe();
+  };
+
+  // Определение направления свайпа
+  const handleSwipe = () => {
+    if (!touchStartX.current || !touchEndX.current) return;
+    
+    const distance = touchStartX.current - touchEndX.current;
+    const minSwipeDistance = 50; // Минимальное расстояние для свайпа
+
+    if (Math.abs(distance) > minSwipeDistance) {
+      if (distance > 0) {
+        // Свайп влево - следующий слайд
+        nextSlide();
+      } else {
+        // Свайп вправо - предыдущий слайд
+        prevSlide();
+      }
+    }
+
+    // Сбрасываем значения
+    touchStartX.current = null;
+    touchEndX.current = null;
   };
 
   if (isLoading || banners.length === 0) {
@@ -94,7 +163,37 @@ export default function Banners({ restaurantId, initialBanners }: BannersProps) 
 
   return (
     <div className="relative w-full">
-      <div className="overflow-hidden rounded-[15px] relative">
+      <div 
+        className="overflow-hidden rounded-[15px] relative"
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+      >
+        {/* Кнопка "Назад" */}
+        {banners.length > 1 && (
+          <button
+            onClick={prevSlide}
+            className="absolute left-2 top-1/2 -translate-y-1/2 z-20 bg-black/50 hover:bg-black/70 text-white rounded-full p-2 transition-all duration-200 flex items-center justify-center"
+            aria-label="Предыдущий слайд"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M15 18l-6-6 6-6" />
+            </svg>
+          </button>
+        )}
+
+        {/* Кнопка "Вперед" */}
+        {banners.length > 1 && (
+          <button
+            onClick={nextSlide}
+            className="absolute right-2 top-1/2 -translate-y-1/2 z-20 bg-black/50 hover:bg-black/70 text-white rounded-full p-2 transition-all duration-200 flex items-center justify-center"
+            aria-label="Следующий слайд"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M9 18l6-6-6-6" />
+            </svg>
+          </button>
+        )}
+
         <div
           className="flex transition-transform duration-500 ease-in-out"
           style={{
