@@ -59,6 +59,8 @@ export default function MenuBlock({ restaurantId, initialMenuItems }: MenuBlockP
   const [selectedDish, setSelectedDish] = useState<MenuItem | null>(null);
   const fetchAbortControllerRef = useRef<AbortController | null>(null);
   const previousRestaurantIdRef = useRef<string | undefined>(undefined);
+  // Отслеживаем, для какого ресторана были загружены initialMenuItems
+  const initialMenuItemsRestaurantIdRef = useRef<string | undefined>(undefined);
   
   // Мемоизируем текущий ID ресторана
   const currentRestaurantId = useMemo(
@@ -131,8 +133,20 @@ export default function MenuBlock({ restaurantId, initialMenuItems }: MenuBlockP
   );
 
   // Используем предзагруженные элементы меню только если они соответствуют текущему ресторану
+  // Важно: initialMenuItems используются только при первой загрузке компонента
+  // При смене ресторана всегда используем кэш или загружаем заново
   const shouldUseInitialMenuItems = useMemo(
-    () => validInitialMenuItems.length > 0 && (!currentRestaurantId || cachedMenuItems.length === 0),
+    () => {
+      // Используем initialMenuItems только если:
+      // 1. Они есть
+      // 2. Они соответствуют текущему ресторану (проверяется через ref в useEffect)
+      // 3. Нет данных в кэше для текущего ресторана
+      const initialMatchesCurrent = !currentRestaurantId || 
+        initialMenuItemsRestaurantIdRef.current === currentRestaurantId;
+      return validInitialMenuItems.length > 0 && 
+        initialMatchesCurrent && 
+        cachedMenuItems.length === 0;
+    },
     [validInitialMenuItems.length, currentRestaurantId, cachedMenuItems.length]
   );
 
@@ -184,6 +198,11 @@ export default function MenuBlock({ restaurantId, initialMenuItems }: MenuBlockP
       fetchAbortControllerRef.current = null;
     }
 
+    // Если ресторан изменился, сбрасываем ссылку на initialMenuItems
+    if (previousRestaurantIdRef.current !== currentRestaurantId && previousRestaurantIdRef.current !== undefined) {
+      initialMenuItemsRestaurantIdRef.current = undefined;
+    }
+
     previousRestaurantIdRef.current = currentRestaurantId;
 
     if (!currentRestaurantId) {
@@ -203,8 +222,12 @@ export default function MenuBlock({ restaurantId, initialMenuItems }: MenuBlockP
     }
 
     // Если есть initialMenuItems для текущего ресторана, сохраняем их и не делаем запрос
-    if (validInitialMenuItems.length > 0 && !cachedItems) {
-      // Сохраняем initialMenuItems в store
+    // Используем initialMenuItems только при первой загрузке компонента
+    const isFirstLoad = previousRestaurantIdRef.current === undefined;
+    if (validInitialMenuItems.length > 0 && !cachedItems && isFirstLoad) {
+      // При первой загрузке сохраняем initialMenuItems в store для текущего ресторана
+      // Отслеживаем, для какого ресторана были загружены initialMenuItems
+      initialMenuItemsRestaurantIdRef.current = currentRestaurantId;
       setMenuItems(validInitialMenuItems, currentRestaurantId);
       setIsLoading(false);
       setError(null);
